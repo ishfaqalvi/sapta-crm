@@ -1,0 +1,808 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Vantage — Agency Operations Hub</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@500;600;700;800&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --navy-950:#0B1330;
+    --navy-900:#111B45;
+    --navy-800:#1B285F;
+    --navy-700:#28376F;
+    --slate-bg:#EEF1F8;
+    --card:#FFFFFF;
+    --line:#E3E7F1;
+    --ink:#131A33;
+    --sub:#5B6480;
+    --teal:#0E9C97;
+    --teal-bg:#E4F7F5;
+    --amber:#B8790A;
+    --amber-bg:#FCF0DA;
+    --coral:#D6455A;
+    --coral-bg:#FCE7EA;
+    --violet:#6C4FD1;
+    --violet-bg:#EEE9FB;
+    --thread:#0E9C97;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    background:var(--slate-bg);
+    color:var(--ink);
+    font-family:'Inter',sans-serif;
+    font-size:14px;
+    -webkit-font-smoothing:antialiased;
+  }
+  h1,h2,h3,.display{font-family:'Sora',sans-serif;}
+  .mono{font-family:'JetBrains Mono',monospace;}
+
+  /* ---------- Shell ---------- */
+  .shell{display:flex;min-height:100vh;}
+
+  /* ---------- Sidebar ---------- */
+  .sidebar{
+    width:236px;
+    flex-shrink:0;
+    background:linear-gradient(180deg,var(--navy-950) 0%, var(--navy-900) 100%);
+    color:#C9CEE6;
+    padding:22px 16px;
+    position:sticky;
+    top:0;
+    height:100vh;
+    display:flex;
+    flex-direction:column;
+    gap:6px;
+  }
+  .brand{
+    display:flex;align-items:center;gap:10px;
+    padding:4px 8px 20px 8px;
+    color:#fff;
+  }
+  .brand-mark{
+    width:34px;height:34px;border-radius:9px;
+    background:linear-gradient(135deg,var(--teal),#1FD3C9);
+    display:flex;align-items:center;justify-content:center;
+    font-family:'Sora';font-weight:800;font-size:15px;color:var(--navy-950);
+  }
+  .brand-name{font-family:'Sora';font-weight:700;font-size:16.5px;letter-spacing:0.2px;}
+  .brand-sub{font-size:10.5px;color:#7C86AD;letter-spacing:0.5px;text-transform:uppercase;margin-top:1px;}
+
+  .nav-group-label{
+    font-size:10.5px;text-transform:uppercase;letter-spacing:0.8px;
+    color:#5C6690;margin:16px 10px 6px;font-weight:600;
+  }
+  .nav-item{
+    display:flex;align-items:center;gap:10px;
+    padding:9px 12px;border-radius:9px;
+    cursor:pointer;font-size:13.5px;font-weight:500;
+    color:#B4BBDD;
+    transition:background .15s, color .15s;
+    user-select:none;
+  }
+  .nav-item svg{flex-shrink:0;opacity:0.85;}
+  .nav-item:hover{background:rgba(255,255,255,0.06);color:#fff;}
+  .nav-item.active{background:rgba(14,156,151,0.18);color:#fff;box-shadow:inset 3px 0 0 var(--teal);}
+  .sidebar-foot{
+    margin-top:auto;padding:12px 10px;border-top:1px solid rgba(255,255,255,0.08);
+    font-size:11px;color:#5C6690;
+  }
+
+  /* ---------- Main ---------- */
+  .main{flex:1;min-width:0;}
+  .topbar{
+    position:sticky;top:0;z-index:5;
+    background:rgba(238,241,248,0.92);
+    backdrop-filter:blur(6px);
+    padding:18px 28px 12px;
+    border-bottom:1px solid var(--line);
+  }
+  .topbar-title{font-family:'Sora';font-weight:700;font-size:21px;color:var(--navy-950);}
+  .topbar-desc{font-size:12.5px;color:var(--sub);margin-top:2px;}
+  .content{padding:22px 28px 60px;}
+  .view{display:none;}
+  .view.active{display:block;animation:fade .25s ease;}
+  @keyframes fade{from{opacity:0;transform:translateY(4px);}to{opacity:1;transform:none;}}
+
+  /* ---------- Stat cards ---------- */
+  .stat-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-bottom:20px;}
+  .stat-card{
+    background:var(--card);border:1px solid var(--line);border-radius:12px;
+    padding:14px 16px;display:flex;flex-direction:column;gap:6px;
+  }
+  .stat-top{display:flex;align-items:center;justify-content:space-between;}
+  .stat-icon{width:30px;height:30px;border-radius:8px;display:flex;align-items:center;justify-content:center;}
+  .stat-value{font-family:'Sora';font-weight:700;font-size:22px;color:var(--navy-950);}
+  .stat-label{font-size:11.5px;color:var(--sub);}
+
+  /* ---------- Card / table wrapper ---------- */
+  .panel{
+    background:var(--card);border:1px solid var(--line);border-radius:14px;
+    margin-bottom:22px;overflow:hidden;
+  }
+  .panel-head{
+    display:flex;align-items:center;justify-content:space-between;
+    padding:16px 18px 12px;border-bottom:1px solid var(--line);
+    flex-wrap:wrap;gap:10px;
+  }
+  .panel-head-l{display:flex;align-items:center;gap:10px;}
+  .panel-icon{
+    width:32px;height:32px;border-radius:8px;background:var(--navy-900);
+    display:flex;align-items:center;justify-content:center;color:#fff;flex-shrink:0;
+  }
+  .panel-title{font-family:'Sora';font-weight:700;font-size:15px;color:var(--navy-950);}
+  .panel-desc{font-size:11.5px;color:var(--sub);margin-top:1px;}
+  .search-box{
+    display:flex;align-items:center;gap:6px;
+    border:1px solid var(--line);border-radius:8px;padding:6px 10px;
+    background:#F8FAFD;min-width:200px;
+  }
+  .search-box input{border:none;background:transparent;outline:none;font-size:12.5px;width:100%;font-family:'Inter';color:var(--ink);}
+
+  .table-scroll{overflow-x:auto;}
+  table{width:100%;border-collapse:collapse;font-size:12.8px;}
+  thead th{
+    text-align:left;background:var(--navy-900);color:#EAF0FF;
+    padding:10px 14px;font-weight:600;font-size:11.5px;
+    letter-spacing:0.3px;text-transform:uppercase;white-space:nowrap;
+  }
+  tbody td{padding:10px 14px;border-bottom:1px solid var(--line);white-space:nowrap;color:var(--ink);}
+  tbody tr:last-child td{border-bottom:none;}
+  tbody tr{transition:background .15s, opacity .2s;}
+  tbody tr:hover{background:#F7F9FE;}
+  tbody tr.dim{opacity:0.32;}
+  tbody tr.thread-lit{background:var(--teal-bg) !important;}
+
+  .badge{
+    display:inline-flex;align-items:center;gap:5px;
+    padding:3px 9px;border-radius:99px;font-size:11px;font-weight:600;white-space:nowrap;
+  }
+  .b-active,.b-enabled,.b-completed,.b-cleared{background:var(--teal-bg);color:var(--teal);}
+  .b-pending,.b-notenabled,.b-duepending,.b-paused,.b-onhold{background:var(--amber-bg);color:var(--amber);}
+  .b-inactive,.b-stopped,.b-overdue,.b-expiring{background:var(--coral-bg);color:var(--coral);}
+  .b-progress,.b-processing{background:var(--violet-bg);color:var(--violet);}
+  .b-na{background:#EEF0F5;color:#8A92AD;}
+
+  .platform-chip{display:inline-flex;align-items:center;gap:6px;font-weight:600;color:var(--navy-800);}
+  .platform-dot{width:16px;height:16px;border-radius:5px;display:inline-flex;align-items:center;justify-content:center;color:#fff;font-size:9px;flex-shrink:0;}
+
+  .pw-cell{display:flex;align-items:center;gap:8px;}
+  .pw-eye{cursor:pointer;color:var(--sub);border:none;background:none;padding:2px;display:flex;}
+  .pw-eye:hover{color:var(--navy-900);}
+
+  .skill-chip{
+    display:inline-block;background:#EEF1FA;color:var(--navy-800);
+    padding:2px 8px;border-radius:6px;font-size:10.8px;font-weight:600;margin:0 3px 3px 0;
+  }
+  .avatar{
+    width:26px;height:26px;border-radius:50%;
+    background:linear-gradient(135deg,var(--teal),var(--navy-700));
+    color:#fff;display:inline-flex;align-items:center;justify-content:center;
+    font-size:10.5px;font-weight:700;margin-right:8px;vertical-align:middle;
+  }
+  .progress-track{width:90px;height:6px;border-radius:99px;background:#E7EAF3;overflow:hidden;display:inline-block;vertical-align:middle;margin-right:8px;}
+  .progress-fill{height:100%;border-radius:99px;background:var(--teal);}
+  .client-link{color:var(--navy-800);font-weight:700;cursor:pointer;text-decoration:none;border-bottom:1.5px dashed transparent;}
+  .client-link:hover{border-bottom-color:var(--teal);}
+  .id-pill{font-family:'JetBrains Mono';font-size:11px;background:#F1F3FA;padding:2px 7px;border-radius:6px;color:var(--navy-800);font-weight:600;}
+
+  .note-banner{
+    display:flex;align-items:flex-start;gap:10px;
+    background:var(--teal-bg);border:1px solid #BFE7E3;color:#0B6B67;
+    border-radius:10px;padding:11px 14px;font-size:12px;margin-bottom:18px;
+  }
+  .thread-banner{
+    display:flex;align-items:center;gap:10px;flex-wrap:wrap;
+    background:var(--navy-900);color:#fff;border-radius:12px;padding:14px 18px;margin-bottom:20px;
+  }
+  .thread-banner .tb-title{font-family:'Sora';font-weight:700;font-size:14px;}
+  .thread-banner .tb-desc{font-size:11.5px;color:#AEB6DD;}
+  .clear-thread{
+    margin-left:auto;background:rgba(255,255,255,0.12);border:1px solid rgba(255,255,255,0.2);
+    color:#fff;padding:6px 12px;border-radius:8px;font-size:11.5px;font-weight:600;cursor:pointer;
+  }
+  .clear-thread:hover{background:rgba(255,255,255,0.2);}
+
+  .action-btn{border:none;background:none;color:var(--sub);cursor:pointer;padding:4px;display:inline-flex;}
+  .action-btn:hover{color:var(--navy-900);}
+
+  section.grid-2{display:grid;grid-template-columns:1fr 1fr;gap:22px;}
+  @media (max-width:1180px){section.grid-2{grid-template-columns:1fr;}}
+
+  ::-webkit-scrollbar{height:8px;width:8px;}
+  ::-webkit-scrollbar-thumb{background:#C9CFE3;border-radius:99px;}
+
+  @media (max-width:900px){
+    .sidebar{position:fixed;left:-260px;z-index:20;transition:left .2s;}
+    .sidebar.open{left:0;}
+    .content{padding:16px;}
+  }
+</style>
+</head>
+<body>
+<div class="shell">
+
+  <!-- SIDEBAR -->
+  <div class="sidebar" id="sidebar">
+    <div class="brand">
+      <div class="brand-mark">V</div>
+      <div>
+        <div class="brand-name">Vantage</div>
+        <div class="brand-sub">Ops Hub</div>
+      </div>
+    </div>
+
+    <div class="nav-group-label">Workspace</div>
+    <div class="nav-item active" data-view="overview">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/></svg>
+      Overview
+    </div>
+    <div class="nav-item" data-view="credentials">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="11" width="16" height="9" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>
+      Credentials
+    </div>
+    <div class="nav-item" data-view="team">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="9" cy="7" r="3.2"/><path d="M2 21c0-4 3-6.5 7-6.5s7 2.5 7 6.5"/><circle cx="17.5" cy="8" r="2.6"/><path d="M22 21c0-3-1.8-5.2-4.5-6"/></svg>
+      Team
+    </div>
+    <div class="nav-item" data-view="clients">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 21V8l9-5 9 5v13"/><path d="M9 21v-6h6v6"/></svg>
+      Client Hub
+    </div>
+
+    <div class="sidebar-foot">Sample data · for template preview only</div>
+  </div>
+
+  <!-- MAIN -->
+  <div class="main">
+    <div class="topbar">
+      <div class="topbar-title" id="topbar-title">Overview</div>
+      <div class="topbar-desc" id="topbar-desc">Everything happening across your agency, at a glance.</div>
+    </div>
+
+    <div class="content">
+
+      <!-- ============ OVERVIEW ============ -->
+      <div class="view active" id="view-overview">
+        <div class="stat-row" id="overview-stats"></div>
+
+        <div class="note-banner">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="flex-shrink:0;margin-top:1px"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg>
+          <div>Every table below keys off <strong>Client ID</strong>. Open <strong>Client Hub</strong> and click any client to trace their SEO, payments, projects and accounts in one thread.</div>
+        </div>
+
+        <section class="grid-2">
+          <div class="panel">
+            <div class="panel-head">
+              <div class="panel-head-l">
+                <div class="panel-icon">
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M13 2 3 14h7l-1 8 10-12h-7l1-8Z"/></svg>
+                </div>
+                <div><div class="panel-title">Task Load This Week</div><div class="panel-desc">Across all active projects</div></div>
+              </div>
+            </div>
+            <div class="table-scroll"><table>
+              <thead><tr><th>Task</th><th>Client</th><th>Assigned</th><th>Status</th><th>Progress</th></tr></thead>
+              <tbody id="overview-tasks"></tbody>
+            </table></div>
+          </div>
+
+          <div class="panel">
+            <div class="panel-head">
+              <div class="panel-head-l">
+                <div class="panel-icon">
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v20"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+                </div>
+                <div><div class="panel-title">Outstanding Dues</div><div class="panel-desc">By client, all currencies AED</div></div>
+              </div>
+            </div>
+            <div class="table-scroll"><table>
+              <thead><tr><th>Client</th><th>Type</th><th>Remaining Due</th><th>Status</th></tr></thead>
+              <tbody id="overview-dues"></tbody>
+            </table></div>
+          </div>
+        </section>
+      </div>
+
+      <!-- ============ CREDENTIALS ============ -->
+      <div class="view" id="view-credentials">
+        <div class="stat-row" id="cred-stats"></div>
+        <div class="panel">
+          <div class="panel-head">
+            <div class="panel-head-l">
+              <div class="panel-icon">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="11" width="16" height="9" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>
+              </div>
+              <div><div class="panel-title">Client Credentials & Accounts</div><div class="panel-desc">Website, Gmail, and social logins for every client, in one place</div></div>
+            </div>
+            <div class="search-box">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
+              <input id="cred-search" placeholder="Search client or platform…">
+            </div>
+          </div>
+          <div class="table-scroll"><table>
+            <thead><tr><th>ID</th><th>Client</th><th>Account Type</th><th>Platform</th><th>Email / Username</th><th>Password</th><th>Recovery</th><th>2FA</th><th>Notes</th><th>Updated</th></tr></thead>
+            <tbody id="cred-body"></tbody>
+          </table></div>
+        </div>
+      </div>
+
+      <!-- ============ TEAM ============ -->
+      <div class="view" id="view-team">
+        <div class="stat-row" id="team-stats"></div>
+        <div class="panel">
+          <div class="panel-head">
+            <div class="panel-head-l">
+              <div class="panel-icon">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="9" cy="7" r="3.2"/><path d="M2 21c0-4 3-6.5 7-6.5s7 2.5 7 6.5"/><circle cx="17.5" cy="8" r="2.6"/><path d="M22 21c0-3-1.8-5.2-4.5-6"/></svg>
+              </div>
+              <div><div class="panel-title">Employees / Team</div><div class="panel-desc">Roles, skills, and status for the whole team</div></div>
+            </div>
+          </div>
+          <div class="table-scroll"><table>
+            <thead><tr><th>ID</th><th>Name</th><th>Role</th><th>Department</th><th>Contact</th><th>Skills</th><th>Joined</th><th>Type</th><th>Status</th></tr></thead>
+            <tbody id="emp-body"></tbody>
+          </table></div>
+        </div>
+
+        <div class="panel">
+          <div class="panel-head">
+            <div class="panel-head-l">
+              <div class="panel-icon">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M13 2 3 14h7l-1 8 10-12h-7l1-8Z"/></svg>
+              </div>
+              <div><div class="panel-title">Task / Project Assignment</div><div class="panel-desc">Who's working on what, and how far along</div></div>
+            </div>
+          </div>
+          <div class="table-scroll"><table>
+            <thead><tr><th>Task ID</th><th>Title</th><th>Type</th><th>Client / Project</th><th>Assigned To</th><th>Priority</th><th>Due</th><th>Status</th><th>Progress</th></tr></thead>
+            <tbody id="task-body"></tbody>
+          </table></div>
+        </div>
+      </div>
+
+      <!-- ============ CLIENT HUB ============ -->
+      <div class="view" id="view-clients">
+
+        <div class="thread-banner" id="thread-banner" style="display:none;">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M12 3v6m0 6v6M3 12h6m6 0h6"/></svg>
+          <div><div class="tb-title" id="tb-title">Tracing —</div><div class="tb-desc">Rows across every table below are keyed to this Client ID</div></div>
+          <button class="clear-thread" onclick="clearThread()">Clear thread ✕</button>
+        </div>
+        <div class="note-banner" id="hint-banner">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="flex-shrink:0;margin-top:1px"><path d="M9 18h6M10 21h4M12 3a6 6 0 0 0-4 10.5c.6.6 1 1.3 1 2.5h6c0-1.2.4-1.9 1-2.5A6 6 0 0 0 12 3Z"/></svg>
+          <div>Click any client name in the table below to light up their thread across SEO, payments, projects, domains and accounts.</div>
+        </div>
+
+        <div class="panel">
+          <div class="panel-head">
+            <div class="panel-head-l">
+              <div class="panel-icon">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 21V8l9-5 9 5v13"/><path d="M9 21v-6h6v6"/></svg>
+              </div>
+              <div><div class="panel-title">Clients — Main Table</div><div class="panel-desc">Every other table below keys off Client ID</div></div>
+            </div>
+          </div>
+          <div class="table-scroll"><table>
+            <thead><tr><th>Client ID</th><th>Client Name</th><th>Contact</th><th>Mobile</th><th>Email</th><th>City</th><th>Status</th><th>Notes</th></tr></thead>
+            <tbody id="clients-body"></tbody>
+          </table></div>
+        </div>
+
+        <section class="grid-2">
+          <div class="panel">
+            <div class="panel-head"><div class="panel-head-l">
+              <div class="panel-icon"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3v18h18"/><path d="m7 14 4-4 3 3 5-6"/></svg></div>
+              <div><div class="panel-title">SEO Clients</div><div class="panel-desc">Active retainers & fees</div></div>
+            </div></div>
+            <div class="table-scroll"><table>
+              <thead><tr><th>SEO ID</th><th>Client ID</th><th>Status</th><th>Fee</th><th>Due</th><th>Payment</th></tr></thead>
+              <tbody id="seo-body"></tbody>
+            </table></div>
+          </div>
+
+          <div class="panel">
+            <div class="panel-head"><div class="panel-head-l">
+              <div class="panel-icon"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="14" rx="2"/><path d="M3 9h18"/></svg></div>
+              <div><div class="panel-title">Website Projects</div><div class="panel-desc">Build status & delivery</div></div>
+            </div></div>
+            <div class="table-scroll"><table>
+              <thead><tr><th>Project ID</th><th>Client ID</th><th>Project</th><th>Total</th><th>Due</th><th>Status</th></tr></thead>
+              <tbody id="proj-body"></tbody>
+            </table></div>
+          </div>
+
+          <div class="panel">
+            <div class="panel-head"><div class="panel-head-l">
+              <div class="panel-icon"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v20M2 12h20"/></svg></div>
+              <div><div class="panel-title">Domain & Hosting</div><div class="panel-desc">Renewals to watch</div></div>
+            </div></div>
+            <div class="table-scroll"><table>
+              <thead><tr><th>ID</th><th>Client ID</th><th>Domain</th><th>Host</th><th>Renews</th><th>Status</th></tr></thead>
+              <tbody id="domain-body"></tbody>
+            </table></div>
+          </div>
+
+          <div class="panel">
+            <div class="panel-head"><div class="panel-head-l">
+              <div class="panel-icon"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3 7 9 6 9-6"/></svg></div>
+              <div><div class="panel-title">Google Accounts</div><div class="panel-desc">Access checklist per client</div></div>
+            </div></div>
+            <div class="table-scroll"><table>
+              <thead><tr><th>ID</th><th>Client ID</th><th>Gmail</th><th>Business Profile</th><th>Search Console</th><th>Analytics</th><th>Ads</th></tr></thead>
+              <tbody id="google-body"></tbody>
+            </table></div>
+          </div>
+        </section>
+
+        <div class="panel">
+          <div class="panel-head"><div class="panel-head-l">
+            <div class="panel-icon"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 11 12 14l8-8"/><path d="M21 12v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h11"/></svg></div>
+            <div><div class="panel-title">Tasks / Reminders</div><div class="panel-desc">Follow-ups owed to each client</div></div>
+          </div></div>
+          <div class="table-scroll"><table>
+            <thead><tr><th>Task ID</th><th>Client ID</th><th>Reminder</th><th>Priority</th><th>Assigned</th><th>Due</th><th>Status</th></tr></thead>
+            <tbody id="reminder-body"></tbody>
+          </table></div>
+        </div>
+
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<script>
+/* ============ DATA (sample / placeholder — not real credentials) ============ */
+
+const clients = [
+  {id:"C001", name:"Alpha Movers", contact:"John Smith", mobile:"+971 50 123 4567", email:"info@alphamovers.ae", city:"Dubai", status:"Active", notes:"VIP client"},
+  {id:"C002", name:"Bright Furniture", contact:"David Johnson", mobile:"+971 55 234 5678", email:"contact@brightfurniture.ae", city:"Sharjah", status:"Active", notes:"Regular"},
+  {id:"C003", name:"City Home Services", contact:"Michael Brown", mobile:"+971 52 345 6789", email:"hello@cityhomeservices.ae", city:"Abu Dhabi", status:"Active", notes:"—"},
+  {id:"C004", name:"Future Tech LLC", contact:"Robert Wilson", mobile:"+971 58 456 7890", email:"info@futuretech.ae", city:"Dubai", status:"Inactive", notes:"Paused billing"},
+  {id:"C005", name:"Green Landscape", contact:"Emily Davis", mobile:"+971 54 567 8901", email:"support@greenlandscape.ae", city:"Ajman", status:"Active", notes:"New client"},
+];
+
+const credentials = [
+  {id:"CRED001", client:"C001", type:"Website", icon:"web", platform:"alphamovers.ae", user:"info@alphamovers.ae", pass:"Xk9#mQ2vLp", recovery:"+971 50 123 4567", tfa:"Enabled", notes:"WordPress admin", updated:"15-Jun-2024"},
+  {id:"CRED002", client:"C001", type:"Gmail", icon:"gmail", platform:"mail.google.com", user:"info@alphamovers.ae", pass:"Gm7$rT4wZx", recovery:"backup@alphamovers.ae", tfa:"Enabled", notes:"Main Gmail account", updated:"15-Jun-2024"},
+  {id:"CRED003", client:"C001", type:"Facebook", icon:"fb", platform:"facebook.com", user:"alphamovers.ae", pass:"Fb2!nH8yUq", recovery:"+971 50 123 4567", tfa:"Not Enabled", notes:"Business page admin", updated:"14-Jun-2024"},
+  {id:"CRED004", client:"C001", type:"Instagram", icon:"ig", platform:"instagram.com", user:"@alphamovers.ae", pass:"Ig5&kL3sDv", recovery:"+971 50 123 4567", tfa:"Enabled", notes:"Business account", updated:"14-Jun-2024"},
+  {id:"CRED005", client:"C001", type:"LinkedIn", icon:"in", platform:"linkedin.com", user:"alphamovers.ae", pass:"Ln6@pQ9xRt", recovery:"backup@alphamovers.ae", tfa:"N/A", notes:"Company page", updated:"13-Jun-2024"},
+  {id:"CRED006", client:"C001", type:"YouTube", icon:"yt", platform:"youtube.com", user:"alphamoverschannel", pass:"Yt1#wE7mNb", recovery:"backup@alphamovers.ae", tfa:"Enabled", notes:"Channel manager", updated:"13-Jun-2024"},
+  {id:"CRED007", client:"C002", type:"Website", icon:"web", platform:"brightfurniture.ae", user:"admin@brightfurniture.ae", pass:"Bf4$tY6uIo", recovery:"+971 55 234 5678", tfa:"Enabled", notes:"cPanel / hosting", updated:"10-Jun-2024"},
+  {id:"CRED008", client:"C002", type:"Gmail", icon:"gmail", platform:"mail.google.com", user:"contact@brightfurniture.ae", pass:"Gm8#zX2cVb", recovery:"backup@brightfurniture.ae", tfa:"Enabled", notes:"Support Gmail", updated:"10-Jun-2024"},
+  {id:"CRED009", client:"C002", type:"Facebook", icon:"fb", platform:"facebook.com", user:"brightfurniture.ae", pass:"Fb3!nM5kLp", recovery:"+971 55 234 5678", tfa:"Not Enabled", notes:"Page admin", updated:"09-Jun-2024"},
+  {id:"CRED010", client:"C003", type:"Website", icon:"web", platform:"cityhomeservices.ae", user:"admin@cityhomeservices.ae", pass:"Ch7@qW3eRt", recovery:"+971 52 345 6789", tfa:"Enabled", notes:"WordPress admin", updated:"08-Jun-2024"},
+  {id:"CRED011", client:"C003", type:"Gmail", icon:"gmail", platform:"mail.google.com", user:"info@cityhomeservices.ae", pass:"Gm2$yU8oPl", recovery:"backup@cityhomeservices.ae", tfa:"Enabled", notes:"Official Gmail", updated:"08-Jun-2024"},
+  {id:"CRED012", client:"C003", type:"Instagram", icon:"ig", platform:"instagram.com", user:"@cityhomeservices", pass:"Ig9&hJ4nMx", recovery:"+971 52 345 6789", tfa:"Enabled", notes:"Business account", updated:"07-Jun-2024"},
+];
+
+const platformMeta = {
+  web:{label:"Website", color:"#2563EB"},
+  gmail:{label:"Gmail", color:"#DC2626"},
+  fb:{label:"Facebook", color:"#1877F2"},
+  ig:{label:"Instagram", color:"#D6249F"},
+  in:{label:"LinkedIn", color:"#0A66C2"},
+  yt:{label:"YouTube", color:"#FF0000"},
+};
+
+const employees = [
+  {id:"EMP001", name:"Ahmed Khan", initials:"AK", role:"Senior Developer", dept:"Development", email:"ahmed.khan@saptatech.com", phone:"+92 300 1234567", skills:["PHP","Laravel","WordPress"], joined:"01-Jan-2024", type:"Full Time", status:"Active"},
+  {id:"EMP002", name:"Fatima Zahra", initials:"FZ", role:"Frontend Developer", dept:"Development", email:"fatima.zahra@saptatech.com", phone:"+92 301 2345678", skills:["HTML","CSS","JavaScript"], joined:"15-Feb-2024", type:"Full Time", status:"Active"},
+  {id:"EMP003", name:"Usman Ali", initials:"UA", role:"SEO Specialist", dept:"SEO", email:"usman.ali@saptatech.com", phone:"+92 302 3456789", skills:["SEO","On Page","Analytics"], joined:"10-Mar-2024", type:"Full Time", status:"Active"},
+  {id:"EMP004", name:"Ayesha Malik", initials:"AM", role:"Content Writer", dept:"Content", email:"ayesha.malik@saptatech.com", phone:"+92 303 4567890", skills:["Content","SEO","Blogging"], joined:"20-Apr-2024", type:"Full Time", status:"Active"},
+  {id:"EMP005", name:"Bilal Hussain", initials:"BH", role:"Graphic Designer", dept:"Design", email:"bilal.hussain@saptatech.com", phone:"+92 304 5678901", skills:["Photoshop","Illustrator","UI/UX"], joined:"05-May-2024", type:"Part Time", status:"Active"},
+  {id:"EMP006", name:"M. Talha", initials:"MT", role:"Junior Developer", dept:"Development", email:"talha@saptatech.com", phone:"+92 305 6789012", skills:["PHP","MySQL","WordPress"], joined:"01-Jun-2024", type:"Full Time", status:"Active"},
+  {id:"EMP007", name:"Hina Batool", initials:"HB", role:"Project Manager", dept:"Management", email:"hina.batool@saptatech.com", phone:"+92 306 7890123", skills:["Management","Planning","JIRA"], joined:"15-Jan-2024", type:"Full Time", status:"Active"},
+];
+
+const teamTasks = [
+  {id:"TASK001", title:"Develop New Website", type:"Project", client:"Alpha Movers", assignee:"Ahmed Khan", initials:"AK", priority:"High", due:"20-Jun-2024", status:"In Progress", progress:60},
+  {id:"TASK002", title:"On Page SEO Optimization", type:"Task", client:"Bright Furniture", assignee:"Usman Ali", initials:"UA", priority:"Medium", due:"15-Jun-2024", status:"Completed", progress:100},
+  {id:"TASK003", title:"Write Blog Articles (5)", type:"Task", client:"City Home Services", assignee:"Ayesha Malik", initials:"AM", priority:"Medium", due:"10-Jun-2024", status:"In Progress", progress:40},
+  {id:"TASK004", title:"Fix Website Bugs", type:"Task", client:"Fast Track Furniture", assignee:"M. Talha", initials:"MT", priority:"High", due:"08-Jun-2024", status:"Pending", progress:0},
+  {id:"TASK005", title:"Social Media Post Design", type:"Task", client:"Green Leaf Landscaping", assignee:"Bilal Hussain", initials:"BH", priority:"Low", due:"12-Jun-2024", status:"In Progress", progress:70},
+  {id:"TASK006", title:"E-Commerce Website", type:"Project", client:"Desert Line Movers", assignee:"Ahmed Khan", initials:"AK", priority:"High", due:"30-Jun-2024", status:"Pending", progress:0},
+];
+
+const seoClients = [
+  {id:"S001", client:"C001", status:"Active", fee:1200, due:600, payment:"Due Pending"},
+  {id:"S002", client:"C002", status:"Active", fee:800, due:0, payment:"Cleared"},
+  {id:"S003", client:"C003", status:"Paused", fee:1000, due:1500, payment:"Due Pending"},
+  {id:"S004", client:"C004", status:"Stopped", fee:600, due:0, payment:"Cleared"},
+  {id:"S005", client:"C005", status:"Active", fee:700, due:300, payment:"Due Pending"},
+];
+
+const projects = [
+  {id:"P001", client:"C001", name:"Corporate Website", total:3000, due:1000, status:"Processing"},
+  {id:"P002", client:"C002", name:"E-Commerce Site", total:4500, due:3000, status:"In Progress"},
+  {id:"P003", client:"C003", name:"Landing Page", total:1200, due:0, status:"Completed"},
+  {id:"P004", client:"C005", name:"Business Website", total:2500, due:2000, status:"On Hold"},
+];
+
+const domains = [
+  {id:"D001", client:"C001", domain:"alphamovers.ae", host:"Hostinger", renews:"15-Jan-2025", status:"Active"},
+  {id:"D002", client:"C002", domain:"brightfurn.com", host:"GoDaddy", renews:"10-Mar-2025", status:"Active"},
+  {id:"D003", client:"C003", domain:"cityhome.ae", host:"Bluehost", renews:"05-Feb-2025", status:"Expiring Soon"},
+  {id:"D004", client:"C005", domain:"greenlandscape.ae", host:"Namecheap", renews:"22-Dec-2024", status:"Active"},
+];
+
+const googleAccounts = [
+  {id:"G001", client:"C001", gmail:"alphamovers@gmail.com", biz:true, sc:true, an:true, ads:true},
+  {id:"G002", client:"C002", gmail:"brightfurn@gmail.com", biz:true, sc:true, an:true, ads:true},
+  {id:"G003", client:"C003", gmail:"cityhome@gmail.com", biz:true, sc:true, an:true, ads:true},
+  {id:"G004", client:"C005", gmail:"greenland@gmail.com", biz:true, sc:true, an:true, ads:false},
+];
+
+const reminders = [
+  {id:"T001", client:"C001", text:"SEO Monthly Report", priority:"High", assigned:"Hamza", due:"20-Jul-2024", status:"Pending"},
+  {id:"T002", client:"C002", text:"Website Content Update", priority:"Medium", assigned:"Zeeshan", due:"22-Jul-2024", status:"Completed"},
+  {id:"T003", client:"C003", text:"Backlinks Work", priority:"Medium", assigned:"Talha", due:"25-Jul-2024", status:"Pending"},
+  {id:"T004", client:"C005", text:"Domain Renewal", priority:"Low", assigned:"Adeel", due:"22-Dec-2024", status:"Pending"},
+];
+
+/* ============ helpers ============ */
+function badge(text, cls){ return `<span class="badge ${cls}">${text}</span>`; }
+function statusBadge(s){
+  const map = {
+    "Active":"b-active","Enabled":"b-enabled","Completed":"b-completed","Cleared":"b-cleared",
+    "Pending":"b-pending","Not Enabled":"b-notenabled","Due Pending":"b-duepending","Paused":"b-paused","On Hold":"b-onhold",
+    "Inactive":"b-inactive","Stopped":"b-stopped","Overdue":"b-overdue","Expiring Soon":"b-expiring",
+    "In Progress":"b-progress","Processing":"b-processing","N/A":"b-na"
+  };
+  return badge(s, map[s] || "b-na");
+}
+function priorityBadge(p){
+  const map = {"High":"b-inactive","Medium":"b-pending","Low":"b-active"};
+  return badge(p, map[p] || "b-na");
+}
+function clientName(cid){ const c = clients.find(x=>x.id===cid); return c ? c.name : cid; }
+function clientLink(cid){ return `<span class="client-link" onclick="lightThread('${cid}')">${clientName(cid)}</span>`; }
+
+/* ============ render: overview ============ */
+function renderOverview(){
+  const totalClients = clients.length;
+  const activeSeo = seoClients.filter(s=>s.status==="Active").length;
+  const totalDue = seoClients.reduce((a,s)=>a+s.due,0) + projects.reduce((a,p)=>a+p.due,0);
+  const projInProgress = projects.filter(p=>p.status==="In Progress"||p.status==="Processing").length;
+  const stats = [
+    {label:"Total Clients", value: totalClients, color:"var(--navy-900)", bg:"#EEF1FA"},
+    {label:"Active SEO Retainers", value: activeSeo, color:"var(--teal)", bg:"var(--teal-bg)"},
+    {label:"Employees", value: employees.length, color:"var(--violet)", bg:"var(--violet-bg)"},
+    {label:"Projects In Progress", value: projInProgress, color:"var(--amber)", bg:"var(--amber-bg)"},
+    {label:"Outstanding Due (AED)", value: totalDue.toLocaleString(), color:"var(--coral)", bg:"var(--coral-bg)"},
+  ];
+  document.getElementById("overview-stats").innerHTML = stats.map(s=>`
+    <div class="stat-card">
+      <div class="stat-top"><div class="stat-icon" style="background:${s.bg};color:${s.color}">●</div></div>
+      <div class="stat-value">${s.value}</div>
+      <div class="stat-label">${s.label}</div>
+    </div>`).join("");
+
+  document.getElementById("overview-tasks").innerHTML = teamTasks.slice(0,5).map(t=>`
+    <tr>
+      <td>${t.title}</td>
+      <td>${t.client}</td>
+      <td><span class="avatar">${t.initials}</span>${t.assignee}</td>
+      <td>${statusBadge(t.status)}</td>
+      <td><span class="progress-track"><span class="progress-fill" style="width:${t.progress}%"></span></span>${t.progress}%</td>
+    </tr>`).join("");
+
+  const dues = [];
+  seoClients.forEach(s=>{ if(s.due>0) dues.push({client:clientName(s.client), type:"SEO Retainer", due:s.due, status:s.payment}); });
+  projects.forEach(p=>{ if(p.due>0) dues.push({client:clientName(p.client), type:p.name, due:p.due, status: p.due>1500?"Overdue":"Due Pending"}); });
+  document.getElementById("overview-dues").innerHTML = dues.map(d=>`
+    <tr><td>${d.client}</td><td>${d.type}</td><td>AED ${d.due.toLocaleString()}</td><td>${statusBadge(d.status)}</td></tr>
+  `).join("");
+}
+
+/* ============ render: credentials ============ */
+function renderCredentials(filter=""){
+  const stats = [
+    {label:"Total Websites", value: credentials.filter(c=>c.type==="Website").length},
+    {label:"Gmail Accounts", value: credentials.filter(c=>c.type==="Gmail").length},
+    {label:"Facebook Pages", value: credentials.filter(c=>c.type==="Facebook").length},
+    {label:"Instagram Accounts", value: credentials.filter(c=>c.type==="Instagram").length},
+    {label:"2FA Enabled", value: credentials.filter(c=>c.tfa==="Enabled").length},
+  ];
+  document.getElementById("cred-stats").innerHTML = stats.map(s=>`
+    <div class="stat-card">
+      <div class="stat-value">${s.value}</div>
+      <div class="stat-label">${s.label}</div>
+    </div>`).join("");
+
+  const rows = credentials.filter(c=>{
+    const f = filter.toLowerCase();
+    return !f || clientName(c.client).toLowerCase().includes(f) || c.type.toLowerCase().includes(f) || c.platform.toLowerCase().includes(f);
+  });
+
+  document.getElementById("cred-body").innerHTML = rows.map((c,i)=>{
+    const meta = platformMeta[c.icon];
+    return `<tr>
+      <td><span class="id-pill">${c.id}</span></td>
+      <td>${clientName(c.client)}</td>
+      <td><span class="platform-chip"><span class="platform-dot" style="background:${meta.color}">●</span>${c.type}</span></td>
+      <td>${c.platform}</td>
+      <td class="mono">${c.user}</td>
+      <td>
+        <div class="pw-cell">
+          <span class="mono" id="pw-${i}">••••••••••</span>
+          <button class="pw-eye" onclick="togglePw(${i}, '${c.pass}')" title="Show / hide">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg>
+          </button>
+        </div>
+      </td>
+      <td>${c.recovery}</td>
+      <td>${statusBadge(c.tfa)}</td>
+      <td>${c.notes}</td>
+      <td>${c.updated}</td>
+    </tr>`;
+  }).join("");
+}
+function togglePw(i, val){
+  const el = document.getElementById("pw-"+i);
+  if(el.textContent.includes("•")){ el.textContent = val; }
+  else { el.textContent = "••••••••••"; }
+}
+
+/* ============ render: team ============ */
+function renderTeam(){
+  const stats = [
+    {label:"Total Employees", value: employees.length},
+    {label:"Active", value: employees.filter(e=>e.status==="Active").length},
+    {label:"Departments", value: new Set(employees.map(e=>e.dept)).size},
+    {label:"Full Time", value: employees.filter(e=>e.type==="Full Time").length},
+    {label:"Part Time", value: employees.filter(e=>e.type==="Part Time").length},
+  ];
+  document.getElementById("team-stats").innerHTML = stats.map(s=>`
+    <div class="stat-card"><div class="stat-value">${s.value}</div><div class="stat-label">${s.label}</div></div>`).join("");
+
+  document.getElementById("emp-body").innerHTML = employees.map(e=>`
+    <tr>
+      <td><span class="id-pill">${e.id}</span></td>
+      <td><span class="avatar">${e.initials}</span>${e.name}</td>
+      <td>${e.role}</td>
+      <td>${e.dept}</td>
+      <td style="line-height:1.5">${e.email}<br><span style="color:var(--sub)">${e.phone}</span></td>
+      <td>${e.skills.map(s=>`<span class="skill-chip">${s}</span>`).join("")}</td>
+      <td>${e.joined}</td>
+      <td>${e.type}</td>
+      <td>${statusBadge(e.status)}</td>
+    </tr>`).join("");
+
+  document.getElementById("task-body").innerHTML = teamTasks.map(t=>`
+    <tr>
+      <td><span class="id-pill">${t.id}</span></td>
+      <td>${t.title}</td>
+      <td>${badge(t.type, t.type==="Project"?"b-progress":"b-active")}</td>
+      <td>${t.client}</td>
+      <td><span class="avatar">${t.initials}</span>${t.assignee}</td>
+      <td>${priorityBadge(t.priority)}</td>
+      <td>${t.due}</td>
+      <td>${statusBadge(t.status)}</td>
+      <td><span class="progress-track"><span class="progress-fill" style="width:${t.progress}%"></span></span>${t.progress}%</td>
+    </tr>`).join("");
+}
+
+/* ============ render: client hub ============ */
+function renderClients(){
+  document.getElementById("clients-body").innerHTML = clients.map(c=>`
+    <tr data-cid="${c.id}">
+      <td><span class="id-pill">${c.id}</span></td>
+      <td>${clientLink(c.id)}</td>
+      <td>${c.contact}</td>
+      <td>${c.mobile}</td>
+      <td>${c.email}</td>
+      <td>${c.city}</td>
+      <td>${statusBadge(c.status)}</td>
+      <td>${c.notes}</td>
+    </tr>`).join("");
+
+  document.getElementById("seo-body").innerHTML = seoClients.map(s=>`
+    <tr data-cid="${s.client}">
+      <td><span class="id-pill">${s.id}</span></td>
+      <td>${clientLink(s.client)}</td>
+      <td>${statusBadge(s.status)}</td>
+      <td>AED ${s.fee.toLocaleString()}</td>
+      <td>AED ${s.due.toLocaleString()}</td>
+      <td>${statusBadge(s.payment)}</td>
+    </tr>`).join("");
+
+  document.getElementById("proj-body").innerHTML = projects.map(p=>`
+    <tr data-cid="${p.client}">
+      <td><span class="id-pill">${p.id}</span></td>
+      <td>${clientLink(p.client)}</td>
+      <td>${p.name}</td>
+      <td>AED ${p.total.toLocaleString()}</td>
+      <td>AED ${p.due.toLocaleString()}</td>
+      <td>${statusBadge(p.status)}</td>
+    </tr>`).join("");
+
+  document.getElementById("domain-body").innerHTML = domains.map(d=>`
+    <tr data-cid="${d.client}">
+      <td><span class="id-pill">${d.id}</span></td>
+      <td>${clientLink(d.client)}</td>
+      <td>${d.domain}</td>
+      <td>${d.host}</td>
+      <td>${d.renews}</td>
+      <td>${statusBadge(d.status)}</td>
+    </tr>`).join("");
+
+  const check = (v)=> v ? `<span style="color:var(--teal)">✓</span>` : `<span style="color:var(--coral)">✕</span>`;
+  document.getElementById("google-body").innerHTML = googleAccounts.map(g=>`
+    <tr data-cid="${g.client}">
+      <td><span class="id-pill">${g.id}</span></td>
+      <td>${clientLink(g.client)}</td>
+      <td class="mono">${g.gmail}</td>
+      <td>${check(g.biz)}</td>
+      <td>${check(g.sc)}</td>
+      <td>${check(g.an)}</td>
+      <td>${check(g.ads)}</td>
+    </tr>`).join("");
+
+  document.getElementById("reminder-body").innerHTML = reminders.map(r=>`
+    <tr data-cid="${r.client}">
+      <td><span class="id-pill">${r.id}</span></td>
+      <td>${clientLink(r.client)}</td>
+      <td>${r.text}</td>
+      <td>${priorityBadge(r.priority)}</td>
+      <td>${r.assigned}</td>
+      <td>${r.due}</td>
+      <td>${statusBadge(r.status)}</td>
+    </tr>`).join("");
+}
+
+/* ============ thread highlight (signature interaction) ============ */
+function lightThread(cid){
+  document.querySelectorAll("#view-clients tbody tr").forEach(row=>{
+    if(row.dataset.cid === cid){
+      row.classList.add("thread-lit"); row.classList.remove("dim");
+    } else {
+      row.classList.remove("thread-lit"); row.classList.add("dim");
+    }
+  });
+  const banner = document.getElementById("thread-banner");
+  banner.style.display = "flex";
+  document.getElementById("hint-banner").style.display = "none";
+  document.getElementById("tb-title").textContent = "Tracing — " + clientName(cid) + " (" + cid + ")";
+}
+function clearThread(){
+  document.querySelectorAll("#view-clients tbody tr").forEach(row=>{
+    row.classList.remove("thread-lit","dim");
+  });
+  document.getElementById("thread-banner").style.display = "none";
+  document.getElementById("hint-banner").style.display = "flex";
+}
+
+/* ============ nav ============ */
+const titles = {
+  overview: ["Overview","Everything happening across your agency, at a glance."],
+  credentials: ["Credentials","Website, Gmail and social logins for every client."],
+  team: ["Team","Roles, skills, and task load for the whole team."],
+  clients: ["Client Hub","Every client and the tables connected to them by Client ID."],
+};
+document.querySelectorAll(".nav-item").forEach(item=>{
+  item.addEventListener("click", ()=>{
+    document.querySelectorAll(".nav-item").forEach(n=>n.classList.remove("active"));
+    item.classList.add("active");
+    document.querySelectorAll(".view").forEach(v=>v.classList.remove("active"));
+    const view = item.dataset.view;
+    document.getElementById("view-"+view).classList.add("active");
+    document.getElementById("topbar-title").textContent = titles[view][0];
+    document.getElementById("topbar-desc").textContent = titles[view][1];
+  });
+});
+
+document.getElementById("cred-search").addEventListener("input", (e)=> renderCredentials(e.target.value));
+
+/* ============ init ============ */
+renderOverview();
+renderCredentials();
+renderTeam();
+renderClients();
+</script>
+</body>
+</html>

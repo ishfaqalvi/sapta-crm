@@ -1,0 +1,829 @@
+<!DOCTYPE html>
+<html lang="en" data-bs-theme="light">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Dashboard - SAPTA CRM</title>
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root {
+  --sidebar-width: 260px;
+  --sidebar-collapsed: 70px;
+  --primary: #6366f1;
+  --primary-dark: #4f46e5;
+  --secondary: #64748b;
+  --success: #10b981;
+  --warning: #f59e0b;
+  --danger: #ef4444;
+  --info: #06b6d4;
+  --dark: #1e293b;
+  --light: #f8fafc;
+  --card-bg: #ffffff;
+  --body-bg: #f1f5f9;
+  --border-color: #e2e8f0;
+  --text-primary: #0f172a;
+  --text-secondary: #64748b;
+  --sidebar-bg: #ffffff;
+  --sidebar-text: #475569;
+  --sidebar-active: #6366f1;
+  --sidebar-active-bg: #eef2ff;
+  --header-bg: #ffffff;
+  --table-header-bg: #f8fafc;
+  --hover-bg: #f8fafc;
+}
+[data-bs-theme="dark"] {
+  --card-bg: #1e293b;
+  --body-bg: #0f172a;
+  --border-color: #334155;
+  --text-primary: #f1f5f9;
+  --text-secondary: #94a3b8;
+  --sidebar-bg: #1e293b;
+  --sidebar-text: #cbd5e1;
+  --sidebar-active: #818cf8;
+  --sidebar-active-bg: #312e81;
+  --header-bg: #1e293b;
+  --table-header-bg: #1e293b;
+  --hover-bg: #334155;
+}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+  font-family: 'Inter', sans-serif;
+  background: var(--body-bg);
+  color: var(--text-primary);
+  overflow-x: hidden;
+  transition: background 0.3s, color 0.3s;
+}
+.sidebar {
+  width: var(--sidebar-width);
+  height: 100vh;
+  background: var(--sidebar-bg);
+  border-right: 1px solid var(--border-color);
+  position: fixed;
+  left: 0;
+  top: 0;
+  z-index: 1000;
+  transition: all 0.3s ease;
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+}
+.sidebar.collapsed { width: var(--sidebar-collapsed); }
+.sidebar.collapsed .nav-text,
+.sidebar.collapsed .sidebar-header h5,
+.sidebar.collapsed .sidebar-section-title { display: none; }
+.sidebar.collapsed .nav-link { justify-content: center; padding: 12px; }
+.sidebar.collapsed .nav-link i { margin-right: 0; font-size: 1.2rem; }
+.sidebar-header {
+  padding: 20px;
+  border-bottom: 1px solid var(--border-color);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.sidebar-header .logo-icon {
+  width: 40px; height: 40px;
+  background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+  border-radius: 10px;
+  display: flex; align-items: center; justify-content: center;
+  color: white; font-weight: 700; font-size: 1.1rem;
+  flex-shrink: 0;
+}
+.sidebar-header h5 { font-weight: 700; color: var(--text-primary); margin: 0; }
+.sidebar-section-title {
+  padding: 16px 20px 8px;
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: var(--text-secondary);
+  font-weight: 600;
+}
+.nav-link {
+  color: var(--sidebar-text);
+  padding: 10px 20px;
+  margin: 2px 8px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  transition: all 0.2s;
+  cursor: pointer;
+  text-decoration: none;
+}
+.nav-link:hover, .nav-link.active {
+  background: var(--sidebar-active-bg);
+  color: var(--sidebar-active);
+}
+.nav-link i { width: 20px; text-align: center; font-size: 0.95rem; }
+.nav-link .badge {
+  margin-left: auto;
+  font-size: 0.7rem;
+  padding: 3px 8px;
+  border-radius: 20px;
+}
+.main-content {
+  margin-left: var(--sidebar-width);
+  min-height: 100vh;
+  transition: margin-left 0.3s ease;
+}
+.main-content.expanded { margin-left: var(--sidebar-collapsed); }
+.top-header {
+  background: var(--header-bg);
+  border-bottom: 1px solid var(--border-color);
+  padding: 12px 24px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  position: sticky;
+  top: 0;
+  z-index: 100;
+}
+.header-left { display: flex; align-items: center; gap: 16px; }
+.toggle-btn {
+  background: none; border: none;
+  color: var(--text-secondary);
+  font-size: 1.2rem;
+  cursor: pointer;
+  padding: 8px;
+  border-radius: 8px;
+  transition: all 0.2s;
+}
+.toggle-btn:hover { background: var(--hover-bg); color: var(--text-primary); }
+.search-box {
+  position: relative;
+  width: 320px;
+}
+.search-box input {
+  width: 100%;
+  padding: 10px 16px 10px 40px;
+  border: 1px solid var(--border-color);
+  border-radius: 10px;
+  background: var(--body-bg);
+  color: var(--text-primary);
+  font-size: 0.9rem;
+  transition: all 0.2s;
+}
+.search-box input:focus {
+  outline: none;
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px rgba(99,102,241,0.1);
+}
+.search-box i {
+  position: absolute;
+  left: 14px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--text-secondary);
+}
+.header-right { display: flex; align-items: center; gap: 12px; }
+.header-btn {
+  width: 40px; height: 40px;
+  border-radius: 10px;
+  border: 1px solid var(--border-color);
+  background: var(--card-bg);
+  color: var(--text-secondary);
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer;
+  transition: all 0.2s;
+  position: relative;
+}
+.header-btn:hover { background: var(--hover-bg); color: var(--text-primary); }
+.header-btn .notification-dot {
+  position: absolute;
+  top: 8px; right: 8px;
+  width: 8px; height: 8px;
+  background: var(--danger);
+  border-radius: 50%;
+  border: 2px solid var(--card-bg);
+}
+.user-avatar {
+  width: 40px; height: 40px;
+  border-radius: 10px;
+  background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+  color: white;
+  display: flex; align-items: center; justify-content: center;
+  font-weight: 600;
+  cursor: pointer;
+}
+.content-area { padding: 24px; }
+.page-title {
+  font-size: 1.5rem;
+  font-weight: 700;
+  margin-bottom: 4px;
+  color: var(--text-primary);
+}
+.breadcrumb {
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+  margin-bottom: 24px;
+}
+.breadcrumb a { color: var(--primary); text-decoration: none; }
+.card {
+  background: var(--card-bg);
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+  transition: all 0.3s;
+}
+.card:hover { box-shadow: 0 4px 12px rgba(0,0,0,0.08); }
+.card-header {
+  background: transparent;
+  border-bottom: 1px solid var(--border-color);
+  padding: 16px 20px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.card-body { padding: 20px; }
+.stat-card {
+  padding: 20px;
+  border-radius: 12px;
+  background: var(--card-bg);
+  border: 1px solid var(--border-color);
+  transition: all 0.3s;
+  position: relative;
+  overflow: hidden;
+}
+.stat-card::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0;
+  width: 4px; height: 100%;
+  border-radius: 12px 0 0 12px;
+}
+.stat-card:hover { transform: translateY(-2px); box-shadow: 0 8px 24px rgba(0,0,0,0.1); }
+.stat-icon {
+  width: 48px; height: 48px;
+  border-radius: 12px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 1.3rem;
+  margin-bottom: 12px;
+}
+.stat-value {
+  font-size: 1.75rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin-bottom: 4px;
+}
+.stat-label {
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+  font-weight: 500;
+}
+.stat-change {
+  font-size: 0.8rem;
+  font-weight: 600;
+  margin-top: 8px;
+}
+.stat-change.up { color: var(--success); }
+.stat-change.down { color: var(--danger); }
+.table-container { overflow-x: auto; }
+.table {
+  width: 100%;
+  margin-bottom: 0;
+  color: var(--text-primary);
+}
+.table thead th {
+  background: var(--table-header-bg);
+  border-bottom: 2px solid var(--border-color);
+  font-weight: 600;
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--text-secondary);
+  padding: 14px 16px;
+  white-space: nowrap;
+}
+.table tbody td {
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--border-color);
+  vertical-align: middle;
+  font-size: 0.9rem;
+}
+.table tbody tr:hover { background: var(--hover-bg); }
+.badge-soft {
+  padding: 5px 12px;
+  border-radius: 20px;
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+.badge-soft-primary { background: rgba(99,102,241,0.1); color: var(--primary); }
+.badge-soft-success { background: rgba(16,185,129,0.1); color: var(--success); }
+.badge-soft-warning { background: rgba(245,158,11,0.1); color: var(--warning); }
+.badge-soft-danger { background: rgba(239,68,68,0.1); color: var(--danger); }
+.badge-soft-info { background: rgba(6,182,212,0.1); color: var(--info); }
+.badge-soft-secondary { background: rgba(100,116,139,0.1); color: var(--secondary); }
+.progress-custom {
+  height: 8px;
+  border-radius: 4px;
+  background: var(--border-color);
+  overflow: hidden;
+}
+.progress-bar-custom {
+  height: 100%;
+  border-radius: 4px;
+  transition: width 0.3s;
+}
+.avatar-group { display: flex; align-items: center; }
+.avatar-group .avatar {
+  width: 32px; height: 32px;
+  border-radius: 50%;
+  border: 2px solid var(--card-bg);
+  margin-left: -8px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: white;
+}
+.avatar-group .avatar:first-child { margin-left: 0; }
+.btn-primary-custom {
+  background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+  border: none;
+  color: white;
+  padding: 10px 20px;
+  border-radius: 10px;
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  transition: all 0.2s;
+  text-decoration: none;
+}
+.btn-primary-custom:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(99,102,241,0.3);
+  color: white;
+}
+.filter-bar {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  flex-wrap: wrap;
+  margin-bottom: 20px;
+}
+.filter-bar .form-select, .filter-bar .form-control {
+  border-radius: 10px;
+  border: 1px solid var(--border-color);
+  background: var(--card-bg);
+  color: var(--text-primary);
+  padding: 8px 14px;
+  font-size: 0.9rem;
+}
+.btn-action {
+  width: 32px; height: 32px;
+  border-radius: 8px;
+  border: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.2s;
+  margin: 0 2px;
+  font-size: 0.85rem;
+}
+.btn-view { background: rgba(99,102,241,0.1); color: var(--primary); }
+.btn-view:hover { background: var(--primary); color: white; }
+.btn-edit { background: rgba(245,158,11,0.1); color: var(--warning); }
+.btn-edit:hover { background: var(--warning); color: white; }
+.btn-delete { background: rgba(239,68,68,0.1); color: var(--danger); }
+.btn-delete:hover { background: var(--danger); color: white; }
+.btn-copy { background: rgba(6,182,212,0.1); color: var(--info); }
+.btn-copy:hover { background: var(--info); color: white; }
+.nav-tabs-custom {
+  border-bottom: 2px solid var(--border-color);
+  gap: 4px;
+}
+.nav-tabs-custom .nav-link {
+  border: none;
+  background: none;
+  color: var(--text-secondary);
+  padding: 12px 20px;
+  font-weight: 500;
+  border-radius: 8px 8px 0 0;
+  margin: 0;
+}
+.nav-tabs-custom .nav-link.active {
+  color: var(--primary);
+  background: var(--sidebar-active-bg);
+  border-bottom: 2px solid var(--primary);
+  margin-bottom: -2px;
+}
+.cred-card {
+  background: var(--card-bg);
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  padding: 16px;
+  transition: all 0.2s;
+}
+.cred-card:hover { border-color: var(--primary); box-shadow: 0 4px 12px rgba(99,102,241,0.1); }
+.cred-card-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+.cred-icon {
+  width: 40px; height: 40px;
+  border-radius: 10px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 1.1rem;
+}
+.cred-title { font-weight: 600; font-size: 0.95rem; }
+.cred-subtitle { font-size: 0.8rem; color: var(--text-secondary); }
+.cred-field {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--border-color);
+  font-size: 0.85rem;
+}
+.cred-field:last-child { border-bottom: none; }
+.cred-label { color: var(--text-secondary); }
+.cred-value { font-weight: 500; font-family: monospace; }
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border-color); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: var(--text-secondary); }
+@media (max-width: 991px) {
+  .sidebar { transform: translateX(-100%); }
+  .sidebar.show { transform: translateX(0); }
+  .main-content { margin-left: 0 !important; }
+  .search-box { width: 200px; }
+}
+</style>
+</head>
+<body>
+
+<nav class="sidebar" id="sidebar">
+  <div class="sidebar-header">
+    <div class="logo-icon">S</div>
+    <h5 class="nav-text">SAPTA CRM</h5>
+  </div>
+  <div class="sidebar-section-title nav-text">Main</div>
+  <a href="dashboard.html" class="nav-link active">
+    <i class="fas fa-th-large"></i>
+    <span class="nav-text">Dashboard</span>
+  </a>
+  <a href="clients.html" class="nav-link">
+    <i class="fas fa-users"></i>
+    <span class="nav-text">Clients</span>
+    <span class="badge bg-primary nav-text">48</span>
+  </a>
+  <div class="sidebar-section-title nav-text">SEO</div>
+  <a href="active-seo.html" class="nav-link">
+    <i class="fas fa-chart-line"></i>
+    <span class="nav-text">Active SEO</span>
+    <span class="badge bg-success nav-text">32</span>
+  </a>
+  <a href="paused-seo.html" class="nav-link">
+    <i class="fas fa-pause-circle"></i>
+    <span class="nav-text">Paused SEO</span>
+    <span class="badge bg-warning nav-text">8</span>
+  </a>
+  <div class="sidebar-section-title nav-text">Websites</div>
+  <a href="website-projects.html" class="nav-link">
+    <i class="fas fa-globe"></i>
+    <span class="nav-text">Website Projects</span>
+    <span class="badge bg-info nav-text">15</span>
+  </a>
+  <div class="sidebar-section-title nav-text">Finance</div>
+  <a href="seo-payments.html" class="nav-link">
+    <i class="fas fa-money-bill-wave"></i>
+    <span class="nav-text">SEO Payments</span>
+  </a>
+  <a href="website-payments.html" class="nav-link">
+    <i class="fas fa-credit-card"></i>
+    <span class="nav-text">Website Payments</span>
+  </a>
+  <div class="sidebar-section-title nav-text">Management</div>
+  <a href="credentials.html" class="nav-link">
+    <i class="fas fa-key"></i>
+    <span class="nav-text">Credentials</span>
+  </a>
+  <a href="domains.html" class="nav-link">
+    <i class="fas fa-server"></i>
+    <span class="nav-text">Domains & Hosting</span>
+  </a>
+  <a href="employees.html" class="nav-link">
+    <i class="fas fa-user-tie"></i>
+    <span class="nav-text">Employees</span>
+  </a>
+  <a href="tasks.html" class="nav-link">
+    <i class="fas fa-tasks"></i>
+    <span class="nav-text">Tasks</span>
+    <span class="badge bg-danger nav-text">12</span>
+  </a>
+  <div class="sidebar-section-title nav-text">Analytics</div>
+  <a href="reports.html" class="nav-link">
+    <i class="fas fa-chart-pie"></i>
+    <span class="nav-text">Reports</span>
+  </a>
+  <a href="settings.html" class="nav-link">
+    <i class="fas fa-cog"></i>
+    <span class="nav-text">Settings</span>
+  </a>
+</nav>
+
+<div class="main-content" id="mainContent">
+  <header class="top-header">
+    <div class="header-left">
+      <button class="toggle-btn" onclick="toggleSidebar()">
+        <i class="fas fa-bars"></i>
+      </button>
+      <div class="search-box">
+        <i class="fas fa-search"></i>
+        <input type="text" placeholder="Search clients, projects, tasks...">
+      </div>
+    </div>
+    <div class="header-right">
+      <button class="header-btn" onclick="toggleTheme()">
+        <i class="fas fa-moon" id="themeIcon"></i>
+      </button>
+      <button class="header-btn">
+        <i class="fas fa-bell"></i>
+        <span class="notification-dot"></span>
+      </button>
+      <button class="header-btn">
+        <i class="fas fa-envelope"></i>
+      </button>
+      <div class="user-avatar">AD</div>
+    </div>
+  </header>
+
+  <div class="content-area">
+    <h2 class="page-title">Dashboard</h2>
+    <div class="breadcrumb">Welcome back, here's what's happening today</div>
+    
+    <div class="row g-3 mb-4">
+      <div class="col-xl-3 col-lg-4 col-md-6">
+        <div class="stat-card">
+          <div class="stat-icon" style="background: rgba(99,102,241,0.1); color: var(--primary);">
+            <i class="fas fa-users"></i>
+          </div>
+          <div class="stat-value">48</div>
+          <div class="stat-label">Total Clients</div>
+          <div class="stat-change up"><i class="fas fa-arrow-up"></i> 12% from last month</div>
+          <div style="position: absolute; top: 0; left: 0; width: 4px; height: 100%; background: var(--primary); border-radius: 12px 0 0 12px;"></div>
+        </div>
+      </div>
+      <div class="col-xl-3 col-lg-4 col-md-6">
+        <div class="stat-card">
+          <div class="stat-icon" style="background: rgba(16,185,129,0.1); color: var(--success);">
+            <i class="fas fa-chart-line"></i>
+          </div>
+          <div class="stat-value">32</div>
+          <div class="stat-label">Active SEO Clients</div>
+          <div class="stat-change up"><i class="fas fa-arrow-up"></i> 5 new this month</div>
+          <div style="position: absolute; top: 0; left: 0; width: 4px; height: 100%; background: var(--success); border-radius: 12px 0 0 12px;"></div>
+        </div>
+      </div>
+      <div class="col-xl-3 col-lg-4 col-md-6">
+        <div class="stat-card">
+          <div class="stat-icon" style="background: rgba(245,158,11,0.1); color: var(--warning);">
+            <i class="fas fa-pause-circle"></i>
+          </div>
+          <div class="stat-value">8</div>
+          <div class="stat-label">Paused SEO</div>
+          <div class="stat-change down"><i class="fas fa-arrow-down"></i> 2 resumed</div>
+          <div style="position: absolute; top: 0; left: 0; width: 4px; height: 100%; background: var(--warning); border-radius: 12px 0 0 12px;"></div>
+        </div>
+      </div>
+      <div class="col-xl-3 col-lg-4 col-md-6">
+        <div class="stat-card">
+          <div class="stat-icon" style="background: rgba(6,182,212,0.1); color: var(--info);">
+            <i class="fas fa-globe"></i>
+          </div>
+          <div class="stat-value">15</div>
+          <div class="stat-label">Website Projects</div>
+          <div class="stat-change up"><i class="fas fa-arrow-up"></i> 3 in progress</div>
+          <div style="position: absolute; top: 0; left: 0; width: 4px; height: 100%; background: var(--info); border-radius: 12px 0 0 12px;"></div>
+        </div>
+      </div>
+      <div class="col-xl-3 col-lg-4 col-md-6">
+        <div class="stat-card">
+          <div class="stat-icon" style="background: rgba(99,102,241,0.1); color: var(--primary);">
+            <i class="fas fa-rupee-sign"></i>
+          </div>
+          <div class="stat-value">2.4M</div>
+          <div class="stat-label">Monthly Revenue (PKR)</div>
+          <div class="stat-change up"><i class="fas fa-arrow-up"></i> 18% vs last month</div>
+          <div style="position: absolute; top: 0; left: 0; width: 4px; height: 100%; background: var(--primary); border-radius: 12px 0 0 12px;"></div>
+        </div>
+      </div>
+      <div class="col-xl-3 col-lg-4 col-md-6">
+        <div class="stat-card">
+          <div class="stat-icon" style="background: rgba(239,68,68,0.1); color: var(--danger);">
+            <i class="fas fa-exclamation-triangle"></i>
+          </div>
+          <div class="stat-value">485K</div>
+          <div class="stat-label">Outstanding PKR</div>
+          <div class="stat-change down"><i class="fas fa-arrow-up"></i> 5 overdue</div>
+          <div style="position: absolute; top: 0; left: 0; width: 4px; height: 100%; background: var(--danger); border-radius: 12px 0 0 12px;"></div>
+        </div>
+      </div>
+      <div class="col-xl-3 col-lg-4 col-md-6">
+        <div class="stat-card">
+          <div class="stat-icon" style="background: rgba(245,158,11,0.1); color: var(--warning);">
+            <i class="fas fa-coins"></i>
+          </div>
+          <div class="stat-value">AED 12K</div>
+          <div class="stat-label">Outstanding AED</div>
+          <div class="stat-change down"><i class="fas fa-arrow-up"></i> 2 overdue</div>
+          <div style="position: absolute; top: 0; left: 0; width: 4px; height: 100%; background: var(--warning); border-radius: 12px 0 0 12px;"></div>
+        </div>
+      </div>
+      <div class="col-xl-3 col-lg-4 col-md-6">
+        <div class="stat-card">
+          <div class="stat-icon" style="background: rgba(16,185,129,0.1); color: var(--success);">
+            <i class="fas fa-user-tie"></i>
+          </div>
+          <div class="stat-value">12</div>
+          <div class="stat-label">Employees</div>
+          <div class="stat-change up"><i class="fas fa-arrow-up"></i> 2 new hires</div>
+          <div style="position: absolute; top: 0; left: 0; width: 4px; height: 100%; background: var(--success); border-radius: 12px 0 0 12px;"></div>
+        </div>
+      </div>
+      <div class="col-xl-3 col-lg-4 col-md-6">
+        <div class="stat-card">
+          <div class="stat-icon" style="background: rgba(239,68,68,0.1); color: var(--danger);">
+            <i class="fas fa-clock"></i>
+          </div>
+          <div class="stat-value">12</div>
+          <div class="stat-label">Pending Tasks</div>
+          <div class="stat-change down"><i class="fas fa-arrow-up"></i> 3 due today</div>
+          <div style="position: absolute; top: 0; left: 0; width: 4px; height: 100%; background: var(--danger); border-radius: 12px 0 0 12px;"></div>
+        </div>
+      </div>
+      <div class="col-xl-3 col-lg-4 col-md-6">
+        <div class="stat-card">
+          <div class="stat-icon" style="background: rgba(16,185,129,0.1); color: var(--success);">
+            <i class="fas fa-check-circle"></i>
+          </div>
+          <div class="stat-value">156</div>
+          <div class="stat-label">Completed Tasks</div>
+          <div class="stat-change up"><i class="fas fa-arrow-up"></i> 24 this week</div>
+          <div style="position: absolute; top: 0; left: 0; width: 4px; height: 100%; background: var(--success); border-radius: 12px 0 0 12px;"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="row g-3">
+      <div class="col-lg-8">
+        <div class="card">
+          <div class="card-header">
+            <span><i class="fas fa-tasks me-2 text-primary"></i>Recent Tasks</span>
+            <a href="tasks.html" class="btn-primary-custom" style="padding: 6px 14px; font-size: 0.85rem;">
+              <i class="fas fa-plus"></i> New Task
+            </a>
+          </div>
+          <div class="card-body p-0">
+            <div class="table-container">
+              <table class="table">
+                <thead>
+                  <tr>
+                    <th>Task</th>
+                    <th>Client</th>
+                    <th>Employee</th>
+                    <th>Priority</th>
+                    <th>Status</th>
+                    <th>Due Date</th>
+                    <th>Progress</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td><strong>Keyword Research</strong></td>
+                    <td>Al-Futtaim Group</td>
+                    <td><span class="badge-soft badge-soft-secondary">Ahmed K.</span></td>
+                    <td><span class="badge-soft badge-soft-danger">High</span></td>
+                    <td><span class="badge-soft badge-soft-warning">In Progress</span></td>
+                    <td>Jul 12, 2026</td>
+                    <td><div class="progress-custom" style="width: 100px;"><div class="progress-bar-custom" style="width: 65%; background: var(--warning);"></div></div></td>
+                  </tr>
+                  <tr>
+                    <td><strong>On-Page SEO Audit</strong></td>
+                    <td>Dubai Marina Towers</td>
+                    <td><span class="badge-soft badge-soft-secondary">Sarah M.</span></td>
+                    <td><span class="badge-soft badge-soft-warning">Medium</span></td>
+                    <td><span class="badge-soft badge-soft-info">Review</span></td>
+                    <td>Jul 10, 2026</td>
+                    <td><div class="progress-custom" style="width: 100px;"><div class="progress-bar-custom" style="width: 90%; background: var(--info);"></div></div></td>
+                  </tr>
+                  <tr>
+                    <td><strong>Backlink Outreach</strong></td>
+                    <td>Emirates NBD</td>
+                    <td><span class="badge-soft badge-soft-secondary">Ali R.</span></td>
+                    <td><span class="badge-soft badge-soft-danger">High</span></td>
+                    <td><span class="badge-soft badge-soft-success">Completed</span></td>
+                    <td>Jul 08, 2026</td>
+                    <td><div class="progress-custom" style="width: 100px;"><div class="progress-bar-custom" style="width: 100%; background: var(--success);"></div></div></td>
+                  </tr>
+                  <tr>
+                    <td><strong>Content Strategy</strong></td>
+                    <td>Abu Dhabi Mall</td>
+                    <td><span class="badge-soft badge-soft-secondary">Fatima Z.</span></td>
+                    <td><span class="badge-soft badge-soft-secondary">Low</span></td>
+                    <td><span class="badge-soft badge-soft-primary">Pending</span></td>
+                    <td>Jul 15, 2026</td>
+                    <td><div class="progress-custom" style="width: 100px;"><div class="progress-bar-custom" style="width: 15%; background: var(--primary);"></div></div></td>
+                  </tr>
+                  <tr>
+                    <td><strong>Technical SEO Fix</strong></td>
+                    <td>Saudi Aramco</td>
+                    <td><span class="badge-soft badge-soft-secondary">Omar H.</span></td>
+                    <td><span class="badge-soft badge-soft-danger">High</span></td>
+                    <td><span class="badge-soft badge-soft-warning">In Progress</span></td>
+                    <td>Jul 11, 2026</td>
+                    <td><div class="progress-custom" style="width: 100px;"><div class="progress-bar-custom" style="width: 45%; background: var(--warning);"></div></div></td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="col-lg-4">
+        <div class="card">
+          <div class="card-header">
+            <span><i class="fas fa-bell me-2 text-warning"></i>Recent Activity</span>
+          </div>
+          <div class="card-body">
+            <div class="d-flex gap-3 mb-3 pb-3" style="border-bottom: 1px solid var(--border-color);">
+              <div class="flex-shrink-0">
+                <div style="width: 36px; height: 36px; border-radius: 50%; background: rgba(99,102,241,0.1); color: var(--primary); display: flex; align-items: center; justify-content: center;">
+                  <i class="fas fa-user-plus" style="font-size: 0.8rem;"></i>
+                </div>
+              </div>
+              <div>
+                <div style="font-weight: 600; font-size: 0.9rem;">New client added</div>
+                <div style="font-size: 0.8rem; color: var(--text-secondary);">Dubai Holdings signed up for SEO</div>
+                <div style="font-size: 0.75rem; color: var(--text-secondary); margin-top: 4px;">2 hours ago</div>
+              </div>
+            </div>
+            <div class="d-flex gap-3 mb-3 pb-3" style="border-bottom: 1px solid var(--border-color);">
+              <div class="flex-shrink-0">
+                <div style="width: 36px; height: 36px; border-radius: 50%; background: rgba(16,185,129,0.1); color: var(--success); display: flex; align-items: center; justify-content: center;">
+                  <i class="fas fa-check" style="font-size: 0.8rem;"></i>
+                </div>
+              </div>
+              <div>
+                <div style="font-weight: 600; font-size: 0.9rem;">Payment received</div>
+                <div style="font-size: 0.8rem; color: var(--text-secondary);">AED 5,000 from Emirates Airlines</div>
+                <div style="font-size: 0.75rem; color: var(--text-secondary); margin-top: 4px;">4 hours ago</div>
+              </div>
+            </div>
+            <div class="d-flex gap-3 mb-3 pb-3" style="border-bottom: 1px solid var(--border-color);">
+              <div class="flex-shrink-0">
+                <div style="width: 36px; height: 36px; border-radius: 50%; background: rgba(245,158,11,0.1); color: var(--warning); display: flex; align-items: center; justify-content: center;">
+                  <i class="fas fa-exclamation" style="font-size: 0.8rem;"></i>
+                </div>
+              </div>
+              <div>
+                <div style="font-weight: 600; font-size: 0.9rem;">Task overdue</div>
+                <div style="font-size: 0.8rem; color: var(--text-secondary);">Website audit for Jumeirah Group</div>
+                <div style="font-size: 0.75rem; color: var(--text-secondary); margin-top: 4px;">1 day ago</div>
+              </div>
+            </div>
+            <div class="d-flex gap-3">
+              <div class="flex-shrink-0">
+                <div style="width: 36px; height: 36px; border-radius: 50%; background: rgba(6,182,212,0.1); color: var(--info); display: flex; align-items: center; justify-content: center;">
+                  <i class="fas fa-globe" style="font-size: 0.8rem;"></i>
+                </div>
+              </div>
+              <div>
+                <div style="font-weight: 600; font-size: 0.9rem;">Website launched</div>
+                <div style="font-size: 0.8rem; color: var(--text-secondary);">Al-Futtaim corporate site is live</div>
+                <div style="font-size: 0.75rem; color: var(--text-secondary); margin-top: 4px;">Yesterday</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+function toggleSidebar() {
+  document.getElementById('sidebar').classList.toggle('collapsed');
+  document.getElementById('mainContent').classList.toggle('expanded');
+}
+function toggleTheme() {
+  const html = document.documentElement;
+  const icon = document.getElementById('themeIcon');
+  if (html.getAttribute('data-bs-theme') === 'light') {
+    html.setAttribute('data-bs-theme', 'dark');
+    icon.classList.replace('fa-moon', 'fa-sun');
+  } else {
+    html.setAttribute('data-bs-theme', 'light');
+    icon.classList.replace('fa-sun', 'fa-moon');
+  }
+}
+</script>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>
