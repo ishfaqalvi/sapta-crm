@@ -17,7 +17,10 @@ import {
     Phone,
     Plus,
     Search,
+    ShieldCheck,
     Trash2,
+    UserCheck,
+    UserX,
     X,
 } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
@@ -33,12 +36,22 @@ const breadcrumbs: BreadcrumbItem[] = [
     },
 ];
 
+export interface ClientWithUser extends Client {
+    user?: {
+        id: number;
+        email: string;
+        type: string;
+        created_at: string;
+    };
+}
+
 interface ClientsIndexProps {
-    clients: PaginatedData<Client>;
+    clients: PaginatedData<ClientWithUser>;
     stats?: {
         total: number;
         active: number;
         inactive: number;
+        with_portal?: number;
     };
     filters?: {
         search?: string;
@@ -56,13 +69,13 @@ export default function ClientsIndex({ clients, stats, filters }: ClientsIndexPr
     const [selectedCurrencyFilter, setSelectedCurrencyFilter] = useState(filters?.currency || '');
 
     // Drawer state for View Client Details
-    const [viewingClient, setViewingClient] = useState<Client | null>(null);
+    const [viewingClient, setViewingClient] = useState<ClientWithUser | null>(null);
 
     // Modal state for Delete confirmation
-    const [deletingClient, setDeletingClient] = useState<Client | null>(null);
+    const [deletingClient, setDeletingClient] = useState<ClientWithUser | null>(null);
     const [isDeleting, setIsDeleting] = useState(false);
 
-    // Filter debounce effect (matches Employee Directory standard)
+    // Filter debounce effect
     const isInitialRender = useRef(true);
     useEffect(() => {
         if (isInitialRender.current) {
@@ -103,10 +116,10 @@ export default function ClientsIndex({ clients, stats, filters }: ClientsIndexPr
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                     <div>
                         <h1 className="text-xl sm:text-2xl font-extrabold text-slate-900 dark:text-white tracking-tight">
-                            Client Hub & Operational Threads
+                            Client Hub & Directory
                         </h1>
                         <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 mt-0.5">
-                            Centralized directory of client accounts, retainers, contact records, and multi-currency billing setups.
+                            Centralized directory of client accounts, contact records, and billing setups.
                         </p>
                     </div>
 
@@ -176,6 +189,7 @@ export default function ClientsIndex({ clients, stats, filters }: ClientsIndexPr
                                     <th className="px-6 py-4">Contact Person</th>
                                     <th className="px-6 py-4">Phone / Location</th>
                                     <th className="px-6 py-4">Currency</th>
+                                    <th className="px-6 py-4">Portal Account</th>
                                     <th className="px-6 py-4">Status</th>
                                     <th className="px-6 py-4 text-right">Actions</th>
                                 </tr>
@@ -256,13 +270,27 @@ export default function ClientsIndex({ clients, stats, filters }: ClientsIndexPr
                                                 </span>
                                             </td>
 
+                                            {/* Portal Account Status Badge (Read-Only) */}
+                                            <td className="px-6 py-4">
+                                                {client.user ? (
+                                                    <span className="px-2.5 py-1 rounded-full text-[10px] font-extrabold uppercase tracking-wider inline-flex items-center gap-1.5 bg-indigo-50 text-indigo-700 dark:bg-indigo-950/60 dark:text-indigo-300 border border-indigo-200/60">
+                                                        <UserCheck className="size-3.5" />
+                                                        <span>Portal Active</span>
+                                                    </span>
+                                                ) : (
+                                                    <span className="px-2.5 py-1 rounded-full text-[10px] font-extrabold uppercase tracking-wider inline-flex items-center gap-1.5 bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400 border border-slate-200/60 dark:border-slate-700">
+                                                        <UserX className="size-3.5" />
+                                                        <span>No Account</span>
+                                                    </span>
+                                                )}
+                                            </td>
+
                                             {/* Status */}
                                             <td className="px-6 py-4">
-                                                <span className={`px-2.5 py-1 rounded-full text-[11px] font-bold inline-flex items-center gap-1 ${
-                                                    client.status === 'active'
-                                                        ? 'bg-emerald-50 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800'
-                                                        : 'bg-amber-50 dark:bg-amber-950/50 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-800'
-                                                }`}>
+                                                <span className={`px-2.5 py-1 rounded-full text-[11px] font-bold inline-flex items-center gap-1 ${client.status === 'active'
+                                                    ? 'bg-emerald-50 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800'
+                                                    : 'bg-amber-50 dark:bg-amber-950/50 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-800'
+                                                    }`}>
                                                     {client.status === 'active' ? (
                                                         <>
                                                             <CheckCircle2 className="size-3" />
@@ -281,9 +309,9 @@ export default function ClientsIndex({ clients, stats, filters }: ClientsIndexPr
                                             <td className="px-6 py-4 text-right">
                                                 <div className="flex items-center justify-end gap-1.5">
                                                     <Link
-                                                        href={`/clients/${client.id}`}
+                                                        href={`/clients/view/${client.id}`}
                                                         className="size-8 rounded-xl bg-purple-50 dark:bg-purple-950/60 text-purple-600 dark:text-purple-400 hover:bg-purple-600 hover:text-white dark:hover:bg-purple-600 dark:hover:text-white transition-all flex items-center justify-center shadow-2xs"
-                                                        title="View Client Detail Page"
+                                                        title="Open Client Portal Workspace"
                                                     >
                                                         <Eye className="size-3.5" />
                                                     </Link>
@@ -291,7 +319,7 @@ export default function ClientsIndex({ clients, stats, filters }: ClientsIndexPr
                                                         <Link
                                                             href={`/clients/${client.id}/edit`}
                                                             className="size-8 rounded-xl bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400 hover:bg-blue-600 hover:text-white dark:hover:bg-blue-600 dark:hover:text-white transition-all flex items-center justify-center shadow-2xs"
-                                                            title="Edit Client Profile"
+                                                            title="Edit Client Details"
                                                         >
                                                             <Edit2 className="size-3.5" />
                                                         </Link>
@@ -311,7 +339,7 @@ export default function ClientsIndex({ clients, stats, filters }: ClientsIndexPr
                                     ))
                                 ) : (
                                     <tr>
-                                        <td colSpan={6} className="px-6 py-12 text-center text-slate-400 italic">
+                                        <td colSpan={7} className="px-6 py-12 text-center text-slate-400 italic">
                                             No client records found.
                                         </td>
                                     </tr>
@@ -322,111 +350,6 @@ export default function ClientsIndex({ clients, stats, filters }: ClientsIndexPr
 
                     <Pagination meta={clients} />
                 </div>
-
-                {/* VIEW CLIENT DETAILS & THREAD DRAWER */}
-                {viewingClient && (
-                    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs overflow-y-auto">
-                        <div className="w-full max-w-3xl rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-6 shadow-2xl space-y-6 animate-in fade-in zoom-in-95 duration-200 max-h-[90vh] overflow-y-auto">
-                            <div className="flex items-center justify-between border-b border-slate-100 pb-4 dark:border-slate-800">
-                                <div className="flex items-center gap-3">
-                                    <span className="h-8 px-3 rounded-lg bg-indigo-50 dark:bg-indigo-950/60 text-xs font-mono font-bold text-indigo-700 dark:text-indigo-300 border border-indigo-200/50 dark:border-indigo-800/50 inline-flex items-center">
-                                        {viewingClient.client_code}
-                                    </span>
-                                    <div>
-                                        <h3 className="text-xl font-extrabold text-slate-900 dark:text-white">{viewingClient.name}</h3>
-                                        <p className="text-xs text-slate-500 dark:text-slate-400">{viewingClient.company_name || 'Individual Client'}</p>
-                                    </div>
-                                </div>
-                                <button
-                                    onClick={() => setViewingClient(null)}
-                                    className="rounded-xl p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-600 dark:hover:bg-slate-800 dark:hover:text-slate-200"
-                                >
-                                    <X className="size-5" />
-                                </button>
-                            </div>
-
-                            <div className="space-y-5">
-                                {/* Key Metadata Grid */}
-                                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 bg-slate-50 dark:bg-slate-950 p-4 rounded-2xl border border-slate-200/80 dark:border-slate-800">
-                                    <div>
-                                        <p className="text-xs text-slate-400 font-bold uppercase tracking-wider">Contact Person</p>
-                                        <p className="font-extrabold text-slate-900 dark:text-white text-sm mt-0.5">{viewingClient.contact_person}</p>
-                                    </div>
-                                    <div>
-                                        <p className="text-xs text-slate-400 font-bold uppercase tracking-wider">Email Address</p>
-                                        <p className="font-semibold text-blue-600 dark:text-blue-400 text-sm mt-0.5">{viewingClient.email || '—'}</p>
-                                    </div>
-                                    <div>
-                                        <p className="text-xs text-slate-400 font-bold uppercase tracking-wider">Phone / Mobile</p>
-                                        <p className="font-mono font-semibold text-slate-900 dark:text-white text-sm mt-0.5">{viewingClient.mobile || viewingClient.phone || '—'}</p>
-                                    </div>
-                                    <div>
-                                        <p className="text-xs text-slate-400 font-bold uppercase tracking-wider">City / Country</p>
-                                        <p className="font-semibold text-slate-900 dark:text-white text-sm mt-0.5">
-                                            {[viewingClient.city, viewingClient.country].filter(Boolean).join(', ') || '—'}
-                                        </p>
-                                    </div>
-                                    <div>
-                                        <p className="text-xs text-slate-400 font-bold uppercase tracking-wider">Billing Currency</p>
-                                        <p className="font-mono font-extrabold text-slate-900 dark:text-white text-sm mt-0.5">{viewingClient.currency}</p>
-                                    </div>
-                                    <div>
-                                        <p className="text-xs text-slate-400 font-bold uppercase tracking-wider">Account Status</p>
-                                        <p className="mt-0.5">
-                                            {viewingClient.status === 'active' ? (
-                                                <span className="inline-flex items-center gap-1 text-xs font-bold text-emerald-600 dark:text-emerald-400">
-                                                    <CheckCircle2 className="size-3.5" /> Active Client
-                                                </span>
-                                            ) : (
-                                                <span className="inline-flex items-center gap-1 text-xs font-bold text-amber-600 dark:text-amber-400">
-                                                    <AlertCircle className="size-3.5" /> Inactive / On-Hold
-                                                </span>
-                                            )}
-                                        </p>
-                                    </div>
-                                </div>
-
-                                {viewingClient.notes && (
-                                    <div className="rounded-2xl border border-slate-200/80 bg-white p-4 dark:border-slate-800 dark:bg-slate-950 space-y-1.5">
-                                        <h4 className="text-xs font-extrabold uppercase tracking-wider text-slate-500 dark:text-slate-400">Notes & Special Instructions</h4>
-                                        <p className="text-xs text-slate-700 dark:text-slate-300 leading-relaxed whitespace-pre-wrap">{viewingClient.notes}</p>
-                                    </div>
-                                )}
-
-                                {/* Client Operational Thread Banner */}
-                                <div className="rounded-2xl bg-slate-900 text-white p-5 space-y-2 dark:bg-slate-950 border border-slate-800">
-                                    <div className="flex items-center justify-between">
-                                        <h4 className="font-extrabold text-sm flex items-center gap-2">
-                                            <Layers className="size-4 text-emerald-400" /> Operational Threads Linked to {viewingClient.client_code}
-                                        </h4>
-                                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-emerald-950 text-emerald-400 border border-emerald-800">Operational</span>
-                                    </div>
-                                    <p className="text-xs text-slate-300 leading-relaxed">
-                                        SEO retainers, website projects, credential vault logins, domain renewals, and assigned tasks for{' '}
-                                        <strong className="text-white">{viewingClient.name}</strong> key dynamically to this Client ID across Sapta CRM.
-                                    </p>
-                                </div>
-                            </div>
-
-                            <div className="flex justify-end gap-3 pt-2 border-t border-slate-100 dark:border-slate-800">
-                                <Link
-                                    href={`/clients/${viewingClient.id}/edit`}
-                                    className="h-10 px-4 text-xs font-bold rounded-xl bg-blue-50 text-blue-600 dark:bg-blue-950/60 dark:text-blue-400 hover:bg-blue-100 transition-colors inline-flex items-center gap-2"
-                                >
-                                    <Edit2 className="size-3.5" />
-                                    <span>Edit Client Profile</span>
-                                </Link>
-                                <button
-                                    type="button"
-                                    onClick={() => setViewingClient(null)}
-                                    className="h-10 px-5 text-xs font-bold rounded-xl bg-slate-900 text-white dark:bg-slate-100 dark:text-slate-900 hover:opacity-90 transition-opacity"
-                                >
-                                    Close Overview
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                )}
 
                 {/* Delete Confirmation Modal */}
                 {deletingClient && (
@@ -451,7 +374,7 @@ export default function ClientsIndex({ clients, stats, filters }: ClientsIndexPr
                                     type="button"
                                     onClick={() => setDeletingClient(null)}
                                     disabled={isDeleting}
-                                    className="h-10 px-4 text-xs font-semibold rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-200 transition-colors disabled:opacity-50"
+                                    className="h-10 px-4 text-xs font-semibold rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-200 transition-colors disabled:opacity-50 cursor-pointer"
                                 >
                                     Cancel
                                 </button>
@@ -460,7 +383,7 @@ export default function ClientsIndex({ clients, stats, filters }: ClientsIndexPr
                                     type="button"
                                     onClick={handleConfirmDelete}
                                     disabled={isDeleting}
-                                    className="h-10 px-5 text-xs font-bold rounded-xl bg-gradient-to-r from-rose-600 to-red-600 hover:from-rose-700 hover:to-red-700 text-white shadow-md shadow-rose-600/20 active:scale-[0.99] transition-all flex items-center justify-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed"
+                                    className="h-10 px-5 text-xs font-bold rounded-xl bg-gradient-to-r from-rose-600 to-red-600 hover:from-rose-700 hover:to-red-700 text-white shadow-md shadow-rose-600/20 active:scale-[0.99] transition-all flex items-center justify-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed cursor-pointer"
                                 >
                                     {isDeleting ? (
                                         <div className="flex items-center gap-2">

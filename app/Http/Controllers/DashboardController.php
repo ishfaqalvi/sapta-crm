@@ -21,7 +21,7 @@ class DashboardController extends Controller
     /**
      * Display the Executive CRM Analytics & Live Dashboard.
      */
-    public function index(Request $request): Response
+    public function index(Request $request)
     {
         // 1. Financial KPIs (Strictly Website Payments + SEO Payments; Invoices are optional)
         $websitePaidPkr = ProjectPayment::where('status', 'paid')->sum('amount_pkr') ?? 0;

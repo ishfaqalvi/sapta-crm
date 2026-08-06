@@ -2,7 +2,8 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\Client;
+use App\Models\{Client, Currency};
+use App\Traits\HasActiveClientContext;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
@@ -11,8 +12,10 @@ use Inertia\Response;
 
 class ClientController extends Controller
 {
+    use HasActiveClientContext;
+
     /**
-     * Display a listing of clients with search and filter functionality.
+     * Display a listing of clients with search, filter, and read-only portal access status.
      */
     public function index(Request $request): Response
     {
@@ -21,6 +24,11 @@ class ClientController extends Controller
         $currency = $request->query('currency');
 
         $clients = Client::query()
+            ->with([
+                'user' => function ($query) {
+                    $query->where('type', 'client')->select('id', 'client_id', 'name', 'email', 'type', 'created_at');
+                }
+            ])
             ->when($search, function ($query, $search) {
                 $query->where(function ($q) use ($search) {
                     $q->where('name', 'like', "%{$search}%")
@@ -47,6 +55,9 @@ class ClientController extends Controller
             'total' => Client::count(),
             'active' => Client::where('status', 'active')->count(),
             'inactive' => Client::where('status', 'inactive')->count(),
+            'with_portal' => Client::whereHas('user', function ($q) {
+                $q->where('type', 'client');
+            })->count(),
         ];
 
         return Inertia::render('clients/index', [
@@ -67,33 +78,18 @@ class ClientController extends Controller
     {
         return Inertia::render('clients/create', [
             'next_client_code' => Client::generateClientCode(),
-            'currencies' => \App\Models\Currency::where('is_active', true)->select('code', 'name', 'symbol')->get(),
+            'currencies' => Currency::where('is_active', true)->select('code', 'name', 'symbol')->get(),
         ]);
     }
 
     /**
-     * Display the specified client thread / details.
+     * Set active client context in user profile and redirect to client portal dashboard.
      */
-    public function show(Client $client): Response
+    public function show(Client $client): RedirectResponse
     {
-        $client->load([
-            'websiteProjects' => function ($q) {
-                $q->with(['payments', 'tasks.assignedEmployee'])->latest();
-            },
-            'seoRetainers' => function ($q) {
-                $q->with('payments')->latest();
-            },
-            'projectPayments' => function ($q) {
-                $q->with('websiteProject')->latest();
-            },
-            'seoPayments' => function ($q) {
-                $q->with('seoRetainer')->latest();
-            },
-        ]);
+        $this->setActiveClientContext($client->id);
 
-        return Inertia::render('clients/show', [
-            'client' => $client,
-        ]);
+        return redirect()->route('client-portal.overview.index');
     }
 
     /**
@@ -103,7 +99,7 @@ class ClientController extends Controller
     {
         return Inertia::render('clients/edit', [
             'client' => $client,
-            'currencies' => \App\Models\Currency::where('is_active', true)->select('code', 'name', 'symbol')->get(),
+            'currencies' => Currency::where('is_active', true)->select('code', 'name', 'symbol')->get(),
         ]);
     }
 
@@ -162,6 +158,10 @@ class ClientController extends Controller
      */
     public function destroy(Client $client): RedirectResponse
     {
+        if ($client->user) {
+            $client->user->delete();
+        }
+
         $client->delete();
 
         return redirect()->route('clients.index')->with('success', 'Client deleted successfully.');

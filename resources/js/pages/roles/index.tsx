@@ -204,6 +204,7 @@ export default function RolesIndex({ roles, permissions, groupedPermissions }: R
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                     {roles.map((role) => {
                         const isSuperAdmin = ['super admin', 'super-admin'].includes(role.name.toLowerCase());
+                        const isClientRole = role.name.toLowerCase() === 'client';
                         const roleDisplayName = role.name;
 
                         return (
@@ -238,7 +239,7 @@ export default function RolesIndex({ roles, permissions, groupedPermissions }: R
                                         <div className="flex items-center justify-between text-xs font-bold text-slate-700 dark:text-slate-300">
                                             <span>Attached Permissions</span>
                                             <span className="text-blue-600 dark:text-blue-400">
-                                                {isSuperAdmin ? 'All Access (18/18)' : `${role.permissions.length} Enabled`}
+                                                {isSuperAdmin ? `All Access (${permissions.length}/${permissions.length})` : `${role.permissions.length} Enabled`}
                                             </span>
                                         </div>
 
@@ -283,13 +284,15 @@ export default function RolesIndex({ roles, permissions, groupedPermissions }: R
                                                 <span>Edit Permissions</span>
                                             </button>
 
-                                            <button
-                                                onClick={() => handleOpenDeleteModal(role)}
-                                                className="h-9 w-9 rounded-xl bg-rose-50 dark:bg-rose-950/40 hover:bg-rose-100 text-rose-600 dark:text-rose-400 flex items-center justify-center transition-colors"
-                                                title="Delete Role"
-                                            >
-                                                <Trash2 className="size-3.5" />
-                                            </button>
+                                            {!isClientRole && (
+                                                <button
+                                                    onClick={() => handleOpenDeleteModal(role)}
+                                                    className="h-9 w-9 rounded-xl bg-rose-50 dark:bg-rose-950/40 hover:bg-rose-100 text-rose-600 dark:text-rose-400 flex items-center justify-center transition-colors cursor-pointer"
+                                                    title="Delete Role"
+                                                >
+                                                    <Trash2 className="size-3.5" />
+                                                </button>
+                                            )}
                                         </>
                                     )}
                                 </div>

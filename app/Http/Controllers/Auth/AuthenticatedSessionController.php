@@ -2,14 +2,19 @@
 
 namespace App\Http\Controllers\Auth;
 
-use App\Http\Controllers\Controller;
-use App\Http\Requests\Auth\LoginRequest;
-use Illuminate\Http\RedirectResponse;
-use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\Route;
+use App\Models\User;
 use Inertia\Inertia;
 use Inertia\Response;
+use Illuminate\Http\Request;
+use App\Http\Controllers\Controller;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Route;
+use Illuminate\Http\RedirectResponse;
+use App\Http\Requests\Auth\LoginRequest;
+use Illuminate\Support\Facades\RateLimiter;
+use Illuminate\Validation\ValidationException;
+
 
 class AuthenticatedSessionController extends Controller
 {
@@ -18,7 +23,11 @@ class AuthenticatedSessionController extends Controller
      */
     public function create(Request $request): Response|RedirectResponse
     {
-        if ($request->user()) {
+        $user = Auth::user();
+        if ($user) {
+            if ($user->type === 'client') {
+                return redirect()->route('client-portal.overview.index');
+            }
             return redirect()->route('dashboard');
         }
 
@@ -33,11 +42,30 @@ class AuthenticatedSessionController extends Controller
      */
     public function store(LoginRequest $request): RedirectResponse
     {
-        $request->authenticate();
+        $request->ensureIsNotRateLimited();
 
+        $user = User::where('email', $request->email)->first();
+
+        if (!$user || !Hash::check($request->password, $user->password)) {
+            RateLimiter::hit($request->throttleKey());
+            throw ValidationException::withMessages([
+                'email' => __('auth.failed'),
+            ]);
+        }
+
+        RateLimiter::clear($request->throttleKey());
+
+        $remember = $request->boolean('remember');
+
+        Auth::login($user, $remember);
         $request->session()->regenerate();
 
-        return redirect()->intended(route('dashboard', absolute: false));
+        // Redirect based on user->type ('client' vs 'admin')
+        if ($user->type === 'client') {
+            return redirect()->route('client-portal.overview.index');
+        }
+
+        return redirect()->route('dashboard');
     }
 
     /**
@@ -45,7 +73,7 @@ class AuthenticatedSessionController extends Controller
      */
     public function destroy(Request $request): RedirectResponse
     {
-        Auth::guard('web')->logout();
+        Auth::logout();
 
         $request->session()->invalidate();
         $request->session()->regenerateToken();

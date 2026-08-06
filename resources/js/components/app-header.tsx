@@ -1,3 +1,4 @@
+import AppearanceToggleDropdown from '@/components/appearance-dropdown';
 import { Breadcrumbs } from '@/components/breadcrumbs';
 import { Icon } from '@/components/icon';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -152,6 +153,9 @@ export function AppHeader({ breadcrumbs = [] }: AppHeaderProps) {
                                 ))}
                             </div>
                         </div>
+
+                        {/* Theme Switcher Toggle */}
+                        <AppearanceToggleDropdown />
 
                         {/* Premium Header User Profile Dropdown */}
                         <DropdownMenu>

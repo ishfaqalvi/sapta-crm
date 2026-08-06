@@ -1,3 +1,4 @@
+import AppearanceToggleDropdown from '@/components/appearance-dropdown';
 import { Breadcrumbs } from '@/components/breadcrumbs';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { SidebarTrigger } from '@/components/ui/sidebar';
@@ -23,7 +24,7 @@ export function AppSidebarHeader({ breadcrumbs = [] }: { breadcrumbs?: Breadcrum
                 <Breadcrumbs breadcrumbs={breadcrumbs} />
             </div>
 
-            {/* Right: Search, Notifications & User Dropdown */}
+            {/* Right: Search, Notifications, Dark Mode & User Dropdown */}
             <div className="flex items-center gap-3">
                 {/* Search Bar */}
                 <div className="relative hidden md:block w-64">
@@ -31,19 +32,12 @@ export function AppSidebarHeader({ breadcrumbs = [] }: { breadcrumbs?: Breadcrum
                     <input
                         type="text"
                         placeholder="Search CRM..."
-                        className="w-full h-9 pl-9 pr-4 text-xs rounded-xl bg-slate-100/80 dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 text-slate-800 dark:text-slate-200 placeholder:text-slate-400 focus:outline-none focus:border-blue-600 focus:bg-white transition-all"
+                        className="w-full h-9 pl-9 pr-4 text-xs rounded-xl bg-slate-100/80 dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 text-slate-800 dark:text-slate-200 placeholder:text-slate-400 focus:outline-none focus:border-blue-600 focus:bg-white dark:focus:bg-slate-950 transition-all"
                     />
                 </div>
 
-                {/* Live Currency Status Pill */}
-                <div className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-blue-50 dark:bg-blue-950/50 border border-blue-200/80 dark:border-blue-800/60 text-blue-700 dark:text-blue-300 text-[11px] font-bold">
-                    <span className="relative flex size-2">
-                        <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-blue-400 opacity-75"></span>
-                        <span className="relative inline-flex size-2 rounded-full bg-blue-600"></span>
-                    </span>
-                    <Coins className="size-3 text-amber-500" />
-                    <span>Multi-Currency (PKR)</span>
-                </div>
+                {/* Theme Toggle (Light / Dark Mode) */}
+                <AppearanceToggleDropdown />
 
                 {/* Notification Bell */}
                 <button className="relative flex h-9 w-9 items-center justify-center rounded-xl border border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-900 transition-colors">

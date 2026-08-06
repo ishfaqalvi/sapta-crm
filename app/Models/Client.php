@@ -53,4 +53,17 @@ class Client extends Model
     {
         return $this->hasMany(ProjectPayment::class);
     }
+
+    public function credentials()
+    {
+        return $this->hasMany(ClientCredential::class);
+    }
+
+    /**
+     * Relationship: Client has one portal User account (type = client).
+     */
+    public function user()
+    {
+        return $this->hasOne(User::class, 'client_id')->where('type', 'client');
+    }
 }

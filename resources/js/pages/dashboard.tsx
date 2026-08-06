@@ -376,7 +376,7 @@ export default function Dashboard({
                                             <span className="font-extrabold text-xs text-slate-900 dark:text-white font-mono block">
                                                 {inv.currency_code} {inv.total_amount.toFixed(2)}
                                             </span>
-                                            <span className={`px-2 py-0.5 rounded-full text-[9px] font-extrabold uppercase ${inv.status === 'paid' ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700'
+                                            <span className={`px-2 py-0.5 rounded-full text-[9px] font-extrabold uppercase ${inv.status === 'paid' ? 'bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800' : 'bg-amber-50 dark:bg-amber-950/60 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-800'
                                                 }`}>
                                                 {inv.status}
                                             </span>
@@ -441,7 +441,7 @@ export default function Dashboard({
                                             <span className="font-extrabold text-slate-900 dark:text-white truncate max-w-[170px]">
                                                 {t.task_title}
                                             </span>
-                                            <span className={`px-2 py-0.5 rounded-full text-[9px] font-extrabold uppercase ${t.priority === 'urgent' ? 'bg-rose-50 text-rose-700' : 'bg-amber-50 text-amber-700'
+                                            <span className={`px-2 py-0.5 rounded-full text-[9px] font-extrabold uppercase ${t.priority === 'urgent' ? 'bg-rose-50 dark:bg-rose-950/60 text-rose-700 dark:text-rose-300 border border-rose-200 dark:border-rose-800' : 'bg-amber-50 dark:bg-amber-950/60 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-800'
                                                 }`}>
                                                 {t.priority}
                                             </span>

@@ -2,6 +2,7 @@ import { DropdownMenuGroup, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSep
 import { useInitials } from '@/hooks/use-initials';
 import { useMobileNavigation } from '@/hooks/use-mobile-navigation';
 import { type User } from '@/types';
+import { hasPermission } from '@/utils/permissions';
 import { Link } from '@inertiajs/react';
 import { LogOut, Settings, ShieldCheck, User as UserIcon } from 'lucide-react';
 
@@ -12,6 +13,7 @@ interface UserMenuContentProps {
 export function UserMenuContent({ user }: UserMenuContentProps) {
     const cleanup = useMobileNavigation();
     const getInitials = useInitials();
+    const isClientUser = user.type === 'client';
 
     return (
         <div className="w-full space-y-1">
@@ -44,55 +46,79 @@ export function UserMenuContent({ user }: UserMenuContentProps) {
             {/* Menu Items Group */}
             <DropdownMenuGroup className="space-y-0.5">
                 {/* Profile Edit Link */}
-                <DropdownMenuItem asChild className="focus:bg-slate-100 dark:focus:bg-slate-800 rounded-xl cursor-pointer p-2 transition-colors">
-                    <Link className="flex items-center gap-3 w-full" href={route('profile.edit')} prefetch onClick={cleanup}>
-                        <div className="p-2 rounded-xl bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400 shrink-0">
-                            <UserIcon className="size-4" />
-                        </div>
-                        <div className="space-y-0.5">
-                            <div className="text-xs font-extrabold text-slate-900 dark:text-white leading-none">
-                                My Profile
+                {isClientUser ? (
+                    hasPermission(user, 'view-client-portal-profile') && (
+                        <DropdownMenuItem asChild className="focus:bg-slate-100 dark:focus:bg-slate-800 rounded-xl cursor-pointer p-2 transition-colors">
+                            <Link className="flex items-center gap-3 w-full" href="/client-portal/profile" prefetch onClick={cleanup}>
+                                <div className="p-2 rounded-xl bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400 shrink-0">
+                                    <UserIcon className="size-4" />
+                                </div>
+                                <div className="space-y-0.5">
+                                    <div className="text-xs font-extrabold text-slate-900 dark:text-white leading-none">
+                                        My Profile
+                                    </div>
+                                    <p className="text-[10px] text-slate-400 font-medium leading-none">
+                                        Account details & password
+                                    </p>
+                                </div>
+                            </Link>
+                        </DropdownMenuItem>
+                    )
+                ) : (
+                    <DropdownMenuItem asChild className="focus:bg-slate-100 dark:focus:bg-slate-800 rounded-xl cursor-pointer p-2 transition-colors">
+                        <Link className="flex items-center gap-3 w-full" href={route('profile.edit')} prefetch onClick={cleanup}>
+                            <div className="p-2 rounded-xl bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400 shrink-0">
+                                <UserIcon className="size-4" />
                             </div>
-                            <p className="text-[10px] text-slate-400 font-medium leading-none">
-                                Account details & password
-                            </p>
-                        </div>
-                    </Link>
-                </DropdownMenuItem>
+                            <div className="space-y-0.5">
+                                <div className="text-xs font-extrabold text-slate-900 dark:text-white leading-none">
+                                    My Profile
+                                </div>
+                                <p className="text-[10px] text-slate-400 font-medium leading-none">
+                                    Account details & password
+                                </p>
+                            </div>
+                        </Link>
+                    </DropdownMenuItem>
+                )}
 
-                {/* Roles & Permissions Link */}
-                <DropdownMenuItem asChild className="focus:bg-slate-100 dark:focus:bg-slate-800 rounded-xl cursor-pointer p-2 transition-colors">
-                    <Link className="flex items-center gap-3 w-full" href={route('roles.index')} prefetch onClick={cleanup}>
-                        <div className="p-2 rounded-xl bg-purple-50 dark:bg-purple-950/60 text-purple-600 dark:text-purple-400 shrink-0">
-                            <ShieldCheck className="size-4" />
-                        </div>
-                        <div className="space-y-0.5">
-                            <div className="text-xs font-extrabold text-slate-900 dark:text-white leading-none">
-                                Roles & Access
+                {/* Roles & Permissions Link (ADMIN ONLY) */}
+                {!isClientUser && (
+                    <DropdownMenuItem asChild className="focus:bg-slate-100 dark:focus:bg-slate-800 rounded-xl cursor-pointer p-2 transition-colors">
+                        <Link className="flex items-center gap-3 w-full" href={route('roles.index')} prefetch onClick={cleanup}>
+                            <div className="p-2 rounded-xl bg-purple-50 dark:bg-purple-950/60 text-purple-600 dark:text-purple-400 shrink-0">
+                                <ShieldCheck className="size-4" />
                             </div>
-                            <p className="text-[10px] text-slate-400 font-medium leading-none">
-                                System roles & permissions
-                            </p>
-                        </div>
-                    </Link>
-                </DropdownMenuItem>
+                            <div className="space-y-0.5">
+                                <div className="text-xs font-extrabold text-slate-900 dark:text-white leading-none">
+                                    Roles & Access
+                                </div>
+                                <p className="text-[10px] text-slate-400 font-medium leading-none">
+                                    System roles & permissions
+                                </p>
+                            </div>
+                        </Link>
+                    </DropdownMenuItem>
+                )}
 
-                {/* System Settings Link */}
-                <DropdownMenuItem asChild className="focus:bg-slate-100 dark:focus:bg-slate-800 rounded-xl cursor-pointer p-2 transition-colors">
-                    <Link className="flex items-center gap-3 w-full" href={route('settings.index')} prefetch onClick={cleanup}>
-                        <div className="p-2 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 shrink-0">
-                            <Settings className="size-4" />
-                        </div>
-                        <div className="space-y-0.5">
-                            <div className="text-xs font-extrabold text-slate-900 dark:text-white leading-none">
-                                CRM Settings
+                {/* System Settings Link (ADMIN ONLY) */}
+                {!isClientUser && (
+                    <DropdownMenuItem asChild className="focus:bg-slate-100 dark:focus:bg-slate-800 rounded-xl cursor-pointer p-2 transition-colors">
+                        <Link className="flex items-center gap-3 w-full" href={route('settings.index')} prefetch onClick={cleanup}>
+                            <div className="p-2 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 shrink-0">
+                                <Settings className="size-4" />
                             </div>
-                            <p className="text-[10px] text-slate-400 font-medium leading-none">
-                                Preferences & system options
-                            </p>
-                        </div>
-                    </Link>
-                </DropdownMenuItem>
+                            <div className="space-y-0.5">
+                                <div className="text-xs font-extrabold text-slate-900 dark:text-white leading-none">
+                                    CRM Settings
+                                </div>
+                                <p className="text-[10px] text-slate-400 font-medium leading-none">
+                                    Preferences & system options
+                                </p>
+                            </div>
+                        </Link>
+                    </DropdownMenuItem>
+                )}
             </DropdownMenuGroup>
 
             <DropdownMenuSeparator className="bg-slate-100 dark:bg-slate-800 my-1" />

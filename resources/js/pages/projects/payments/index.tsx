@@ -90,6 +90,23 @@ interface ProjectPaymentsIndexProps {
 }
 
 export default function ProjectPaymentsIndex({ payments, projects, stats, filters }: ProjectPaymentsIndexProps) {
+    const formatDateOnly = (dateString?: string | null) => {
+        if (!dateString) return 'N/A';
+        const cleanDate = dateString.includes('T') ? dateString.split('T')[0] : dateString.split(' ')[0];
+        const parts = cleanDate.split('-');
+        if (parts.length === 3) {
+            const year = parseInt(parts[0], 10);
+            const month = parseInt(parts[1], 10) - 1;
+            const day = parseInt(parts[2], 10);
+            if (!isNaN(year) && !isNaN(month) && !isNaN(day) && month >= 0 && month < 12) {
+                const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+                const formattedDay = day < 10 ? `0${day}` : `${day}`;
+                return `${formattedDay} ${months[month]} ${year}`;
+            }
+        }
+        return cleanDate;
+    };
+
     const [searchQuery, setSearchQuery] = useState(filters?.search || '');
     const [selectedStatusFilter, setSelectedStatusFilter] = useState(filters?.status || '');
     const [selectedStageFilter, setSelectedStageFilter] = useState(filters?.stage || '');
@@ -371,7 +388,7 @@ export default function ProjectPaymentsIndex({ payments, projects, stats, filter
                                                     </span>
                                                     {p.paid_at && (
                                                         <span className="text-[10px] text-slate-400 block font-medium">
-                                                            Paid: {p.paid_at}
+                                                            Paid: {formatDateOnly(p.paid_at)}
                                                         </span>
                                                     )}
                                                 </div>

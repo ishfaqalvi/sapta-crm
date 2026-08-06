@@ -4,8 +4,6 @@ namespace Database\Seeders;
 
 use Illuminate\Database\Seeder;
 use Spatie\Permission\Models\Permission;
-use Spatie\Permission\Models\Role;
-use App\Models\User;
 
 class PermissionSeeder extends Seeder
 {
@@ -16,9 +14,6 @@ class PermissionSeeder extends Seeder
     {
         // Reset cached roles and permissions
         app()[\Spatie\Permission\PermissionRegistrar::class]->forgetCachedPermissions();
-
-        // Delete obsolete permissions
-        Permission::whereIn('name', ['view-rates', 'manage-rates', 'view-deals', 'create-deals', 'edit-deals', 'delete-deals'])->delete();
 
         // System Permissions grouped by module
         $permissionsByModule = [
@@ -104,52 +99,76 @@ class PermissionSeeder extends Seeder
                 'edit-currencies',
                 'delete-currencies',
             ],
+            'Credentials & Logins' => [
+                'view-credentials',
+                'create-credentials',
+                'edit-credentials',
+                'delete-credentials',
+            ],
             'System Settings' => [
                 'view-settings',
                 'edit-settings',
             ],
+
+            // Client Portal Permissions
+            'Client Portal Overview' => [
+                'view-client-portal-overview',
+            ],
+            'Client Portal Projects' => [
+                'view-client-portal-projects',
+                'create-client-portal-projects',
+                'edit-client-portal-projects',
+                'delete-client-portal-projects',
+            ],
+            'Client Portal Tasks' => [
+                'view-client-portal-tasks',
+                'create-client-portal-tasks',
+                'edit-client-portal-tasks',
+                'delete-client-portal-tasks',
+            ],
+            'Client Portal Milestones' => [
+                'view-client-portal-milestones',
+                'create-client-portal-milestones',
+                'edit-client-portal-milestones',
+                'delete-client-portal-milestones',
+            ],
+            'Client Portal SEO' => [
+                'view-client-portal-seo',
+                'create-client-portal-seo',
+                'edit-client-portal-seo',
+                'delete-client-portal-seo',
+                'view-client-portal-seo-payments',
+                'create-client-portal-seo-payments',
+                'edit-client-portal-seo-payments',
+                'delete-client-portal-seo-payments',
+            ],
+            'Client Portal Credentials' => [
+                'view-client-portal-credentials',
+                'create-client-portal-credentials',
+                'edit-client-portal-credentials',
+                'delete-client-portal-credentials',
+            ],
+            'Client Portal Invoices' => [
+                'view-client-portal-invoices',
+                'create-client-portal-invoices',
+                'edit-client-portal-invoices',
+                'delete-client-portal-invoices',
+                'download-client-portal-invoices',
+            ],
+            'Client Portal Profile' => [
+                'view-client-portal-profile',
+                'edit-client-portal-profile',
+                'manage-client-portal-account',
+            ],
         ];
 
-        $allPermissions = [];
         foreach ($permissionsByModule as $module => $permissions) {
             foreach ($permissions as $permissionName) {
-                $permission = Permission::firstOrCreate([
+                Permission::firstOrCreate([
                     'name' => $permissionName,
                     'guard_name' => 'web',
                 ]);
-                $allPermissions[] = $permission->name;
             }
-        }
-
-        // Roles Creation
-        $superAdminRole = Role::firstOrCreate(['name' => 'Super Admin', 'guard_name' => 'web']);
-        $managerRole = Role::firstOrCreate(['name' => 'Manager', 'guard_name' => 'web']);
-        $employeeRole = Role::firstOrCreate(['name' => 'Employee', 'guard_name' => 'web']);
-
-        // Give all permissions to Super Admin
-        $superAdminRole->syncPermissions($allPermissions);
-
-        // Give Manager subset permissions
-        $managerPermissions = array_filter($allPermissions, function ($p) {
-            return !in_array($p, ['delete-users', 'delete-roles', 'edit-settings']);
-        });
-        $managerRole->syncPermissions($managerPermissions);
-
-        // Give Employee basic view & task edit permissions
-        $employeePermissions = [
-            'view-clients',
-            'view-website-projects',
-            'view-project-tasks',
-            'edit-project-tasks',
-            'view-seo-retainers',
-            'view-employees',
-        ];
-        $employeeRole->syncPermissions($employeePermissions);
-
-        // Ensure user ID 1 (first admin user) has Super Admin role assigned
-        $firstUser = User::first();
-        if ($firstUser && !$firstUser->hasRole('Super Admin')) {
-            $firstUser->assignRole('Super Admin');
         }
     }
 }

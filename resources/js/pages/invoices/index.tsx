@@ -1,4 +1,5 @@
 import Pagination, { type PaginatedData } from '@/components/pagination';
+import SearchableSelect from '@/components/searchable-select';
 import { Button } from '@/components/ui/button';
 import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem, type SharedData } from '@/types';
@@ -83,6 +84,15 @@ export default function InvoicesIndex({ invoices, stats, filters, clients }: Inv
     const [searchQuery, setSearchQuery] = useState(filters.search || '');
     const [statusFilter, setStatusFilter] = useState(filters.status || '');
     const [clientFilter, setClientFilter] = useState(filters.client_id || '');
+
+    const clientFilterOptions = [
+        { value: '', label: 'All Clients', subLabel: 'Show invoices for all clients' },
+        ...clients.map((c) => ({
+            value: String(c.id),
+            label: c.name,
+            subLabel: c.company_name || 'Individual Client',
+        })),
+    ];
 
     // Delete Confirmation State
     const [deletingInvoice, setDeletingInvoice] = useState<InvoiceListItem | null>(null);
@@ -224,18 +234,15 @@ export default function InvoicesIndex({ invoices, stats, filters, clients }: Inv
                             <option value="cancelled">Cancelled</option>
                         </select>
 
-                        <select
-                            value={clientFilter}
-                            onChange={(e) => setClientFilter(e.target.value)}
-                            className="h-10 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-xs font-semibold text-slate-900 dark:text-white px-3 focus:outline-none focus:border-blue-600 transition-all"
-                        >
-                            <option value="">All Clients</option>
-                            {clients.map((c) => (
-                                <option key={c.id} value={c.id}>
-                                    {c.company_name || c.name}
-                                </option>
-                            ))}
-                        </select>
+                        <div className="w-full md:w-64">
+                            <SearchableSelect
+                                options={clientFilterOptions}
+                                value={clientFilter}
+                                onChange={(val) => setClientFilter(val)}
+                                placeholder="Filter by Client"
+                                searchPlaceholder="Type client name..."
+                            />
+                        </div>
                     </div>
                 </div>
 

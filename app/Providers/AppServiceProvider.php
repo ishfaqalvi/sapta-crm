@@ -2,9 +2,10 @@
 
 namespace App\Providers;
 
-use Illuminate\Support\ServiceProvider;
-
+use App\Http\Middleware\EnsureAdminAccess;
+use App\Http\Middleware\EnsureClientPortalAccess;
 use Illuminate\Support\Facades\Gate;
+use Illuminate\Support\ServiceProvider;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -13,7 +14,13 @@ class AppServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
-        //
+        $this->app->singleton(EnsureAdminAccess::class, function () {
+            return new EnsureAdminAccess();
+        });
+
+        $this->app->singleton(EnsureClientPortalAccess::class, function () {
+            return new EnsureClientPortalAccess();
+        });
     }
 
     /**

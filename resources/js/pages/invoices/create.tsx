@@ -1,3 +1,4 @@
+import SearchableSelect from '@/components/searchable-select';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -99,6 +100,22 @@ export default function InvoicesCreate({
     const filteredProjects = form.data.client_id
         ? projects.filter((p) => String(p.client_id) === String(form.data.client_id))
         : projects;
+
+    // SearchableSelect Options
+    const clientSelectOptions = clients.map((c) => ({
+        value: String(c.id),
+        label: c.name,
+        subLabel: c.company_name ? c.company_name : 'Individual Client',
+    }));
+
+    const projectSelectOptions = [
+        { value: '', label: '-- General Invoice (No Project) --', subLabel: 'Standalone invoice without linked project' },
+        ...filteredProjects.map((p) => ({
+            value: String(p.id),
+            label: p.project_name,
+            subLabel: `Budget: ${p.currency || 'PKR'} ${Number(p.total_budget || 0).toLocaleString()}`,
+        })),
+    ];
 
     // Handle Client Selection & Auto Currency
     const handleClientChange = (clientId: string) => {
@@ -214,19 +231,14 @@ export default function InvoicesCreate({
                                 <Label htmlFor="client_id" className="text-xs font-bold text-slate-700 dark:text-slate-300 block">
                                     Select Client *
                                 </Label>
-                                <select
-                                    id="client_id"
+                                <SearchableSelect
+                                    options={clientSelectOptions}
                                     value={form.data.client_id}
-                                    onChange={(e) => handleClientChange(e.target.value)}
-                                    className="h-11 w-full rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-sm font-semibold text-slate-900 dark:text-white px-3 focus:outline-none focus:border-blue-600 transition-all"
-                                >
-                                    <option value="">-- Choose Client --</option>
-                                    {clients.map((c) => (
-                                        <option key={c.id} value={c.id}>
-                                            {c.company_name ? `${c.company_name} (${c.name})` : c.name}
-                                        </option>
-                                    ))}
-                                </select>
+                                    onChange={(val) => handleClientChange(val)}
+                                    placeholder="-- Choose Client --"
+                                    searchPlaceholder="Type client name or company..."
+                                    required
+                                />
                                 {form.errors.client_id && <p className="text-xs font-semibold text-rose-500">{form.errors.client_id}</p>}
                             </div>
 
@@ -235,19 +247,13 @@ export default function InvoicesCreate({
                                 <Label htmlFor="website_project_id" className="text-xs font-bold text-slate-700 dark:text-slate-300 block">
                                     Linked Project (Optional)
                                 </Label>
-                                <select
-                                    id="website_project_id"
+                                <SearchableSelect
+                                    options={projectSelectOptions}
                                     value={form.data.website_project_id}
-                                    onChange={(e) => form.setData('website_project_id', e.target.value)}
-                                    className="h-11 w-full rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-sm font-semibold text-slate-900 dark:text-white px-3 focus:outline-none focus:border-blue-600 transition-all"
-                                >
-                                    <option value="">-- General Invoice (No Project) --</option>
-                                    {filteredProjects.map((p) => (
-                                        <option key={p.id} value={p.id}>
-                                            {p.project_name}
-                                        </option>
-                                    ))}
-                                </select>
+                                    onChange={(val) => form.setData('website_project_id', val)}
+                                    placeholder="-- General Invoice (No Project) --"
+                                    searchPlaceholder="Type project name..."
+                                />
                             </div>
 
                             {/* Currency Picker */}

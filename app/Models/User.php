@@ -24,7 +24,30 @@ class User extends Authenticatable
         'email',
         'avatar',
         'password',
+        'type',
+        'client_id',
     ];
+
+    /**
+     * Check if user is an admin type user.
+     */
+    public function isAdmin(): bool
+    {
+        return $this->type === 'admin';
+    }
+
+    /**
+     * Check if user is a client type user.
+     */
+    public function isClient(): bool
+    {
+        return $this->type === 'client';
+    }
+
+    public function client()
+    {
+        return $this->belongsTo(Client::class);
+    }
 
     /**
      * The attributes that should be hidden for serialization.

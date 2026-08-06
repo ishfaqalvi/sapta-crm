@@ -1,4 +1,4 @@
-import AppLayout from '@/layouts/app-layout';
+import ClientLayout from '@/layouts/client-layout';
 import { type BreadcrumbItem } from '@/types';
 import { Head, Link } from '@inertiajs/react';
 import {
@@ -106,7 +106,9 @@ interface ClientShowProps {
 }
 
 export default function ClientShow({ client }: ClientShowProps) {
-    const [activeTab, setActiveTab] = useState<'overview' | 'projects' | 'tasks' | 'payments' | 'seo'>('overview');
+    const searchParams = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : null;
+    const initialTab = (searchParams?.get('tab') as any) || 'overview';
+    const [activeTab, setActiveTab] = useState<'overview' | 'projects' | 'tasks' | 'payments' | 'seo' | 'settings'>(initialTab);
 
     const breadcrumbs: BreadcrumbItem[] = [
         { title: 'Dashboard', href: '/dashboard' },
@@ -176,7 +178,12 @@ export default function ClientShow({ client }: ClientShowProps) {
     const pendingTasksCount = allTasks.filter((t) => t.status !== 'completed' && t.status !== 'cancelled').length;
 
     return (
-        <AppLayout breadcrumbs={breadcrumbs}>
+        <ClientLayout
+            breadcrumbs={breadcrumbs}
+            client={client}
+            activeTab={activeTab}
+            onTabChange={(tab) => setActiveTab(tab as any)}
+        >
             <Head title={`Client Details - ${client.name}`} />
 
             <div className="flex h-full flex-1 flex-col gap-6 p-4 sm:p-6 bg-slate-50/50 dark:bg-slate-950">
@@ -820,7 +827,56 @@ export default function ClientShow({ client }: ClientShowProps) {
                         )}
                     </div>
                 )}
+
+                {/* Tab 6: Client Profile & Settings */}
+                {activeTab === 'settings' && (
+                    <div className="p-6 rounded-3xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 shadow-2xs space-y-6">
+                        <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-4">
+                            <div>
+                                <h3 className="text-base font-extrabold text-slate-900 dark:text-white">
+                                    Client Profile & Account Settings
+                                </h3>
+                                <p className="text-xs text-slate-400 mt-0.5">
+                                    Update contact details, company information, billing currency, and operational preferences.
+                                </p>
+                            </div>
+                            <Link
+                                href={`/clients/${client.id}/edit`}
+                                className="h-10 px-5 text-xs font-bold rounded-xl bg-gradient-to-r from-[#003796] via-[#0052D4] to-[#1d4ed8] hover:from-[#002a75] hover:to-[#0040b8] text-white shadow-md shadow-blue-600/20 inline-flex items-center gap-2"
+                            >
+                                <Edit2 className="size-4" />
+                                <span>Edit Full Client Record</span>
+                            </Link>
+                        </div>
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 text-xs">
+                            <div className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-950/60 border border-slate-200/60 dark:border-slate-800 space-y-3">
+                                <span className="font-extrabold text-slate-900 dark:text-white text-xs block border-b border-slate-200/40 dark:border-slate-800 pb-2">
+                                    General & Business Details
+                                </span>
+                                <div className="space-y-2">
+                                    <div className="flex justify-between"><span className="text-slate-400">Client Code:</span><span className="font-mono font-bold text-slate-800 dark:text-slate-200">{client.client_code}</span></div>
+                                    <div className="flex justify-between"><span className="text-slate-400">Client Name:</span><span className="font-bold text-slate-800 dark:text-slate-200">{client.name}</span></div>
+                                    <div className="flex justify-between"><span className="text-slate-400">Company Name:</span><span className="font-semibold text-slate-800 dark:text-slate-200">{client.company_name || '—'}</span></div>
+                                    <div className="flex justify-between"><span className="text-slate-400">Account Currency:</span><span className="font-bold text-blue-600 dark:text-blue-400 font-mono">{client.currency}</span></div>
+                                </div>
+                            </div>
+
+                            <div className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-950/60 border border-slate-200/60 dark:border-slate-800 space-y-3">
+                                <span className="font-extrabold text-slate-900 dark:text-white text-xs block border-b border-slate-200/40 dark:border-slate-800 pb-2">
+                                    Primary Contact Information
+                                </span>
+                                <div className="space-y-2">
+                                    <div className="flex justify-between"><span className="text-slate-400">Contact Person:</span><span className="font-bold text-slate-800 dark:text-slate-200">{client.contact_person || '—'}</span></div>
+                                    <div className="flex justify-between"><span className="text-slate-400">Email Address:</span><span className="font-semibold text-blue-600 dark:text-blue-400">{client.email || '—'}</span></div>
+                                    <div className="flex justify-between"><span className="text-slate-400">Phone / Mobile:</span><span className="font-mono font-semibold text-slate-800 dark:text-slate-200">{client.mobile || client.phone || '—'}</span></div>
+                                    <div className="flex justify-between"><span className="text-slate-400">City / Country:</span><span className="font-semibold text-slate-800 dark:text-slate-200">{[client.city, client.country].filter(Boolean).join(', ') || '—'}</span></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                )}
             </div>
-        </AppLayout>
+        </ClientLayout>
     );
 }

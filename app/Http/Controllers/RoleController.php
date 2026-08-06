@@ -37,13 +37,13 @@ class RoleController extends Controller
 
         // Group permissions by module prefix
         $groupedPermissions = [
-            'Clients & Hub' => $permissions->filter(fn($p) => str_contains($p['name'], 'clients'))->values(),
+            'Clients & Hub' => $permissions->filter(fn($p) => str_contains($p['name'], 'clients') && !str_contains($p['name'], 'client-portal'))->values(),
             'Website Projects' => $permissions->filter(fn($p) => str_contains($p['name'], 'website-projects'))->values(),
             'Project Tasks' => $permissions->filter(fn($p) => str_contains($p['name'], 'project-tasks'))->values(),
             'Website Payments' => $permissions->filter(fn($p) => str_contains($p['name'], 'website-payments'))->values(),
-            'Invoices & Billing' => $permissions->filter(fn($p) => str_contains($p['name'], 'invoices'))->values(),
-            'SEO Retainers' => $permissions->filter(fn($p) => str_contains($p['name'], 'seo-retainers'))->values(),
-            'SEO Payments' => $permissions->filter(fn($p) => str_contains($p['name'], 'seo-payments'))->values(),
+            'Invoices & Billing' => $permissions->filter(fn($p) => str_contains($p['name'], 'invoices') && !str_contains($p['name'], 'client-portal'))->values(),
+            'SEO Retainers' => $permissions->filter(fn($p) => str_contains($p['name'], 'seo-retainers') && !str_contains($p['name'], 'client-portal'))->values(),
+            'SEO Payments' => $permissions->filter(fn($p) => str_contains($p['name'], 'seo-payments') && !str_contains($p['name'], 'client-portal'))->values(),
             'Employees Directory' => $permissions->filter(fn($p) => str_contains($p['name'], 'employees'))->values(),
             'Monthly Payroll' => $permissions->filter(fn($p) => str_contains($p['name'], 'payroll'))->values(),
             'Departments' => $permissions->filter(fn($p) => str_contains($p['name'], 'departments'))->values(),
@@ -52,6 +52,16 @@ class RoleController extends Controller
             'Roles & Access' => $permissions->filter(fn($p) => str_contains($p['name'], 'roles'))->values(),
             'Currency Management' => $permissions->filter(fn($p) => str_contains($p['name'], 'currencies'))->values(),
             'System Settings' => $permissions->filter(fn($p) => str_contains($p['name'], 'settings'))->values(),
+
+            // Client Portal Grouped Modules
+            'Client Portal Overview' => $permissions->filter(fn($p) => str_contains($p['name'], 'client-portal-overview'))->values(),
+            'Client Portal Projects' => $permissions->filter(fn($p) => str_contains($p['name'], 'client-portal-projects'))->values(),
+            'Client Portal Tasks' => $permissions->filter(fn($p) => str_contains($p['name'], 'client-portal-tasks'))->values(),
+            'Client Portal Milestones' => $permissions->filter(fn($p) => str_contains($p['name'], 'client-portal-milestones'))->values(),
+            'Client Portal SEO' => $permissions->filter(fn($p) => str_contains($p['name'], 'client-portal-seo'))->values(),
+            'Client Portal Credentials' => $permissions->filter(fn($p) => str_contains($p['name'], 'client-portal-credentials'))->values(),
+            'Client Portal Invoices' => $permissions->filter(fn($p) => str_contains($p['name'], 'client-portal-invoices'))->values(),
+            'Client Portal Profile' => $permissions->filter(fn($p) => str_contains($p['name'], 'client-portal-profile') || str_contains($p['name'], 'client-portal-account'))->values(),
         ];
 
         return Inertia::render('roles/index', [
@@ -126,8 +136,8 @@ class RoleController extends Controller
      */
     public function destroy(Role $role): RedirectResponse
     {
-        if (in_array(strtolower($role->name), ['super admin', 'super-admin'])) {
-            return redirect()->back()->with('error', 'The Super Admin role is protected and cannot be deleted!');
+        if (in_array(strtolower($role->name), ['super admin', 'super-admin', 'client'])) {
+            return redirect()->back()->with('error', "The {$role->name} system role is protected and cannot be deleted!");
         }
 
         $role->delete();

@@ -151,28 +151,26 @@ export default function ClientCreate({ next_client_code }: ClientCreateProps) {
                                     <option value="GBP">GBP - British Pound (£)</option>
                                     <option value="SAR">SAR - Saudi Riyal (ر.س)</option>
                                 </select>
-                                {form.errors.currency && <p className="text-xs font-semibold text-rose-500">{form.errors.currency}</p>}
                             </div>
 
                             <div className="space-y-1.5">
                                 <Label htmlFor="status" className="text-xs font-bold text-slate-700 dark:text-slate-300">
-                                    Initial Account Status *
+                                    Account Status *
                                 </Label>
                                 <select
                                     id="status"
                                     value={form.data.status}
-                                    onChange={(e) => form.setData('status', e.target.value as 'active' | 'inactive')}
+                                    onChange={(e: any) => form.setData('status', e.target.value)}
                                     className="w-full h-11 px-3 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-xs font-semibold text-slate-900 dark:text-white focus:bg-white focus:border-blue-600 transition-all"
                                 >
                                     <option value="active">Active Client</option>
-                                    <option value="inactive">Inactive / On Hold</option>
+                                    <option value="inactive">Inactive / On-Hold</option>
                                 </select>
-                                {form.errors.status && <p className="text-xs font-semibold text-rose-500">{form.errors.status}</p>}
                             </div>
                         </div>
                     </div>
 
-                    {/* Section 2: Primary Contact & Address */}
+                    {/* Section 2: Contact Records */}
                     <div className="p-6 rounded-3xl bg-white dark:bg-slate-900 border border-slate-200/90 dark:border-slate-800 shadow-xs space-y-5">
                         <div className="flex items-center gap-3 pb-4 border-b border-slate-100 dark:border-slate-800">
                             <div className="p-2.5 rounded-xl bg-purple-50 dark:bg-purple-950 text-purple-600 dark:text-purple-400">
@@ -183,21 +181,21 @@ export default function ClientCreate({ next_client_code }: ClientCreateProps) {
                                     Primary Contact Person & Location
                                 </h3>
                                 <p className="text-xs text-slate-400">
-                                    Key point of contact, official email, phone numbers, and physical location.
+                                    Individual contact record, official email address, phone, and geographic location.
                                 </p>
                             </div>
                         </div>
 
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <div className="space-y-1.5">
                                 <Label htmlFor="contact_person" className="text-xs font-bold text-slate-700 dark:text-slate-300">
-                                    Contact Person Name *
+                                    Primary Contact Person Name *
                                 </Label>
                                 <Input
                                     id="contact_person"
                                     value={form.data.contact_person}
                                     onChange={(e) => form.setData('contact_person', e.target.value)}
-                                    placeholder="e.g. Sadiq Khan"
+                                    placeholder="e.g. John Doe"
                                     className="h-11 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-sm font-medium text-slate-900 dark:text-white placeholder:text-slate-400 focus:bg-white focus:border-blue-600 transition-all"
                                 />
                                 {form.errors.contact_person && <p className="text-xs font-semibold text-rose-500">{form.errors.contact_person}</p>}
@@ -212,7 +210,7 @@ export default function ClientCreate({ next_client_code }: ClientCreateProps) {
                                     type="email"
                                     value={form.data.email}
                                     onChange={(e) => form.setData('email', e.target.value)}
-                                    placeholder="sadiq@company.com"
+                                    placeholder="john@acme.com"
                                     className="h-11 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-sm font-medium text-slate-900 dark:text-white placeholder:text-slate-400 focus:bg-white focus:border-blue-600 transition-all"
                                 />
                                 {form.errors.email && <p className="text-xs font-semibold text-rose-500">{form.errors.email}</p>}
@@ -229,14 +227,11 @@ export default function ClientCreate({ next_client_code }: ClientCreateProps) {
                                     placeholder="+971 50 1234567"
                                     className="h-11 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-sm font-medium text-slate-900 dark:text-white placeholder:text-slate-400 focus:bg-white focus:border-blue-600 transition-all"
                                 />
-                                {form.errors.mobile && <p className="text-xs font-semibold text-rose-500">{form.errors.mobile}</p>}
                             </div>
-                        </div>
 
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                             <div className="space-y-1.5">
                                 <Label htmlFor="phone" className="text-xs font-bold text-slate-700 dark:text-slate-300">
-                                    Telephone / Office Line (Optional)
+                                    Telephone Line (Optional)
                                 </Label>
                                 <Input
                                     id="phone"
@@ -275,7 +270,7 @@ export default function ClientCreate({ next_client_code }: ClientCreateProps) {
                         </div>
                     </div>
 
-                    {/* Section 3: Contract Terms & Special Instructions */}
+                    {/* Section 3: Notes & Instructions */}
                     <div className="p-6 rounded-3xl bg-white dark:bg-slate-900 border border-slate-200/90 dark:border-slate-800 shadow-xs space-y-5">
                         <div className="flex items-center gap-3 pb-4 border-b border-slate-100 dark:border-slate-800">
                             <div className="p-2.5 rounded-xl bg-emerald-50 dark:bg-emerald-950 text-emerald-600 dark:text-emerald-400">
@@ -297,13 +292,12 @@ export default function ClientCreate({ next_client_code }: ClientCreateProps) {
                             </Label>
                             <textarea
                                 id="notes"
-                                rows={4}
+                                rows={3}
                                 value={form.data.notes}
                                 onChange={(e) => form.setData('notes', e.target.value)}
                                 placeholder="Enter specific instructions, preferred communication channels, billing cycles, or contract terms..."
                                 className="w-full rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 p-3 text-sm font-medium text-slate-900 dark:text-white placeholder:text-slate-400 focus:bg-white focus:border-blue-600 transition-all focus:outline-none"
                             />
-                            {form.errors.notes && <p className="text-xs font-semibold text-rose-500">{form.errors.notes}</p>}
                         </div>
                     </div>
 
@@ -319,7 +313,7 @@ export default function ClientCreate({ next_client_code }: ClientCreateProps) {
                         <Button
                             type="submit"
                             disabled={form.processing}
-                            className="h-12 px-8 text-sm font-bold rounded-xl bg-gradient-to-r from-[#003796] via-[#0052D4] to-[#1d4ed8] hover:from-[#002a75] hover:to-[#0040b8] text-white shadow-lg shadow-blue-600/20 active:scale-[0.99] transition-all flex items-center justify-center gap-2"
+                            className="h-12 px-8 text-sm font-bold rounded-xl bg-gradient-to-r from-[#003796] via-[#0052D4] to-[#1d4ed8] hover:from-[#002a75] hover:to-[#0040b8] text-white shadow-lg shadow-blue-600/20 active:scale-[0.99] transition-all flex items-center justify-center gap-2 cursor-pointer"
                         >
                             {form.processing ? (
                                 <div className="flex items-center gap-2">

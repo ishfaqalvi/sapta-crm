@@ -142,6 +142,10 @@ class ProjectPaymentController extends Controller
      */
     public function destroy(ProjectPayment $websitePayment): RedirectResponse
     {
+        if ($websitePayment->status === 'paid') {
+            return redirect()->back()->with('error', 'Paid / settled milestone payments cannot be deleted to preserve accurate financial calculations.');
+        }
+
         $websitePayment->delete();
 
         return redirect()->route('website-payments.index')->with('success', 'Project payment milestone deleted.');
