@@ -149,7 +149,7 @@ class ClientSeeder extends Seeder
             ],
         ];
 
-        foreach ($clientsData as $cData) {
+        foreach ($clientsData as $index => $cData) {
             $retainerData = $cData['retainer'];
             unset($cData['retainer']);
 
