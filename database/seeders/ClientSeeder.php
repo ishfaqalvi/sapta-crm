@@ -149,6 +149,12 @@ class ClientSeeder extends Seeder
             ],
         ];
 
+        $categoryIds = \App\Models\ProjectCategory::pluck('id')->toArray();
+        if (empty($categoryIds)) {
+            (new ProjectCategorySeeder())->run();
+            $categoryIds = \App\Models\ProjectCategory::pluck('id')->toArray();
+        }
+
         foreach ($clientsData as $index => $cData) {
             $retainerData = $cData['retainer'];
             unset($cData['retainer']);
@@ -191,6 +197,8 @@ class ClientSeeder extends Seeder
                 ]
             );
 
+            $catId = !empty($categoryIds) ? $categoryIds[$index % count($categoryIds)] : null;
+
             // Create sample Website Project for client
             $project = \App\Models\WebsiteProject::updateOrCreate(
                 [
@@ -198,7 +206,7 @@ class ClientSeeder extends Seeder
                     'project_name' => $client->name . ' Custom Portal Development',
                 ],
                 [
-                    'category_id' => ($index % 4) + 1,
+                    'category_id' => $catId,
                     'total_budget' => 15000.00,
                     'currency' => $client->currency,
                     'start_date' => '2026-06-01',

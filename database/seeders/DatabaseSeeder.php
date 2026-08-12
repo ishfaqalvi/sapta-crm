@@ -16,6 +16,8 @@ class DatabaseSeeder extends Seeder
             RoleSeeder::class,
             AdminUserSeeder::class,
             EmployeeSeeder::class,
+            ProjectCategorySeeder::class,
+            ServiceCategorySeeder::class,
             ClientSeeder::class,
             ClientUserSeeder::class,
         ]);
