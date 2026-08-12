@@ -52,52 +52,98 @@ class ReportController extends Controller
         $clientId = $this->getClientId();
         $client = $this->getClientModel();
 
-        // 1. Fetch all formal Invoices for this client
+        // 1. Fetch Invoices & build Invoice Log
         $invoices = Invoice::where('client_id', $clientId)
             ->with('websiteProject:id,project_name,currency')
             ->latest()
             ->get();
 
-        // 2. Fetch all Project Payment Milestones for this client
-        $projectPayments = ProjectPayment::where('client_id', $clientId)
-            ->with('websiteProject:id,project_name,currency')
-            ->latest()
-            ->get();
+        $invoiceLog = $invoices->map(function ($inv) {
+            return [
+                'id' => $inv->id,
+                'invoice_number' => $inv->invoice_number,
+                'type' => $inv->websiteProject ? 'Project Invoice' : 'General Invoice',
+                'description' => $inv->websiteProject ? $inv->websiteProject->project_name : 'Billing Statement #' . $inv->invoice_number,
+                'issue_date' => $inv->issue_date ? $inv->issue_date->format('Y-m-d') : ($inv->created_at ? $inv->created_at->format('Y-m-d') : ''),
+                'due_date' => $inv->due_date ? $inv->due_date->format('Y-m-d') : '',
+                'total' => (float) $inv->total_amount,
+                'amount_paid' => $inv->status === 'paid' ? (float) $inv->total_amount : 0.0,
+                'currency' => $inv->currency ?? $client->currency ?? 'AED',
+                'status' => $inv->status,
+            ];
+        });
 
-        // 3. Fetch all Service Payments (Recurring Subscriptions) for this client
-        $servicePayments = ServicePayment::where('client_id', $clientId)
-            ->with('service:id,service_name,currency')
-            ->latest()
-            ->get();
+        // 2. Financial Aggregations
+        $totalInvoiced = (float) $invoices->sum('total_amount');
+        $totalPaid = (float) $invoices->where('status', 'paid')->sum('total_amount');
+        $totalPending = (float) $invoices->whereIn('status', ['draft', 'sent', 'overdue'])->sum('total_amount');
 
-        // 4. Fetch Active Projects & Services for Context
-        $websiteProjects = WebsiteProject::where('client_id', $clientId)->get();
-        $clientServices = ClientService::where('client_id', $clientId)->get();
-
-        // Financial Summary Aggregations
-        $totalInvoiced = $invoices->sum('total_amount');
-        $totalInvoicePaid = $invoices->where('status', 'paid')->sum('total_amount');
-        $totalInvoicePending = $invoices->whereIn('status', ['draft', 'sent', 'overdue'])->sum('total_amount');
-
-        $totalProjectMilestones = $projectPayments->sum('amount');
-        $totalProjectPaid = $projectPayments->where('status', 'paid')->sum('amount');
-        $totalProjectPending = $projectPayments->where('status', 'pending')->sum('amount');
-
-        $totalServicePayments = $servicePayments->sum('amount_due');
-        $totalServicePaid = $servicePayments->where('status', 'paid')->sum('amount_paid');
-        $totalServicePending = $servicePayments->whereIn('status', ['due_pending', 'overdue'])->sum('amount_due');
-
-        $overallPaid = $totalInvoicePaid + $totalProjectPaid + $totalServicePaid;
-        $overallPending = $totalInvoicePending + $totalProjectPending + $totalServicePending;
-
-        $stats = [
+        $financials = [
             'total_invoiced' => $totalInvoiced,
-            'total_paid' => $overallPaid,
-            'total_pending' => $overallPending,
-            'invoices_count' => $invoices->count(),
+            'total_paid' => $totalPaid,
+            'total_pending' => $totalPending,
+            'total_invoices_count' => $invoices->count(),
             'paid_invoices_count' => $invoices->where('status', 'paid')->count(),
-            'projects_count' => $websiteProjects->count(),
-            'services_count' => $clientServices->count(),
+            'pending_invoices_count' => $invoices->whereIn('status', ['draft', 'sent', 'overdue'])->count(),
+        ];
+
+        // 3. Projects Report
+        $websiteProjects = WebsiteProject::where('client_id', $clientId)
+            ->with(['category', 'payments', 'tasks'])
+            ->latest()
+            ->get();
+
+        $projects = $websiteProjects->map(function ($proj) {
+            $totalCost = (float) $proj->total_budget;
+            $paid = (float) $proj->payments->where('status', 'paid')->sum('amount');
+            $remaining = max(0, $totalCost - $paid);
+            $totalTasks = $proj->tasks->count();
+            $completedTasks = $proj->tasks->where('status', 'completed')->count();
+
+            return [
+                'id' => $proj->id,
+                'project_name' => $proj->project_name,
+                'category_name' => $proj->category ? $proj->category->name : 'Uncategorized',
+                'status' => $proj->status,
+                'project_cost' => $totalCost,
+                'paid_amount' => $paid,
+                'remaining_balance' => $remaining,
+                'currency' => $proj->currency,
+                'total_tasks' => $totalTasks,
+                'completed_tasks' => $completedTasks,
+                'progress_percentage' => (int) $proj->progress_percentage,
+                'created_at' => $proj->created_at ? $proj->created_at->format('Y-m-d') : null,
+            ];
+        });
+
+        // 4. Client Services & Subscriptions
+        $clientServices = ClientService::where('client_id', $clientId)
+            ->with(['category', 'payments'])
+            ->latest()
+            ->get();
+
+        $services = $clientServices->map(function ($serv) {
+            $paidCycles = $serv->payments->where('status', 'paid')->count();
+            $pendingCycles = $serv->payments->whereIn('status', ['due_pending', 'overdue'])->count();
+
+            return [
+                'id' => $serv->id,
+                'service_name' => $serv->service_name,
+                'category_name' => $serv->category ? $serv->category->name : 'General Service',
+                'monthly_fee' => (float) $serv->monthly_fee,
+                'currency' => $serv->currency,
+                'billing_day' => (int) $serv->billing_day,
+                'status' => $serv->status,
+                'paid_cycles' => $paidCycles,
+                'pending_cycles' => $pendingCycles,
+                'start_date' => $serv->start_date ? $serv->start_date->format('Y-m-d') : '',
+            ];
+        });
+
+        $serviceStats = [
+            'total_services' => $clientServices->count(),
+            'active_services' => $clientServices->where('status', 'active')->count(),
+            'monthly_recurring_total' => (float) $clientServices->where('status', 'active')->sum('monthly_fee'),
         ];
 
         $companySettings = [
@@ -111,10 +157,11 @@ class ReportController extends Controller
 
         return Inertia::render('client-portal/reports/index', [
             'client' => $client,
-            'invoices' => $invoices,
-            'projectPayments' => $projectPayments,
-            'servicePayments' => $servicePayments,
-            'stats' => $stats,
+            'financials' => $financials,
+            'projects' => $projects,
+            'services' => $services,
+            'serviceStats' => $serviceStats,
+            'invoiceLog' => $invoiceLog,
             'company' => $companySettings,
         ]);
     }

@@ -95,12 +95,30 @@ interface ClientPortalReportsProps {
 
 export default function ClientPortalReportsIndex({
     client,
-    financials,
-    projects,
-    services,
-    serviceStats,
-    invoiceLog,
-    company,
+    financials = {
+        total_invoiced: 0,
+        total_paid: 0,
+        total_pending: 0,
+        total_invoices_count: 0,
+        paid_invoices_count: 0,
+        pending_invoices_count: 0,
+    },
+    projects = [],
+    services = [],
+    serviceStats = {
+        total_services: 0,
+        active_services: 0,
+        monthly_recurring_total: 0,
+    },
+    invoiceLog = [],
+    company = {
+        name: 'Sapta Technologies',
+        email: 'contact@saptatechnologies.com',
+        phone: '+92 300 1234567',
+        address: 'Software Technology Park',
+        tax_id: '',
+        logo: '/app-logo-icon.png',
+    },
 }: ClientPortalReportsProps) {
     const breadcrumbs: BreadcrumbItem[] = [
         { title: 'Client Portal', href: '/client-portal/overview' },

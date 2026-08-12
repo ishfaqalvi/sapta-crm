@@ -53,7 +53,7 @@ class ProjectController extends Controller
             'completed' => WebsiteProject::where('status', 'completed')->count(),
         ];
 
-        $categories = ProjectCategory::where('is_active', true)->select('id', 'name', 'color')->orderBy('name')->get();
+        $categories = ProjectCategory::where('is_active', true)->select('id', 'name')->orderBy('name')->get();
 
         return Inertia::render('projects/index', [
             'projects' => $projects,
@@ -109,7 +109,7 @@ class ProjectController extends Controller
     {
         $clients = Client::where('status', 'active')->select('id', 'client_code', 'name', 'company_name', 'currency')->get();
         $currencies = Currency::where('is_active', true)->select('code', 'name', 'symbol')->get();
-        $categories = ProjectCategory::where('is_active', true)->select('id', 'name', 'color')->orderBy('name')->get();
+        $categories = ProjectCategory::where('is_active', true)->select('id', 'name')->orderBy('name')->get();
 
         return Inertia::render('projects/create', [
             'clients' => $clients,
@@ -157,7 +157,7 @@ class ProjectController extends Controller
         $websiteProject->load(['client', 'category']);
         $clients = Client::select('id', 'client_code', 'name', 'company_name', 'currency')->get();
         $currencies = Currency::where('is_active', true)->select('code', 'name', 'symbol')->get();
-        $categories = ProjectCategory::where('is_active', true)->select('id', 'name', 'color')->orderBy('name')->get();
+        $categories = ProjectCategory::where('is_active', true)->select('id', 'name')->orderBy('name')->get();
 
         return Inertia::render('projects/edit', [
             'project' => $websiteProject,
