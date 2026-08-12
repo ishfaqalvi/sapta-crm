@@ -29,6 +29,18 @@ class RoleController extends Controller
             ];
         });
 
+        $permissionsByModule = PermissionRegistry::getPermissionsByModule();
+
+        // Ensure all registered permissions exist in the permissions table
+        foreach ($permissionsByModule as $module => $permList) {
+            foreach ($permList as $permName) {
+                Permission::firstOrCreate([
+                    'name' => $permName,
+                    'guard_name' => 'web',
+                ]);
+            }
+        }
+
         $allPermissions = Permission::all();
         $permissionsByName = $allPermissions->keyBy('name');
 
@@ -41,14 +53,14 @@ class RoleController extends Controller
 
         // Group permissions dynamically using the single source of truth PermissionRegistry
         $groupedPermissions = [];
-        foreach (PermissionRegistry::getPermissionsByModule() as $module => $permList) {
+        foreach ($permissionsByModule as $module => $permList) {
             $groupedPermissions[$module] = collect($permList)->map(function ($permName) use ($permissionsByName) {
                 $p = $permissionsByName->get($permName);
                 return [
                     'id' => $p ? $p->id : null,
                     'name' => $permName,
                 ];
-            })->filter(fn($p) => $p['id'] !== null)->values();
+            })->values();
         }
 
         return Inertia::render('roles/index', [

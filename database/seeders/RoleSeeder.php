@@ -2,6 +2,7 @@
 
 namespace Database\Seeders;
 
+use App\Constants\PermissionRegistry;
 use Illuminate\Database\Seeder;
 use Spatie\Permission\Models\Permission;
 use Spatie\Permission\Models\Role;
@@ -16,7 +17,17 @@ class RoleSeeder extends Seeder
         // Reset cached roles and permissions
         app()[\Spatie\Permission\PermissionRegistrar::class]->forgetCachedPermissions();
 
-        $allPermissions = Permission::pluck('name')->toArray();
+        // Get single source of truth permission list from PermissionRegistry
+        $permissionsByModule = PermissionRegistry::getPermissionsByModule();
+        $allPermissions = array_merge(...array_values($permissionsByModule));
+
+        // Ensure all registered permissions exist in Spatie Permission table
+        foreach ($allPermissions as $permName) {
+            Permission::firstOrCreate([
+                'name' => $permName,
+                'guard_name' => 'web',
+            ]);
+        }
 
         // Create Spatie Roles with title case names
         $superAdminRole = Role::firstOrCreate(['name' => 'Super Admin', 'guard_name' => 'web']);
@@ -25,61 +36,31 @@ class RoleSeeder extends Seeder
         $employeeRole   = Role::firstOrCreate(['name' => 'Employee', 'guard_name' => 'web']);
         $clientRole     = Role::firstOrCreate(['name' => 'Client', 'guard_name' => 'web']);
 
-        // Give all permissions to Super Admin role
+        // 1. Give all permissions to Super Admin role
         $superAdminRole->syncPermissions($allPermissions);
 
-        // Give standard permissions to Admin role (except delete-roles)
+        // 2. Give standard permissions to Admin role (except delete-roles)
         $adminPermissions = array_filter($allPermissions, function ($p) {
             return $p !== 'delete-roles';
         });
         $adminRole->syncPermissions($adminPermissions);
 
-        // Give Manager subset permissions
+        // 3. Give Manager subset permissions
         $managerPermissions = array_filter($allPermissions, function ($p) {
             return !in_array($p, ['delete-users', 'delete-roles', 'edit-settings']);
         });
         $managerRole->syncPermissions($managerPermissions);
 
-        // Give Employee basic view & task edit permissions
-        $employeePermissions = [
-            'view-clients',
-            'view-website-projects',
-            'view-project-tasks',
-            'edit-project-tasks',
-            'view-services',
-            'view-service-categories',
-            'view-service-payments',
-            'view-employees',
-        ];
+        // 4. Give Employee basic view & directory permissions
+        $employeePermissions = array_filter($allPermissions, function ($p) {
+            return str_starts_with($p, 'view-') && !str_contains($p, 'client-portal-') && !in_array($p, ['view-users', 'view-roles', 'view-settings']);
+        });
         $employeeRole->syncPermissions($employeePermissions);
 
-        // Give Client Portal permissions to Client Role
-        $clientPermissions = [
-            'view-client-portal-overview',
-            'view-client-portal-projects',
-            'create-client-portal-projects',
-            'edit-client-portal-projects',
-            'delete-client-portal-projects',
-            'view-client-portal-tasks',
-            'create-client-portal-tasks',
-            'edit-client-portal-tasks',
-            'view-client-portal-milestones',
-            'create-client-portal-milestones',
-            'edit-client-portal-milestones',
-            'view-client-portal-services',
-            'create-client-portal-services',
-            'edit-client-portal-services',
-            'delete-client-portal-services',
-            'view-client-portal-credentials',
-            'create-client-portal-credentials',
-            'edit-client-portal-credentials',
-            'delete-client-portal-credentials',
-            'view-client-portal-invoices',
-            'download-client-portal-invoices',
-            'view-client-portal-profile',
-            'edit-client-portal-profile',
-            'view-client-portal-reports',
-        ];
+        // 5. Give Client Portal permissions to Client Role
+        $clientPermissions = array_filter($allPermissions, function ($p) {
+            return str_contains($p, 'client-portal-');
+        });
         $clientRole->syncPermissions($clientPermissions);
     }
 }
