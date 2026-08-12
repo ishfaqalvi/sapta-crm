@@ -189,7 +189,6 @@ export default function ClientsIndex({ clients, stats, filters }: ClientsIndexPr
                                     <th className="px-6 py-4">Contact Person</th>
                                     <th className="px-6 py-4">Phone / Location</th>
                                     <th className="px-6 py-4">Currency</th>
-                                    <th className="px-6 py-4">Portal Account</th>
                                     <th className="px-6 py-4">Status</th>
                                     <th className="px-6 py-4 text-right">Actions</th>
                                 </tr>
@@ -268,21 +267,6 @@ export default function ClientsIndex({ clients, stats, filters }: ClientsIndexPr
                                                 <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md bg-blue-50 dark:bg-blue-950/60 text-blue-700 dark:text-blue-300 font-extrabold font-mono text-[11px] border border-blue-100 dark:border-blue-900/40">
                                                     {client.currency}
                                                 </span>
-                                            </td>
-
-                                            {/* Portal Account Status Badge (Read-Only) */}
-                                            <td className="px-6 py-4">
-                                                {client.user ? (
-                                                    <span className="px-2.5 py-1 rounded-full text-[10px] font-extrabold uppercase tracking-wider inline-flex items-center gap-1.5 bg-indigo-50 text-indigo-700 dark:bg-indigo-950/60 dark:text-indigo-300 border border-indigo-200/60">
-                                                        <UserCheck className="size-3.5" />
-                                                        <span>Portal Active</span>
-                                                    </span>
-                                                ) : (
-                                                    <span className="px-2.5 py-1 rounded-full text-[10px] font-extrabold uppercase tracking-wider inline-flex items-center gap-1.5 bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400 border border-slate-200/60 dark:border-slate-700">
-                                                        <UserX className="size-3.5" />
-                                                        <span>No Account</span>
-                                                    </span>
-                                                )}
                                             </td>
 
                                             {/* Status */}

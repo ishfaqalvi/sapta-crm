@@ -1,24 +1,17 @@
 import Pagination, { type PaginatedData } from '@/components/pagination';
 import SearchableSelect from '@/components/searchable-select';
-import { Button } from '@/components/ui/button';
 import AppLayout from '@/layouts/app-layout';
-import { type BreadcrumbItem, type SharedData } from '@/types';
-import { hasPermission } from '@/utils/permissions';
-import { Head, Link, router, usePage } from '@inertiajs/react';
+import { type BreadcrumbItem } from '@/types';
+import { Head, Link, router } from '@inertiajs/react';
 import {
     AlertTriangle,
     CheckCircle2,
     Clock,
-    DollarSign,
     Download,
-    Edit2,
     Eye,
     FileText,
-    Plus,
     Receipt,
     Search,
-    Trash2,
-    X,
 } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 
@@ -78,9 +71,6 @@ interface InvoicesIndexProps {
 }
 
 export default function InvoicesIndex({ invoices, stats, filters, clients }: InvoicesIndexProps) {
-    const { auth } = usePage().props as unknown as SharedData;
-    const user = auth?.user;
-
     const [searchQuery, setSearchQuery] = useState(filters.search || '');
     const [statusFilter, setStatusFilter] = useState(filters.status || '');
     const [clientFilter, setClientFilter] = useState(filters.client_id || '');
@@ -93,9 +83,6 @@ export default function InvoicesIndex({ invoices, stats, filters, clients }: Inv
             subLabel: c.company_name || 'Individual Client',
         })),
     ];
-
-    // Delete Confirmation State
-    const [deletingInvoice, setDeletingInvoice] = useState<InvoiceListItem | null>(null);
 
     // Debounced Filter Effect
     const isFirstRender = useRef(true);
@@ -118,47 +105,26 @@ export default function InvoicesIndex({ invoices, stats, filters, clients }: Inv
         return () => clearTimeout(timer);
     }, [searchQuery, statusFilter, clientFilter]);
 
-    const handleMarkPaid = (inv: InvoiceListItem) => {
-        router.patch(`/invoices/${inv.id}/mark-paid`, {}, { preserveScroll: true });
-    };
-
-    const confirmDelete = () => {
-        if (!deletingInvoice) return;
-        router.delete(`/invoices/${deletingInvoice.id}`, {
-            onFinish: () => setDeletingInvoice(null),
-        });
-    };
-
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
-            <Head title="Invoices & Billing" />
+            <Head title="Invoices Directory" />
 
             <div className="flex h-full flex-1 flex-col gap-6 p-4 sm:p-6 bg-slate-50/50 dark:bg-slate-950">
                 {/* Header */}
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                     <div>
                         <h1 className="text-xl sm:text-2xl font-extrabold text-slate-900 dark:text-white tracking-tight">
-                            Invoices & Client Receipts Engine
+                            Invoices & Client Receipts Directory
                         </h1>
                         <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 mt-0.5">
-                            Manage professional client invoices, multi-currency billing, milestone payment links, and downloadable PDF receipts.
+                            Browse professional client invoices, multi-currency billing records, and downloadable PDF receipts.
                         </p>
                     </div>
-
-                    {hasPermission(user, 'create-invoices') && (
-                        <Link
-                            href="/invoices/create"
-                            className="h-11 px-5 text-xs sm:text-sm font-bold rounded-xl bg-gradient-to-r from-[#003796] via-[#0052D4] to-[#1d4ed8] hover:from-[#002a75] hover:to-[#0040b8] text-white shadow-md shadow-blue-600/20 active:scale-[0.99] transition-all inline-flex items-center gap-2 shrink-0 self-start sm:self-auto"
-                        >
-                            <Plus className="size-4" />
-                            <span>Create New Invoice</span>
-                        </Link>
-                    )}
                 </div>
 
                 {/* Stat KPI Cards */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                    <div className="p-4 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 shadow-xs flex items-center justify-between">
+                    <div className="p-4 rounded-xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 shadow-xs flex items-center justify-between">
                         <div>
                             <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400">Total Invoiced (PKR)</p>
                             <h3 className="text-lg font-extrabold text-slate-900 dark:text-white font-mono mt-0.5">
@@ -170,7 +136,7 @@ export default function InvoicesIndex({ invoices, stats, filters, clients }: Inv
                         </div>
                     </div>
 
-                    <div className="p-4 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 shadow-xs flex items-center justify-between">
+                    <div className="p-4 rounded-xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 shadow-xs flex items-center justify-between">
                         <div>
                             <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400">Total Collected (PKR)</p>
                             <h3 className="text-lg font-extrabold text-emerald-600 dark:text-emerald-400 font-mono mt-0.5">
@@ -182,7 +148,7 @@ export default function InvoicesIndex({ invoices, stats, filters, clients }: Inv
                         </div>
                     </div>
 
-                    <div className="p-4 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 shadow-xs flex items-center justify-between">
+                    <div className="p-4 rounded-xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 shadow-xs flex items-center justify-between">
                         <div>
                             <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400">Pending Dues (PKR)</p>
                             <h3 className="text-lg font-extrabold text-amber-600 dark:text-amber-400 font-mono mt-0.5">
@@ -194,7 +160,7 @@ export default function InvoicesIndex({ invoices, stats, filters, clients }: Inv
                         </div>
                     </div>
 
-                    <div className="p-4 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 shadow-xs flex items-center justify-between">
+                    <div className="p-4 rounded-xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 shadow-xs flex items-center justify-between">
                         <div>
                             <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400">Overdue Invoices</p>
                             <h3 className="text-lg font-extrabold text-rose-600 dark:text-rose-400 mt-0.5">
@@ -208,7 +174,7 @@ export default function InvoicesIndex({ invoices, stats, filters, clients }: Inv
                 </div>
 
                 {/* Filters Toolbar */}
-                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 p-4 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 shadow-xs">
+                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 p-4 rounded-xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 shadow-xs">
                     <div className="relative flex-1 w-full md:max-w-md">
                         <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 size-4 text-slate-400" />
                         <input
@@ -247,20 +213,19 @@ export default function InvoicesIndex({ invoices, stats, filters, clients }: Inv
                 </div>
 
                 {/* Invoices Table */}
-                <div className="rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/90 dark:border-slate-800 shadow-xs overflow-hidden">
+                <div className="rounded-xl bg-white dark:bg-slate-900 border border-slate-200/90 dark:border-slate-800 shadow-xs overflow-hidden">
                     <div className="overflow-x-auto">
                         <table className="w-full text-left text-xs text-slate-600 dark:text-slate-300">
                             <thead className="bg-slate-50 dark:bg-slate-950/70 border-b border-slate-200/80 dark:border-slate-800 uppercase tracking-wider text-[11px] font-bold text-slate-500 dark:text-slate-400">
                                 <tr>
                                     <th className="px-6 py-4">Invoice # & Client</th>
-                                    <th className="px-6 py-4">Linked Project</th>
                                     <th className="px-6 py-4">Issue & Due Date</th>
                                     <th className="px-6 py-4">Billing Amount</th>
                                     <th className="px-6 py-4">Status</th>
                                     <th className="px-6 py-4 text-right">Actions</th>
                                 </tr>
                             </thead>
-                            <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                            <tbody className="divide-y divide-slate-100 dark:divide-slate-800 font-medium">
                                 {invoices.data.length > 0 ? (
                                     invoices.data.map((inv) => (
                                         <tr key={inv.id} className="hover:bg-slate-50/70 dark:hover:bg-slate-800/40 transition-colors">
@@ -273,7 +238,7 @@ export default function InvoicesIndex({ invoices, stats, filters, clients }: Inv
                                                     <div>
                                                         <Link
                                                             href={`/invoices/${inv.id}`}
-                                                            className="font-extrabold text-slate-900 dark:text-white hover:text-blue-600 dark:hover:text-blue-400 text-sm block"
+                                                            className="font-extrabold text-slate-900 dark:text-white hover:text-blue-600 dark:hover:text-blue-400 text-sm block font-mono"
                                                         >
                                                             {inv.invoice_number}
                                                         </Link>
@@ -282,20 +247,6 @@ export default function InvoicesIndex({ invoices, stats, filters, clients }: Inv
                                                         </span>
                                                     </div>
                                                 </div>
-                                            </td>
-
-                                            {/* Linked Project */}
-                                            <td className="px-6 py-4 font-medium text-slate-800 dark:text-slate-200">
-                                                {inv.website_project ? (
-                                                    <Link
-                                                        href={`/website-projects/${inv.website_project.id}`}
-                                                        className="hover:underline text-blue-600 dark:text-blue-400 font-semibold"
-                                                    >
-                                                        {inv.website_project.project_name}
-                                                    </Link>
-                                                ) : (
-                                                    <span className="text-slate-400 italic">General Invoice</span>
-                                                )}
                                             </td>
 
                                             {/* Dates */}
@@ -346,21 +297,11 @@ export default function InvoicesIndex({ invoices, stats, filters, clients }: Inv
                                             {/* Actions */}
                                             <td className="px-6 py-4 text-right">
                                                 <div className="flex items-center justify-end gap-1.5">
-                                                    {inv.status !== 'paid' && hasPermission(user, 'edit-invoices') && (
-                                                        <button
-                                                            onClick={() => handleMarkPaid(inv)}
-                                                            className="size-8 rounded-xl bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-600 hover:text-white dark:hover:bg-emerald-600 dark:hover:text-white transition-all flex items-center justify-center shadow-2xs"
-                                                            title="Mark as Paid"
-                                                        >
-                                                            <CheckCircle2 className="size-3.5" />
-                                                        </button>
-                                                    )}
-
                                                     <a
                                                         href={`/invoices/${inv.id}/pdf`}
                                                         target="_blank"
                                                         rel="noreferrer"
-                                                        className="size-8 rounded-xl bg-amber-50 dark:bg-amber-950/60 text-amber-600 dark:text-amber-400 hover:bg-amber-600 hover:text-white dark:hover:bg-amber-600 dark:hover:text-white transition-all flex items-center justify-center shadow-2xs"
+                                                        className="size-8 rounded-xl bg-amber-50 dark:bg-amber-950/60 text-amber-600 dark:text-amber-400 hover:bg-amber-600 hover:text-white dark:hover:bg-amber-600 dark:hover:text-white transition-all flex items-center justify-center shadow-2xs cursor-pointer"
                                                         title="Download PDF Invoice"
                                                     >
                                                         <Download className="size-3.5" />
@@ -368,39 +309,19 @@ export default function InvoicesIndex({ invoices, stats, filters, clients }: Inv
 
                                                     <Link
                                                         href={`/invoices/${inv.id}`}
-                                                        className="size-8 rounded-xl bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400 hover:bg-blue-600 hover:text-white dark:hover:bg-blue-600 dark:hover:text-white transition-all flex items-center justify-center shadow-2xs"
-                                                        title="View Digital Invoice"
+                                                        className="size-8 rounded-xl bg-purple-50 dark:bg-purple-950/60 text-purple-600 dark:text-purple-400 hover:bg-purple-600 hover:text-white transition-all flex items-center justify-center cursor-pointer shadow-2xs"
+                                                        title="View Details"
                                                     >
                                                         <Eye className="size-3.5" />
                                                     </Link>
-
-                                                    {hasPermission(user, 'edit-invoices') && (
-                                                        <Link
-                                                            href={`/invoices/${inv.id}/edit`}
-                                                            className="size-8 rounded-xl bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 hover:bg-indigo-600 hover:text-white dark:hover:bg-indigo-600 dark:hover:text-white transition-all flex items-center justify-center shadow-2xs"
-                                                            title="Edit Invoice"
-                                                        >
-                                                            <Edit2 className="size-3.5" />
-                                                        </Link>
-                                                    )}
-
-                                                    {hasPermission(user, 'delete-invoices') && (
-                                                        <button
-                                                            onClick={() => setDeletingInvoice(inv)}
-                                                            className="size-8 rounded-xl bg-rose-50 dark:bg-rose-950/40 text-rose-600 dark:text-rose-400 hover:bg-rose-600 hover:text-white dark:hover:bg-rose-600 dark:hover:text-white transition-all flex items-center justify-center shadow-2xs"
-                                                            title="Delete Invoice"
-                                                        >
-                                                            <Trash2 className="size-3.5" />
-                                                        </button>
-                                                    )}
                                                 </div>
                                             </td>
                                         </tr>
                                     ))
                                 ) : (
                                     <tr>
-                                        <td colSpan={6} className="px-6 py-12 text-center text-slate-400 italic">
-                                            No invoices found. Click <strong>Create New Invoice</strong> to create your first client bill.
+                                        <td colSpan={5} className="px-6 py-12 text-center text-slate-400 italic">
+                                            No invoices found.
                                         </td>
                                     </tr>
                                 )}
@@ -410,45 +331,6 @@ export default function InvoicesIndex({ invoices, stats, filters, clients }: Inv
 
                     <Pagination meta={invoices} />
                 </div>
-
-                {/* DELETE CONFIRMATION MODAL */}
-                {deletingInvoice && (
-                    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs overflow-y-auto">
-                        <div className="w-full max-w-md rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-6 shadow-2xl space-y-4 animate-in fade-in zoom-in-95 duration-200">
-                            <div className="flex items-center gap-3">
-                                <div className="p-3 rounded-2xl bg-rose-50 dark:bg-rose-950 text-rose-600 dark:text-rose-400 shrink-0">
-                                    <AlertTriangle className="size-6" />
-                                </div>
-                                <div>
-                                    <h3 className="text-base font-extrabold text-slate-900 dark:text-white">
-                                        Delete Invoice {deletingInvoice.invoice_number}?
-                                    </h3>
-                                    <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-                                        Are you sure you want to permanently delete invoice <strong className="text-slate-900 dark:text-white">{deletingInvoice.invoice_number}</strong>?
-                                    </p>
-                                </div>
-                            </div>
-
-                            <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-100 dark:border-slate-800">
-                                <Button
-                                    type="button"
-                                    variant="outline"
-                                    onClick={() => setDeletingInvoice(null)}
-                                    className="h-10 px-4 text-xs font-semibold rounded-xl"
-                                >
-                                    Cancel
-                                </Button>
-                                <Button
-                                    type="button"
-                                    onClick={confirmDelete}
-                                    className="h-10 px-5 text-xs font-bold rounded-xl bg-rose-600 hover:bg-rose-700 text-white shadow-md shadow-rose-600/20 transition-all"
-                                >
-                                    Confirm Delete
-                                </Button>
-                            </div>
-                        </div>
-                    </div>
-                )}
             </div>
         </AppLayout>
     );

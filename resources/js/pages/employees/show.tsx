@@ -1,6 +1,7 @@
 import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem } from '@/types';
-import { Head, Link } from '@inertiajs/react';
+import { hasPermission } from '@/utils/permissions';
+import { Head, Link, usePage } from '@inertiajs/react';
 import {
     ArrowLeft,
     BadgeDollarSign,
@@ -112,6 +113,7 @@ const monthsList = [
 ];
 
 export default function EmployeeShow({ employee }: EmployeeShowProps) {
+    const user = (usePage().props.auth as any)?.user;
     const [activeTab, setActiveTab] = useState<'overview' | 'tasks' | 'payrolls'>('overview');
 
     const breadcrumbs: BreadcrumbItem[] = [
@@ -185,13 +187,15 @@ export default function EmployeeShow({ employee }: EmployeeShowProps) {
                     </div>
 
                     <div className="flex items-center gap-2.5 shrink-0 pl-9 sm:pl-0">
-                        <Link
-                            href={route('employees.edit', employee.id)}
-                            className="h-10 px-4 text-xs font-bold rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors inline-flex items-center gap-1.5 shadow-2xs"
-                        >
-                            <Edit2 className="size-4" />
-                            <span>Edit Profile</span>
-                        </Link>
+                        {hasPermission(user, 'edit-employees') && (
+                            <Link
+                                href={route('employees.edit', employee.id)}
+                                className="h-10 px-4 text-xs font-bold rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors inline-flex items-center gap-1.5 shadow-2xs"
+                            >
+                                <Edit2 className="size-4" />
+                                <span>Edit Profile</span>
+                            </Link>
+                        )}
                         <Link
                             href="/employees"
                             className="h-10 px-4 text-xs font-bold rounded-xl bg-gradient-to-r from-[#003796] via-[#0052D4] to-[#1d4ed8] text-white hover:from-[#002a75] hover:to-[#0040b8] transition-all inline-flex items-center gap-1.5 shadow-md shadow-blue-600/20"

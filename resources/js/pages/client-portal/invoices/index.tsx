@@ -170,7 +170,7 @@ export default function ClientPortalInvoicesIndex({
         <ClientPortalLayout client={client} breadcrumbs={breadcrumbs} activeTab="payments">
             <Head title={`Invoices & Billing Statements | ${client.name}`} />
 
-            <div className="p-6 w-full space-y-6">
+            <div className="p-2 md:p-6 w-full space-y-6">
                 {/* Header Title */}
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                     <div>
@@ -292,13 +292,12 @@ export default function ClientPortalInvoicesIndex({
                 </div>
 
                 {/* Invoices Table */}
-                <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/80 dark:border-slate-800 overflow-hidden shadow-xs">
-                    <div className="overflow-x-auto">
-                        <table className="w-full text-left border-collapse">
+                <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/80 dark:border-slate-800 overflow-hidden shadow-xs w-full min-w-0">
+                    <div className="w-full overflow-x-auto scrollbar-thin">
+                        <table className="w-full min-w-[750px] text-left border-collapse">
                             <thead>
                                 <tr className="bg-slate-50 dark:bg-slate-800/60 border-b border-slate-200/80 dark:border-slate-800 text-[11px] font-extrabold uppercase text-slate-400 tracking-wider">
                                     <th className="px-6 py-4">Invoice #</th>
-                                    <th className="px-6 py-4">Website Project</th>
                                     <th className="px-6 py-4">Issue Date</th>
                                     <th className="px-6 py-4">Due Date</th>
                                     <th className="px-6 py-4">Total Amount</th>
@@ -317,20 +316,6 @@ export default function ClientPortalInvoicesIndex({
                                                         {item.invoice_number}
                                                     </span>
                                                 </div>
-                                            </td>
-
-                                            <td className="px-6 py-4">
-                                                {item.website_project ? (
-                                                    <Link
-                                                        href={`/client-portal/projects/${item.website_project.id}`}
-                                                        className="font-bold text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-1.5"
-                                                    >
-                                                        <Globe className="size-3.5 text-blue-500" />
-                                                        <span>{item.website_project.project_name}</span>
-                                                    </Link>
-                                                ) : (
-                                                    <span className="text-slate-400 italic">General Account Invoice</span>
-                                                )}
                                             </td>
 
                                             <td className="px-6 py-4">
@@ -420,8 +405,8 @@ export default function ClientPortalInvoicesIndex({
 
             {/* View Invoice Details Modal */}
             {viewingInvoice && (
-                <div className="fixed inset-0 z-50 bg-slate-950/60 backdrop-blur-xs flex items-center justify-center p-4">
-                    <div className="bg-white dark:bg-slate-900 rounded-3xl p-5 md:p-6 max-w-2xl w-full border border-slate-200 dark:border-slate-800 shadow-2xl space-y-4 max-h-[90vh] overflow-y-auto custom-scrollbar">
+                <div className="fixed inset-0 z-50 bg-slate-950/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
+                    <div className="bg-white dark:bg-slate-900 rounded-3xl p-4 sm:p-6 max-w-2xl w-full max-h-[90vh] my-auto overflow-y-auto border border-slate-200 dark:border-slate-800 shadow-2xl space-y-4 custom-scrollbar">
                         {/* Header */}
                         <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800">
                             <div className="flex items-center gap-3">
@@ -455,42 +440,38 @@ export default function ClientPortalInvoicesIndex({
                                 <span className="text-slate-900 dark:text-white font-bold">{client.name}</span>
                                 {client.company_name && <span className="text-slate-500 block text-[11px]">{client.company_name}</span>}
                             </div>
-                            {viewingInvoice.website_project && (
-                                <div className="text-right">
-                                    <span className="text-slate-400 text-[10px] uppercase font-extrabold block">Associated Project</span>
-                                    <span className="text-blue-600 dark:text-blue-400 font-bold">{viewingInvoice.website_project.project_name}</span>
-                                </div>
-                            )}
                         </div>
 
                         {/* Line Items Table */}
-                        <div className="border border-slate-200/80 dark:border-slate-800 rounded-xl overflow-hidden">
-                            <table className="w-full text-left border-collapse text-xs">
-                                <thead>
-                                    <tr className="bg-slate-50 dark:bg-slate-800/60 border-b border-slate-200/80 dark:border-slate-800 text-[10px] font-extrabold uppercase text-slate-400 tracking-wider">
-                                        <th className="p-3">Description</th>
-                                        <th className="p-3 text-center">Qty</th>
-                                        <th className="p-3 text-right">Unit Price</th>
-                                        <th className="p-3 text-right">Amount</th>
-                                    </tr>
-                                </thead>
-                                <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60 font-medium">
-                                    {viewingInvoice.items && viewingInvoice.items.length > 0 ? (
-                                        viewingInvoice.items.map((item, idx) => (
-                                            <tr key={item.id || idx}>
-                                                <td className="p-3 font-semibold text-slate-800 dark:text-slate-200">{item.description}</td>
-                                                <td className="p-3 text-center font-mono">{item.quantity}</td>
-                                                <td className="p-3 text-right font-mono">{formatCurrency(item.unit_price, viewingInvoice.currency_code)}</td>
-                                                <td className="p-3 text-right font-bold text-slate-900 dark:text-white font-mono">{formatCurrency(item.amount || Number(item.quantity) * Number(item.unit_price), viewingInvoice.currency_code)}</td>
-                                            </tr>
-                                        ))
-                                    ) : (
-                                        <tr>
-                                            <td colSpan={4} className="p-4 text-center text-slate-400 italic">No line items.</td>
+                        <div className="border border-slate-200/80 dark:border-slate-800 rounded-xl overflow-hidden w-full min-w-0">
+                            <div className="w-full overflow-x-auto scrollbar-thin">
+                                <table className="w-full min-w-[500px] text-left border-collapse text-xs">
+                                    <thead>
+                                        <tr className="bg-slate-50 dark:bg-slate-800/60 border-b border-slate-200/80 dark:border-slate-800 text-[10px] font-extrabold uppercase text-slate-400 tracking-wider">
+                                            <th className="p-3">Description</th>
+                                            <th className="p-3 text-center">Qty</th>
+                                            <th className="p-3 text-right">Unit Price</th>
+                                            <th className="p-3 text-right">Amount</th>
                                         </tr>
-                                    )}
-                                </tbody>
-                            </table>
+                                    </thead>
+                                    <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60 font-medium">
+                                        {viewingInvoice.items && viewingInvoice.items.length > 0 ? (
+                                            viewingInvoice.items.map((item, idx) => (
+                                                <tr key={item.id || idx}>
+                                                    <td className="p-3 font-semibold text-slate-800 dark:text-slate-200">{item.description}</td>
+                                                    <td className="p-3 text-center font-mono">{item.quantity}</td>
+                                                    <td className="p-3 text-right font-mono">{formatCurrency(item.unit_price, viewingInvoice.currency_code)}</td>
+                                                    <td className="p-3 text-right font-bold text-slate-900 dark:text-white font-mono">{formatCurrency(item.amount || Number(item.quantity) * Number(item.unit_price), viewingInvoice.currency_code)}</td>
+                                                </tr>
+                                            ))
+                                        ) : (
+                                            <tr>
+                                                <td colSpan={4} className="p-4 text-center text-slate-400 italic">No line items.</td>
+                                            </tr>
+                                        )}
+                                    </tbody>
+                                </table>
+                            </div>
                         </div>
 
                         {/* Totals Breakdown */}
@@ -560,8 +541,8 @@ export default function ClientPortalInvoicesIndex({
 
             {/* Delete Invoice Modal */}
             {deletingInvoice && (
-                <div className="fixed inset-0 z-50 bg-slate-950/60 backdrop-blur-xs flex items-center justify-center p-4">
-                    <div className="bg-white dark:bg-slate-900 rounded-3xl p-5 md:p-6 max-w-md w-full border border-slate-200 dark:border-slate-800 shadow-2xl space-y-4">
+                <div className="fixed inset-0 z-50 bg-slate-950/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
+                    <div className="bg-white dark:bg-slate-900 rounded-3xl p-4 sm:p-6 max-w-md w-full max-h-[90vh] my-auto overflow-y-auto border border-slate-200 dark:border-slate-800 shadow-2xl space-y-4">
                         <div className="flex items-center gap-3 text-rose-600 dark:text-rose-400">
                             <div className="p-2.5 rounded-2xl bg-rose-50 dark:bg-rose-950">
                                 <AlertTriangle className="size-6" />

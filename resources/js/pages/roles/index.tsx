@@ -3,7 +3,8 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem } from '@/types';
-import { Head, router, useForm } from '@inertiajs/react';
+import { hasPermission } from '@/utils/permissions';
+import { Head, router, useForm, usePage } from '@inertiajs/react';
 import {
     AlertTriangle,
     Check,
@@ -55,6 +56,7 @@ const formatPermissionName = (name: string) => {
 };
 
 export default function RolesIndex({ roles, permissions, groupedPermissions }: RolesIndexProps) {
+    const user = (usePage().props.auth as any)?.user;
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [editingRole, setEditingRole] = useState<RoleItem | null>(null);
 
@@ -191,13 +193,15 @@ export default function RolesIndex({ roles, permissions, groupedPermissions }: R
                         </p>
                     </div>
 
-                    <Button
-                        onClick={handleCreateRole}
-                        className="h-11 px-5 text-xs sm:text-sm font-bold rounded-xl bg-gradient-to-r from-[#003796] via-[#0052D4] to-[#1d4ed8] hover:from-[#002a75] hover:to-[#0040b8] text-white shadow-md shadow-blue-600/20 active:scale-[0.99] transition-all inline-flex items-center gap-2"
-                    >
-                        <Plus className="size-4" />
-                        <span>Create New Role</span>
-                    </Button>
+                    {hasPermission(user, 'create-roles') && (
+                        <Button
+                            onClick={handleCreateRole}
+                            className="h-11 px-5 text-xs sm:text-sm font-bold rounded-xl bg-gradient-to-r from-[#003796] via-[#0052D4] to-[#1d4ed8] hover:from-[#002a75] hover:to-[#0040b8] text-white shadow-md shadow-blue-600/20 active:scale-[0.99] transition-all inline-flex items-center gap-2"
+                        >
+                            <Plus className="size-4" />
+                            <span>Create New Role</span>
+                        </Button>
+                    )}
                 </div>
 
                 {/* Roles Cards Grid */}
@@ -276,15 +280,17 @@ export default function RolesIndex({ roles, permissions, groupedPermissions }: R
                                         </div>
                                     ) : (
                                         <>
-                                            <button
-                                                onClick={() => handleEditRole(role)}
-                                                className="flex-1 h-9 rounded-xl bg-slate-50 dark:bg-slate-950 hover:bg-slate-100 dark:hover:bg-slate-800 border border-slate-200/80 dark:border-slate-800 text-xs font-bold text-slate-700 dark:text-slate-200 transition-colors flex items-center justify-center gap-1.5"
-                                            >
-                                                <Edit2 className="size-3.5" />
-                                                <span>Edit Permissions</span>
-                                            </button>
+                                            {hasPermission(user, 'edit-roles') && (
+                                                <button
+                                                    onClick={() => handleEditRole(role)}
+                                                    className="flex-1 h-9 rounded-xl bg-slate-50 dark:bg-slate-950 hover:bg-slate-100 dark:hover:bg-slate-800 border border-slate-200/80 dark:border-slate-800 text-xs font-bold text-slate-700 dark:text-slate-200 transition-colors flex items-center justify-center gap-1.5"
+                                                >
+                                                    <Edit2 className="size-3.5" />
+                                                    <span>Edit Permissions</span>
+                                                </button>
+                                            )}
 
-                                            {!isClientRole && (
+                                            {!isClientRole && hasPermission(user, 'delete-roles') && (
                                                 <button
                                                     onClick={() => handleOpenDeleteModal(role)}
                                                     className="h-9 w-9 rounded-xl bg-rose-50 dark:bg-rose-950/40 hover:bg-rose-100 text-rose-600 dark:text-rose-400 flex items-center justify-center transition-colors cursor-pointer"

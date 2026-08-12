@@ -20,13 +20,18 @@ class UserController extends Controller
     {
         $search = $request->query('search');
 
-        $users = User::with('roles')
+        $users = User::with(['roles', 'client'])
             ->when($search, function ($query, $search) {
                 $query->where(function ($q) use ($search) {
                     $q->where('name', 'like', "%{$search}%")
                         ->orWhere('email', 'like', "%{$search}%")
+                        ->orWhere('type', 'like', "%{$search}%")
                         ->orWhereHas('roles', function ($rq) use ($search) {
                             $rq->where('name', 'like', "%{$search}%");
+                        })
+                        ->orWhereHas('client', function ($cq) use ($search) {
+                            $cq->where('name', 'like', "%{$search}%")
+                                ->orWhere('company_name', 'like', "%{$search}%");
                         });
                 });
             })
@@ -35,11 +40,15 @@ class UserController extends Controller
             ->withQueryString()
             ->through(function ($user) {
                 $userRoles = $user->getRoleNames()->toArray();
+                $userType = $user->type ?? ($user->client_id ? 'client' : 'admin');
                 return [
                     'id' => $user->id,
                     'name' => $user->name,
                     'email' => $user->email,
                     'avatar' => $user->avatar,
+                    'type' => $userType,
+                    'client_id' => $user->client_id,
+                    'client_name' => $user->client ? ($user->client->company_name ?: $user->client->name) : null,
                     'roles' => $userRoles,
                     'is_primary_admin' => $user->id === 1,
                     'created_at' => $user->created_at ? $user->created_at->format('Y-m-d H:i') : null,
@@ -53,9 +62,14 @@ class UserController extends Controller
             ];
         });
 
+        $clients = \App\Models\Client::select('id', 'name', 'company_name', 'client_code')
+            ->orderBy('name')
+            ->get();
+
         return Inertia::render('users/index', [
             'users' => $users,
             'roles' => $roles,
+            'clients' => $clients,
             'filters' => [
                 'search' => $search ?? '',
             ],
@@ -71,6 +85,8 @@ class UserController extends Controller
             'name' => ['required', 'string', 'max:255'],
             'email' => ['required', 'email', 'max:255', Rule::unique('users', 'email')],
             'password' => ['required', 'string', 'min:8'],
+            'type' => ['required', Rule::in(['admin', 'client'])],
+            'client_id' => ['nullable', 'exists:clients,id'],
             'roles' => ['required', 'array', 'min:1'],
             'roles.*' => ['string', 'exists:roles,name'],
             'avatar' => ['nullable', 'image', 'mimes:jpeg,png,jpg,gif,webp', 'max:4096'],
@@ -99,6 +115,8 @@ class UserController extends Controller
             'name' => trim($validated['name']),
             'email' => trim(strtolower($validated['email'])),
             'password' => Hash::make($validated['password']),
+            'type' => $validated['type'],
+            'client_id' => $validated['type'] === 'client' ? ($validated['client_id'] ?? null) : null,
             'avatar' => $avatarPath,
             'email_verified_at' => now(),
         ]);
@@ -123,6 +141,8 @@ class UserController extends Controller
             'name' => ['required', 'string', 'max:255'],
             'email' => ['required', 'email', 'max:255', Rule::unique('users', 'email')->ignore($user->id)],
             'password' => ['nullable', 'string', 'min:8'],
+            'type' => ['required', Rule::in(['admin', 'client'])],
+            'client_id' => ['nullable', 'exists:clients,id'],
             'roles' => ['required', 'array', 'min:1'],
             'roles.*' => ['string', 'exists:roles,name'],
             'avatar' => ['nullable', 'image', 'mimes:jpeg,png,jpg,gif,webp', 'max:4096'],
@@ -137,6 +157,8 @@ class UserController extends Controller
 
         $user->name = trim($validated['name']);
         $user->email = trim(strtolower($validated['email']));
+        $user->type = $validated['type'];
+        $user->client_id = $validated['type'] === 'client' ? ($validated['client_id'] ?? null) : null;
 
         if (!empty($validated['password'])) {
             $user->password = Hash::make($validated['password']);

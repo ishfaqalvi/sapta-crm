@@ -9,15 +9,14 @@ import {
     Briefcase,
     Building,
     Building2,
-    CheckSquare,
     Coins,
-    CreditCard,
     FileText,
+    FolderKanban,
     Globe,
     Key,
+    Layers,
     LayoutGrid,
     LineChart,
-    Receipt,
     Settings,
     ShieldCheck,
     User as UserIcon,
@@ -40,7 +39,7 @@ interface PermissionNavGroup {
 
 const rawNavGroups: PermissionNavGroup[] = [
     {
-        title: 'Core Navigation',
+        title: 'Main Navigation',
         items: [
             {
                 title: 'Dashboard',
@@ -56,54 +55,31 @@ const rawNavGroups: PermissionNavGroup[] = [
         ],
     },
     {
-        title: 'Projects & Tasks',
+        title: 'Client Operations',
         items: [
             {
-                title: 'Website Projects',
+                title: 'Projects',
                 url: '/website-projects',
                 icon: Globe,
                 permission: 'view-website-projects',
             },
             {
-                title: 'Project Tasks',
-                url: '/project-tasks',
-                icon: CheckSquare,
-                permission: 'view-project-tasks',
+                title: 'Services',
+                url: '/services',
+                icon: LineChart,
+                permission: 'view-services',
             },
             {
-                title: 'Website Payments',
-                url: '/website-payments',
-                icon: Receipt,
-                permission: 'view-website-payments',
-            },
-            {
-                title: 'Invoices & Billing',
+                title: 'Invoices',
                 url: '/invoices',
                 icon: FileText,
                 permission: 'view-invoices',
             },
             {
-                title: 'Credentials & Logins',
+                title: 'Credentials',
                 url: '/credentials',
                 icon: Key,
                 permission: 'view-credentials',
-            },
-        ],
-    },
-    {
-        title: 'SEO Services',
-        items: [
-            {
-                title: 'SEO Retainers',
-                url: '/seo-retainers',
-                icon: LineChart,
-                permission: 'view-seo-retainers',
-            },
-            {
-                title: 'SEO Payments',
-                url: '/seo-payments',
-                icon: CreditCard,
-                permission: 'view-seo-payments',
             },
         ],
     },
@@ -122,6 +98,23 @@ const rawNavGroups: PermissionNavGroup[] = [
                 icon: Banknote,
                 permission: 'view-payroll',
             },
+        ],
+    },
+    {
+        title: 'Master Data',
+        items: [
+            {
+                title: 'Project Categories',
+                url: '/project-categories',
+                icon: FolderKanban,
+                permission: 'view-project-categories',
+            },
+            {
+                title: 'Service Categories',
+                url: '/service-categories',
+                icon: Layers,
+                permission: 'view-service-categories',
+            },
             {
                 title: 'Departments',
                 url: '/departments',
@@ -134,10 +127,16 @@ const rawNavGroups: PermissionNavGroup[] = [
                 icon: Briefcase,
                 permission: 'view-designations',
             },
+            {
+                title: 'Currencies',
+                url: '/currencies',
+                icon: Coins,
+                permission: 'view-currencies',
+            },
         ],
     },
     {
-        title: 'System & Admin',
+        title: 'System & Administration',
         items: [
             {
                 title: 'User Accounts',
@@ -150,12 +149,6 @@ const rawNavGroups: PermissionNavGroup[] = [
                 url: '/roles',
                 icon: ShieldCheck,
                 permission: 'view-roles',
-            },
-            {
-                title: 'Currencies',
-                url: '/currencies',
-                icon: Coins,
-                permission: 'view-currencies',
             },
             {
                 title: 'My Profile',
@@ -192,7 +185,7 @@ export function AppSidebar() {
         .filter((group) => group.items.length > 0);
 
     return (
-        <Sidebar collapsible="icon" variant="inset" className="border-r border-slate-200/80 dark:border-slate-800/80 bg-white dark:bg-slate-950">
+        <Sidebar collapsible="icon" variant="inset" className="border-r border-slate-200/60 dark:border-slate-800/60 bg-white/80 dark:bg-slate-950/80 backdrop-blur-2xl">
             <SidebarHeader className="p-4 border-b border-slate-100 dark:border-slate-800">
                 <SidebarMenu>
                     <SidebarMenuItem>

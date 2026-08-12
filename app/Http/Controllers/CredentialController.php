@@ -20,7 +20,7 @@ class CredentialController extends Controller
         $type = $request->query('type');
         $clientId = $request->query('client_id');
 
-        $credentials = ClientCredential::with('client:id,name,company_name,client_code')
+        $credentials = ClientCredential::with(['client:id,name,company_name,client_code', 'project:id,project_name'])
             ->when($search, function ($query, $search) {
                 $query->where(function ($q) use ($search) {
                     $q->where('title', 'like', "%{$search}%")
@@ -31,6 +31,9 @@ class CredentialController extends Controller
                             $cq->where('name', 'like', "%{$search}%")
                                 ->orWhere('company_name', 'like', "%{$search}%")
                                 ->orWhere('client_code', 'like', "%{$search}%");
+                        })
+                        ->orWhereHas('project', function ($pq) use ($search) {
+                            $pq->where('project_name', 'like', "%{$search}%");
                         });
                 });
             })

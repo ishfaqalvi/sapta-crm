@@ -4,6 +4,7 @@ namespace App\Http\Controllers\ClientPortal;
 
 use App\Http\Controllers\Controller;
 use App\Models\{Client, User, Currency};
+use App\Traits\AuthorizesClientPortalAccess;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -13,6 +14,8 @@ use Inertia\Response;
 
 class ProfileController extends Controller
 {
+    use AuthorizesClientPortalAccess;
+
     /**
      * Retrieve the active client ID from session context or authenticated user.
      */
@@ -39,6 +42,8 @@ class ProfileController extends Controller
      */
     public function index(): Response
     {
+        $this->authorizePermission('view-client-portal-profile');
+
         $clientId = $this->getClientId();
         $client = Client::with('user:id,client_id,name,email,avatar,type,created_at')->findOrFail($clientId);
 
@@ -57,6 +62,8 @@ class ProfileController extends Controller
      */
     public function updateProfile(Request $request): RedirectResponse
     {
+        $this->authorizePermission('edit-client-portal-profile');
+
         $clientId = $this->getClientId();
         $client = Client::findOrFail($clientId);
 
@@ -80,6 +87,8 @@ class ProfileController extends Controller
      */
     public function updatePassword(Request $request): RedirectResponse
     {
+        $this->authorizePermission('edit-client-portal-profile');
+
         $user = Auth::user();
 
         if (!$user) {
@@ -103,6 +112,8 @@ class ProfileController extends Controller
      */
     public function updateAvatar(Request $request): RedirectResponse
     {
+        $this->authorizePermission('edit-client-portal-profile');
+
         $user = Auth::user();
         $clientId = $this->getClientId();
         $client = Client::with('user')->findOrFail($clientId);
@@ -148,6 +159,7 @@ class ProfileController extends Controller
      */
     public function createAccount(Request $request): RedirectResponse
     {
+        $this->authorizePermission('edit-client-portal-profile');
 
         $clientId = $this->getClientId();
         $client = Client::findOrFail($clientId);
@@ -180,6 +192,7 @@ class ProfileController extends Controller
      */
     public function resetPassword(Request $request): RedirectResponse
     {
+        $this->authorizePermission('edit-client-portal-profile');
 
         $clientId = $this->getClientId();
         $client = Client::with('user')->findOrFail($clientId);
@@ -204,6 +217,7 @@ class ProfileController extends Controller
      */
     public function revokeAccount(): RedirectResponse
     {
+        $this->authorizePermission('edit-client-portal-profile');
 
         $clientId = $this->getClientId();
         $client = Client::with('user')->findOrFail($clientId);

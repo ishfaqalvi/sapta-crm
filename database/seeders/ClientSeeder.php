@@ -198,6 +198,7 @@ class ClientSeeder extends Seeder
                     'project_name' => $client->name . ' Custom Portal Development',
                 ],
                 [
+                    'category_id' => ($index % 4) + 1,
                     'total_budget' => 15000.00,
                     'currency' => $client->currency,
                     'start_date' => '2026-06-01',

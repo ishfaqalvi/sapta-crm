@@ -4,6 +4,7 @@ namespace App\Http\Controllers\ClientPortal;
 
 use App\Http\Controllers\Controller;
 use App\Models\Client;
+use App\Traits\AuthorizesClientPortalAccess;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Inertia\Inertia;
@@ -11,6 +12,8 @@ use Inertia\Response;
 
 class OverviewController extends Controller
 {
+    use AuthorizesClientPortalAccess;
+
     /**
      * Retrieve the authenticated client model securely from session.
      */
@@ -45,6 +48,8 @@ class OverviewController extends Controller
      */
     public function index(): Response
     {
+        $this->authorizePermission('view-client-portal-overview');
+
         $client = $this->getAuthenticatedClient();
 
         return Inertia::render('client-portal/overview/index', [

@@ -13,6 +13,7 @@ class WebsiteProject extends Model
 
     protected $fillable = [
         'client_id',
+        'category_id',
         'project_name',
         'total_budget',
         'currency',
@@ -39,6 +40,11 @@ class WebsiteProject extends Model
         return $this->belongsTo(Client::class);
     }
 
+    public function category(): BelongsTo
+    {
+        return $this->belongsTo(ProjectCategory::class, 'category_id');
+    }
+
     public function payments(): HasMany
     {
         return $this->hasMany(ProjectPayment::class);
@@ -47,5 +53,10 @@ class WebsiteProject extends Model
     public function tasks(): HasMany
     {
         return $this->hasMany(ProjectTask::class, 'website_project_id');
+    }
+
+    public function credentials(): HasMany
+    {
+        return $this->hasMany(ClientCredential::class, 'website_project_id');
     }
 }

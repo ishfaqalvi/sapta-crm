@@ -40,13 +40,21 @@ interface SimpleClient {
     currency: string;
 }
 
-interface WebsiteProjectCreateProps {
-    clients: SimpleClient[];
+interface ProjectCategoryOption {
+    id: number;
+    name: string;
+    color: string | null;
 }
 
-export default function WebsiteProjectCreate({ clients }: WebsiteProjectCreateProps) {
+interface WebsiteProjectCreateProps {
+    clients: SimpleClient[];
+    categories: ProjectCategoryOption[];
+}
+
+export default function WebsiteProjectCreate({ clients, categories }: WebsiteProjectCreateProps) {
     const form = useForm({
         client_id: (clients.length > 0 ? clients[0].id : '') as string | number,
+        category_id: '' as string | number,
         project_name: '',
         total_budget: '' as string | number,
         currency: clients.length > 0 ? clients[0].currency : 'AED',
@@ -112,7 +120,7 @@ export default function WebsiteProjectCreate({ clients }: WebsiteProjectCreatePr
                             </div>
                         </div>
 
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                             <div className="space-y-1.5">
                                 <Label htmlFor="client_id" className="text-xs font-bold text-slate-700 dark:text-slate-300">
                                     Select Client *
@@ -136,6 +144,26 @@ export default function WebsiteProjectCreate({ clients }: WebsiteProjectCreatePr
                             </div>
 
                             <div className="space-y-1.5">
+                                <Label htmlFor="category_id" className="text-xs font-bold text-slate-700 dark:text-slate-300">
+                                    Project Category
+                                </Label>
+                                <SearchableSelect
+                                    id="category_id"
+                                    options={categories.map((cat) => ({
+                                        value: cat.id,
+                                        label: cat.name,
+                                    }))}
+                                    value={form.data.category_id}
+                                    onChange={(val) => form.setData('category_id', val)}
+                                    placeholder="Select Category (Web App, Mobile App...)"
+                                    searchPlaceholder="Search category..."
+                                />
+                                {form.errors.category_id && (
+                                    <p className="text-xs font-semibold text-rose-500">{form.errors.category_id}</p>
+                                )}
+                            </div>
+
+                            <div className="space-y-1.5">
                                 <Label htmlFor="project_name" className="text-xs font-bold text-slate-700 dark:text-slate-300">
                                     Website Project Title *
                                 </Label>
@@ -143,7 +171,7 @@ export default function WebsiteProjectCreate({ clients }: WebsiteProjectCreatePr
                                     id="project_name"
                                     value={form.data.project_name}
                                     onChange={(e) => form.setData('project_name', e.target.value)}
-                                    placeholder="e.g. E-Commerce Portal Redesign & React Custom Frontend"
+                                    placeholder="e.g. E-Commerce Portal Redesign"
                                     className="h-11 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-sm font-medium text-slate-900 dark:text-white placeholder:text-slate-400 focus:bg-white focus:border-blue-600 focus:ring-4 focus:ring-blue-600/10 transition-all"
                                     required
                                 />

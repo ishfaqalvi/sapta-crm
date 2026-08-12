@@ -5,15 +5,17 @@ namespace App\Http\Controllers\ClientPortal;
 use App\Http\Controllers\Controller;
 use App\Models\Client;
 use App\Models\ClientCredential;
+use App\Traits\AuthorizesClientPortalAccess;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 use Inertia\Response;
 
 class CredentialController extends Controller
 {
+    use AuthorizesClientPortalAccess;
+
     /**
      * Retrieve the authenticated client ID securely.
      */
@@ -37,76 +39,69 @@ class CredentialController extends Controller
     }
 
     /**
-     * Display a listing of credentials for the authenticated client.
+     * Display a listing of general credentials (where website_project_id is null) for the authenticated client.
      */
     public function index(Request $request): Response
     {
+        $this->authorizePermission('view-client-portal-credentials');
+
         $clientId = $this->getClientId();
         $client = $this->getClientModel();
 
-        $query = ClientCredential::where('client_id', $clientId);
+        $query = ClientCredential::where('client_id', $clientId)
+            ->whereNull('website_project_id');
 
-        // Search Filter
         if ($request->filled('search')) {
             $search = $request->search;
             $query->where(function ($q) use ($search) {
                 $q->where('title', 'like', "%{$search}%")
+                    ->orWhere('notes', 'like', "%{$search}%")
                     ->orWhere('username', 'like', "%{$search}%")
-                    ->orWhere('url', 'like', "%{$search}%")
-                    ->orWhere('notes', 'like', "%{$search}%");
+                    ->orWhere('url', 'like', "%{$search}%");
             });
         }
 
-        // Category / Type Filter
-        if ($request->filled('type')) {
-            $query->where('type', $request->type);
-        }
-
-        $credentials = $query->orderBy('created_at', 'desc')
+        $credentials = $query->latest('id')
             ->paginate(12)
             ->withQueryString();
 
-        $allCredentials = ClientCredential::where('client_id', $clientId)->get();
-
         $stats = [
-            'total' => $allCredentials->count(),
-            'hosting' => $allCredentials->where('type', 'hosting')->count(),
-            'cms' => $allCredentials->where('type', 'cms')->count(),
-            'database' => $allCredentials->where('type', 'database')->count(),
-            'domain' => $allCredentials->where('type', 'domain')->count(),
-            'api' => $allCredentials->where('type', 'api')->count(),
-            'other' => $allCredentials->where('type', 'other')->count(),
+            'total' => ClientCredential::where('client_id', $clientId)->whereNull('website_project_id')->count(),
         ];
 
         return Inertia::render('client-portal/credentials/index', [
             'client' => $client,
             'credentials' => $credentials,
             'stats' => $stats,
-            'filters' => $request->only(['search', 'type']),
+            'filters' => $request->only(['search']),
         ]);
     }
 
     /**
-     * Store a newly created credential for the authenticated client.
+     * Store a newly created general credential for the authenticated client.
      */
     public function store(Request $request): RedirectResponse
     {
+        $this->authorizePermission('create-client-portal-credentials');
+
         $clientId = $this->getClientId();
 
         $validated = $request->validate([
             'title' => 'required|string|max:255',
-            'type' => ['required', Rule::in(['hosting', 'cms', 'database', 'domain', 'api', 'other'])],
+            'type' => 'nullable|string|max:50',
             'username' => 'nullable|string|max:255',
-            'password' => 'nullable|string|max:2000',
-            'url' => 'nullable|string|max:1000',
-            'notes' => 'nullable|string|max:3000',
+            'password' => 'nullable|string|max:500',
+            'url' => 'nullable|string|max:500',
+            'notes' => 'nullable|string|max:5000',
         ]);
 
         $validated['client_id'] = $clientId;
+        $validated['website_project_id'] = null;
+        $validated['type'] = $validated['type'] ?? 'other';
 
         ClientCredential::create($validated);
 
-        return redirect()->back()->with('success', 'Credential created successfully.');
+        return redirect()->back()->with('success', 'Credential stored successfully.');
     }
 
     /**
@@ -114,6 +109,8 @@ class CredentialController extends Controller
      */
     public function update(Request $request, ClientCredential $credential): RedirectResponse
     {
+        $this->authorizePermission('edit-client-portal-credentials');
+
         $clientId = $this->getClientId();
 
         if ($credential->client_id !== $clientId) {
@@ -122,12 +119,14 @@ class CredentialController extends Controller
 
         $validated = $request->validate([
             'title' => 'required|string|max:255',
-            'type' => ['required', Rule::in(['hosting', 'cms', 'database', 'domain', 'api', 'other'])],
+            'type' => 'nullable|string|max:50',
             'username' => 'nullable|string|max:255',
-            'password' => 'nullable|string|max:2000',
-            'url' => 'nullable|string|max:1000',
-            'notes' => 'nullable|string|max:3000',
+            'password' => 'nullable|string|max:500',
+            'url' => 'nullable|string|max:500',
+            'notes' => 'nullable|string|max:5000',
         ]);
+
+        $validated['type'] = $validated['type'] ?? 'other';
 
         $credential->update($validated);
 
@@ -139,6 +138,8 @@ class CredentialController extends Controller
      */
     public function destroy(ClientCredential $credential): RedirectResponse
     {
+        $this->authorizePermission('delete-client-portal-credentials');
+
         $clientId = $this->getClientId();
 
         if ($credential->client_id !== $clientId) {

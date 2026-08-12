@@ -13,8 +13,10 @@ class SeoRetainer extends Model
 
     protected $fillable = [
         'client_id',
+        'category_id',
         'package_name',
         'monthly_fee',
+        'contract_months',
         'currency',
         'exchange_rate',
         'monthly_fee_pkr',
@@ -26,6 +28,7 @@ class SeoRetainer extends Model
 
     protected $casts = [
         'monthly_fee' => 'decimal:2',
+        'contract_months' => 'integer',
         'exchange_rate' => 'decimal:4',
         'monthly_fee_pkr' => 'decimal:2',
         'billing_day' => 'integer',
@@ -35,6 +38,11 @@ class SeoRetainer extends Model
     public function client(): BelongsTo
     {
         return $this->belongsTo(Client::class);
+    }
+
+    public function category(): BelongsTo
+    {
+        return $this->belongsTo(ServiceCategory::class, 'category_id');
     }
 
     public function payments(): HasMany

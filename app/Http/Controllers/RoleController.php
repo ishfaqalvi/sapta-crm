@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Constants\PermissionRegistry;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
@@ -28,41 +29,27 @@ class RoleController extends Controller
             ];
         });
 
-        $permissions = Permission::all()->map(function ($permission) {
+        $allPermissions = Permission::all();
+        $permissionsByName = $allPermissions->keyBy('name');
+
+        $permissions = $allPermissions->map(function ($permission) {
             return [
                 'id' => $permission->id,
                 'name' => $permission->name,
             ];
         });
 
-        // Group permissions by module prefix
-        $groupedPermissions = [
-            'Clients & Hub' => $permissions->filter(fn($p) => str_contains($p['name'], 'clients') && !str_contains($p['name'], 'client-portal'))->values(),
-            'Website Projects' => $permissions->filter(fn($p) => str_contains($p['name'], 'website-projects'))->values(),
-            'Project Tasks' => $permissions->filter(fn($p) => str_contains($p['name'], 'project-tasks'))->values(),
-            'Website Payments' => $permissions->filter(fn($p) => str_contains($p['name'], 'website-payments'))->values(),
-            'Invoices & Billing' => $permissions->filter(fn($p) => str_contains($p['name'], 'invoices') && !str_contains($p['name'], 'client-portal'))->values(),
-            'SEO Retainers' => $permissions->filter(fn($p) => str_contains($p['name'], 'seo-retainers') && !str_contains($p['name'], 'client-portal'))->values(),
-            'SEO Payments' => $permissions->filter(fn($p) => str_contains($p['name'], 'seo-payments') && !str_contains($p['name'], 'client-portal'))->values(),
-            'Employees Directory' => $permissions->filter(fn($p) => str_contains($p['name'], 'employees'))->values(),
-            'Monthly Payroll' => $permissions->filter(fn($p) => str_contains($p['name'], 'payroll'))->values(),
-            'Departments' => $permissions->filter(fn($p) => str_contains($p['name'], 'departments'))->values(),
-            'Job Designations' => $permissions->filter(fn($p) => str_contains($p['name'], 'designations'))->values(),
-            'User Accounts' => $permissions->filter(fn($p) => str_contains($p['name'], 'users'))->values(),
-            'Roles & Access' => $permissions->filter(fn($p) => str_contains($p['name'], 'roles'))->values(),
-            'Currency Management' => $permissions->filter(fn($p) => str_contains($p['name'], 'currencies'))->values(),
-            'System Settings' => $permissions->filter(fn($p) => str_contains($p['name'], 'settings'))->values(),
-
-            // Client Portal Grouped Modules
-            'Client Portal Overview' => $permissions->filter(fn($p) => str_contains($p['name'], 'client-portal-overview'))->values(),
-            'Client Portal Projects' => $permissions->filter(fn($p) => str_contains($p['name'], 'client-portal-projects'))->values(),
-            'Client Portal Tasks' => $permissions->filter(fn($p) => str_contains($p['name'], 'client-portal-tasks'))->values(),
-            'Client Portal Milestones' => $permissions->filter(fn($p) => str_contains($p['name'], 'client-portal-milestones'))->values(),
-            'Client Portal SEO' => $permissions->filter(fn($p) => str_contains($p['name'], 'client-portal-seo'))->values(),
-            'Client Portal Credentials' => $permissions->filter(fn($p) => str_contains($p['name'], 'client-portal-credentials'))->values(),
-            'Client Portal Invoices' => $permissions->filter(fn($p) => str_contains($p['name'], 'client-portal-invoices'))->values(),
-            'Client Portal Profile' => $permissions->filter(fn($p) => str_contains($p['name'], 'client-portal-profile') || str_contains($p['name'], 'client-portal-account'))->values(),
-        ];
+        // Group permissions dynamically using the single source of truth PermissionRegistry
+        $groupedPermissions = [];
+        foreach (PermissionRegistry::getPermissionsByModule() as $module => $permList) {
+            $groupedPermissions[$module] = collect($permList)->map(function ($permName) use ($permissionsByName) {
+                $p = $permissionsByName->get($permName);
+                return [
+                    'id' => $p ? $p->id : null,
+                    'name' => $permName,
+                ];
+            })->filter(fn($p) => $p['id'] !== null)->values();
+        }
 
         return Inertia::render('roles/index', [
             'roles' => $roles,

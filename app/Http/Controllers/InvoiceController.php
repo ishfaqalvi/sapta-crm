@@ -5,10 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Client;
 use App\Models\Currency;
 use App\Models\Invoice;
-use App\Models\InvoiceItem;
-use App\Models\ProjectPayment;
 use App\Models\SystemSetting;
-use App\Models\WebsiteProject;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -27,16 +24,13 @@ class InvoiceController extends Controller
         $status = $request->query('status');
         $clientId = $request->query('client_id');
 
-        $invoices = Invoice::with(['client', 'websiteProject'])
+        $invoices = Invoice::with(['client'])
             ->when($search, function ($query, $search) {
                 $query->where(function ($q) use ($search) {
                     $q->where('invoice_number', 'like', "%{$search}%")
                         ->orWhereHas('client', function ($cq) use ($search) {
                             $cq->where('name', 'like', "%{$search}%")
                                 ->orWhere('company_name', 'like', "%{$search}%");
-                        })
-                        ->orWhereHas('websiteProject', function ($pq) use ($search) {
-                            $pq->where('project_name', 'like', "%{$search}%");
                         });
                 });
             })
@@ -78,44 +72,22 @@ class InvoiceController extends Controller
     public function create(Request $request): Response
     {
         $prefillClientId = $request->query('client_id');
-        $prefillProjectId = $request->query('website_project_id');
-        $prefillPaymentId = $request->query('project_payment_id');
 
         $clients = Client::select('id', 'name', 'company_name', 'currency')->orderBy('name')->get();
-        $projects = WebsiteProject::select('id', 'client_id', 'project_name', 'total_budget', 'currency')->get();
         $currencies = Currency::where('is_active', true)->get();
         $baseCurrency = SystemSetting::get('base_currency', 'PKR');
 
         $nextInvoiceNumber = Invoice::generateNextInvoiceNumber();
         $defaultTaxRate = (float) SystemSetting::get('default_tax_rate', 0);
 
-        // Optional prefill logic from Project Payment (Milestone)
-        $prefilledData = null;
-        if ($prefillPaymentId) {
-            $payment = ProjectPayment::with(['websiteProject.client'])->find($prefillPaymentId);
-            if ($payment) {
-                $prefilledData = [
-                    'client_id' => $payment->websiteProject->client_id ?? '',
-                    'website_project_id' => $payment->website_project_id,
-                    'project_payment_id' => $payment->id,
-                    'currency_code' => $payment->currency ?? 'PKR',
-                    'amount' => $payment->amount,
-                    'description' => "Milestone Payment: {$payment->title}",
-                ];
-            }
-        }
-
         return Inertia::render('invoices/create', [
             'clients' => $clients,
-            'projects' => $projects,
             'currencies' => $currencies,
             'baseCurrency' => $baseCurrency,
             'nextInvoiceNumber' => $nextInvoiceNumber,
             'defaultTaxRate' => $defaultTaxRate,
-            'prefill' => $prefilledData ?? [
+            'prefill' => [
                 'client_id' => $prefillClientId ?? '',
-                'website_project_id' => $prefillProjectId ?? '',
-                'project_payment_id' => $prefillPaymentId ?? '',
             ],
         ]);
     }
@@ -128,8 +100,6 @@ class InvoiceController extends Controller
         $validated = $request->validate([
             'invoice_number' => ['required', 'string', 'max:50', 'unique:invoices,invoice_number'],
             'client_id' => ['required', 'exists:clients,id'],
-            'website_project_id' => ['nullable', 'exists:website_projects,id'],
-            'project_payment_id' => ['nullable', 'exists:project_payments,id'],
             'currency_code' => ['required', 'string', 'max:10'],
             'issue_date' => ['required', 'date'],
             'due_date' => ['required', 'date', 'after_or_equal:issue_date'],
@@ -145,12 +115,10 @@ class InvoiceController extends Controller
         ]);
 
         DB::transaction(function () use ($validated, $request) {
-            // Get live currency rate to PKR
             $currencyCode = strtoupper($validated['currency_code']);
             $currencyObj = Currency::where('code', $currencyCode)->first();
             $exchangeRate = $currencyObj ? (float) $currencyObj->exchange_rate_to_pkr : 1.0000;
 
-            // Calculate item amounts & subtotal
             $subtotal = 0;
             $itemsData = [];
             foreach ($validated['items'] as $item) {
@@ -176,8 +144,6 @@ class InvoiceController extends Controller
             $invoice = Invoice::create([
                 'invoice_number' => $validated['invoice_number'],
                 'client_id' => $validated['client_id'],
-                'website_project_id' => $validated['website_project_id'] ?? null,
-                'project_payment_id' => $validated['project_payment_id'] ?? null,
                 'currency_code' => $currencyCode,
                 'exchange_rate_to_pkr' => $exchangeRate,
                 'subtotal' => $subtotal,
@@ -207,7 +173,7 @@ class InvoiceController extends Controller
      */
     public function show(Invoice $invoice): Response
     {
-        $invoice->load(['client', 'websiteProject', 'items', 'creator']);
+        $invoice->load(['client', 'items', 'creator']);
 
         $companySettings = [
             'name' => SystemSetting::get('company_name', 'Sapta Technologies'),
@@ -228,16 +194,14 @@ class InvoiceController extends Controller
      */
     public function edit(Invoice $invoice): Response
     {
-        $invoice->load(['client', 'websiteProject', 'items']);
+        $invoice->load(['client', 'items']);
 
         $clients = Client::select('id', 'name', 'company_name', 'currency')->orderBy('name')->get();
-        $projects = WebsiteProject::select('id', 'client_id', 'project_name', 'total_budget', 'currency')->get();
         $currencies = Currency::where('is_active', true)->get();
 
         return Inertia::render('invoices/edit', [
             'invoice' => $invoice,
             'clients' => $clients,
-            'projects' => $projects,
             'currencies' => $currencies,
         ]);
     }
@@ -249,7 +213,6 @@ class InvoiceController extends Controller
     {
         $validated = $request->validate([
             'client_id' => ['required', 'exists:clients,id'],
-            'website_project_id' => ['nullable', 'exists:website_projects,id'],
             'currency_code' => ['required', 'string', 'max:10'],
             'issue_date' => ['required', 'date'],
             'due_date' => ['required', 'date', 'after_or_equal:issue_date'],
@@ -293,7 +256,6 @@ class InvoiceController extends Controller
 
             $invoice->update([
                 'client_id' => $validated['client_id'],
-                'website_project_id' => $validated['website_project_id'] ?? null,
                 'currency_code' => $currencyCode,
                 'exchange_rate_to_pkr' => $exchangeRate,
                 'subtotal' => $subtotal,
@@ -309,7 +271,6 @@ class InvoiceController extends Controller
                 'terms' => $validated['terms'] ?? null,
             ]);
 
-            // Replace line items
             $invoice->items()->delete();
             foreach ($itemsData as $itemData) {
                 $invoice->items()->create($itemData);
@@ -335,7 +296,7 @@ class InvoiceController extends Controller
      */
     public function pdf(Invoice $invoice)
     {
-        $invoice->load(['client', 'websiteProject', 'items', 'creator']);
+        $invoice->load(['client', 'items', 'creator']);
 
         $companySettings = [
             'name' => SystemSetting::get('company_name', 'Sapta Technologies'),

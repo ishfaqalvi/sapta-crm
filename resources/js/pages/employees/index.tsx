@@ -2,7 +2,8 @@ import Pagination, { type PaginatedData } from '@/components/pagination';
 import { Button } from '@/components/ui/button';
 import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem } from '@/types';
-import { Head, Link, router } from '@inertiajs/react';
+import { hasPermission } from '@/utils/permissions';
+import { Head, Link, router, usePage } from '@inertiajs/react';
 import {
     AlertTriangle,
     BadgeDollarSign,
@@ -93,6 +94,7 @@ export default function EmployeesIndex({
     departments,
     filters,
 }: EmployeesIndexProps) {
+    const user = (usePage().props.auth as any)?.user;
     const [searchQuery, setSearchQuery] = useState(filters?.search || '');
     const [selectedDeptFilter, setSelectedDeptFilter] = useState(filters?.department_id || '');
     const [selectedStatusFilter, setSelectedStatusFilter] = useState(filters?.status || '');
@@ -148,13 +150,15 @@ export default function EmployeesIndex({
                         </p>
                     </div>
 
-                    <Link
-                        href={route('employees.create')}
-                        className="h-11 px-5 text-xs sm:text-sm font-bold rounded-xl bg-gradient-to-r from-[#003796] via-[#0052D4] to-[#1d4ed8] hover:from-[#002a75] hover:to-[#0040b8] text-white shadow-md shadow-blue-600/20 active:scale-[0.99] transition-all inline-flex items-center gap-2 shrink-0"
-                    >
-                        <Plus className="size-4" />
-                        <span>Add New Employee</span>
-                    </Link>
+                    {hasPermission(user, 'create-employees') && (
+                        <Link
+                            href={route('employees.create')}
+                            className="h-11 px-5 text-xs sm:text-sm font-bold rounded-xl bg-gradient-to-r from-[#003796] via-[#0052D4] to-[#1d4ed8] hover:from-[#002a75] hover:to-[#0040b8] text-white shadow-md shadow-blue-600/20 active:scale-[0.99] transition-all inline-flex items-center gap-2 shrink-0"
+                        >
+                            <Plus className="size-4" />
+                            <span>Add New Employee</span>
+                        </Link>
+                    )}
                 </div>
 
                 {/* Filters Bar */}
@@ -308,20 +312,24 @@ export default function EmployeesIndex({
                                                     >
                                                         <Eye className="size-3.5" />
                                                     </Link>
-                                                    <Link
-                                                        href={route('employees.edit', emp.id)}
-                                                        className="size-8 rounded-xl bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400 hover:bg-blue-600 hover:text-white dark:hover:bg-blue-600 dark:hover:text-white transition-all flex items-center justify-center shadow-2xs"
-                                                        title="Edit Employee Profile"
-                                                    >
-                                                        <Edit2 className="size-3.5" />
-                                                    </Link>
-                                                    <button
-                                                        onClick={() => setDeletingEmployee(emp)}
-                                                        className="size-8 rounded-xl bg-rose-50 dark:bg-rose-950/40 text-rose-600 dark:text-rose-400 hover:bg-rose-600 hover:text-white dark:hover:bg-rose-600 dark:hover:text-white transition-all flex items-center justify-center shadow-2xs"
-                                                        title="Delete Employee Profile"
-                                                    >
-                                                        <Trash2 className="size-3.5" />
-                                                    </button>
+                                                    {hasPermission(user, 'edit-employees') && (
+                                                        <Link
+                                                            href={route('employees.edit', emp.id)}
+                                                            className="size-8 rounded-xl bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400 hover:bg-blue-600 hover:text-white dark:hover:bg-blue-600 dark:hover:text-white transition-all flex items-center justify-center shadow-2xs"
+                                                            title="Edit Employee Profile"
+                                                        >
+                                                            <Edit2 className="size-3.5" />
+                                                        </Link>
+                                                    )}
+                                                    {hasPermission(user, 'delete-employees') && (
+                                                        <button
+                                                            onClick={() => setDeletingEmployee(emp)}
+                                                            className="size-8 rounded-xl bg-rose-50 dark:bg-rose-950/40 text-rose-600 dark:text-rose-400 hover:bg-rose-600 hover:text-white dark:hover:bg-rose-600 dark:hover:text-white transition-all flex items-center justify-center shadow-2xs"
+                                                            title="Delete Employee Profile"
+                                                        >
+                                                            <Trash2 className="size-3.5" />
+                                                        </button>
+                                                    )}
                                                 </div>
                                             </td>
                                         </tr>

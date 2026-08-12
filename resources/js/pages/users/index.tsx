@@ -1,4 +1,5 @@
 import Pagination, { type PaginatedData } from '@/components/pagination';
+import SearchableSelect from '@/components/searchable-select';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -7,6 +8,7 @@ import { type BreadcrumbItem } from '@/types';
 import { Head, router, useForm, usePage } from '@inertiajs/react';
 import {
     AlertTriangle,
+    Building,
     Camera,
     Check,
     Edit2,
@@ -22,6 +24,7 @@ import {
     UserCog,
     X,
 } from 'lucide-react';
+import { hasPermission } from '@/utils/permissions';
 import { FormEventHandler, useEffect, useRef, useState } from 'react';
 
 const breadcrumbs: BreadcrumbItem[] = [
@@ -36,11 +39,21 @@ interface RoleItem {
     name: string;
 }
 
+interface ClientOption {
+    id: number;
+    name: string;
+    company_name?: string | null;
+    client_code?: string | null;
+}
+
 interface UserItem {
     id: number;
     name: string;
     email: string;
     avatar: string | null;
+    type?: 'admin' | 'client';
+    client_id?: number | null;
+    client_name?: string | null;
     roles: string[];
     is_primary_admin: boolean;
     created_at: string | null;
@@ -49,14 +62,14 @@ interface UserItem {
 interface UsersIndexProps {
     users: PaginatedData<UserItem>;
     roles: RoleItem[];
+    clients?: ClientOption[];
     filters?: {
         search?: string;
     };
 }
 
-export default function UsersIndex({ users, roles, filters }: UsersIndexProps) {
-    const pageProps = usePage().props as unknown as { auth: { user: UserItem } };
-    const authUser = pageProps.auth.user;
+export default function UsersIndex({ users, roles, clients = [], filters }: UsersIndexProps) {
+    const authUser = (usePage().props.auth as any)?.user;
 
     const [searchQuery, setSearchQuery] = useState(filters?.search || '');
     const [isModalOpen, setIsModalOpen] = useState(false);
@@ -71,18 +84,27 @@ export default function UsersIndex({ users, roles, filters }: UsersIndexProps) {
     const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
     const avatarInputRef = useRef<HTMLInputElement>(null);
 
-    // Inertia Form State with _method support for file upload edits
+    // Form options for client select
+    const clientOptions = (clients || []).map((c) => ({
+        value: c.id,
+        label: c.company_name ? `${c.name} (${c.company_name})` : c.name,
+        subLabel: c.client_code ? `Code: ${c.client_code}` : undefined,
+    }));
+
+    // Inertia Form State
     const form = useForm({
         _method: 'post',
         name: '',
         email: '',
         password: '',
+        type: 'admin' as 'admin' | 'client',
+        client_id: '' as string | number,
         roles: [] as string[],
         avatar: null as File | null,
         remove_avatar: false as boolean,
     });
 
-    // Handle Search Input Change with debounced server request
+    // Handle Search Input Change
     const isInitialRender = useRef(true);
     useEffect(() => {
         if (isInitialRender.current) {
@@ -110,6 +132,8 @@ export default function UsersIndex({ users, roles, filters }: UsersIndexProps) {
             name: '',
             email: '',
             password: '',
+            type: 'admin',
+            client_id: '',
             roles: roles.length > 0 ? [roles[0].name] : [],
             avatar: null,
             remove_avatar: false,
@@ -118,7 +142,7 @@ export default function UsersIndex({ users, roles, filters }: UsersIndexProps) {
         setIsModalOpen(true);
     };
 
-    // Open Modal for Editing User (Only ID 1 Primary Super Admin is protected)
+    // Open Modal for Editing User
     const handleEditUser = (user: UserItem) => {
         if (user.id === 1 || user.is_primary_admin) {
             alert('The primary Super Admin account (ID: 1) is protected and cannot be edited!');
@@ -132,6 +156,8 @@ export default function UsersIndex({ users, roles, filters }: UsersIndexProps) {
             name: user.name,
             email: user.email,
             password: '',
+            type: user.type || 'admin',
+            client_id: user.client_id || '',
             roles: user.roles,
             avatar: null,
             remove_avatar: false,
@@ -165,11 +191,8 @@ export default function UsersIndex({ users, roles, filters }: UsersIndexProps) {
     const handleAvatarChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
         if (file) {
-            form.setData((prev) => ({
-                ...prev,
-                avatar: file,
-                remove_avatar: false,
-            }));
+            form.setData('avatar', file);
+            form.setData('remove_avatar', false);
             const reader = new FileReader();
             reader.onloadend = () => {
                 setAvatarPreview(reader.result as string);
@@ -180,18 +203,15 @@ export default function UsersIndex({ users, roles, filters }: UsersIndexProps) {
 
     // Remove Selected Avatar
     const handleRemoveAvatar = () => {
-        form.setData((prev) => ({
-            ...prev,
-            avatar: null,
-            remove_avatar: true,
-        }));
+        form.setData('avatar', null);
+        form.setData('remove_avatar', true);
         setAvatarPreview(null);
         if (avatarInputRef.current) {
             avatarInputRef.current.value = '';
         }
     };
 
-    // Submit Create or Edit User (using form.post so form.processing displays button spinner)
+    // Submit Create or Edit User
     const handleSubmit: FormEventHandler = (e) => {
         e.preventDefault();
 
@@ -208,7 +228,7 @@ export default function UsersIndex({ users, roles, filters }: UsersIndexProps) {
         }
     };
 
-    // Open Delete Confirmation Modal (Only ID 1 Primary Super Admin is protected)
+    // Open Delete Confirmation Modal
     const handleOpenDeleteModal = (user: UserItem) => {
         if (user.id === 1 || user.is_primary_admin) {
             alert('The primary Super Admin account (ID: 1) is protected and cannot be deleted!');
@@ -252,17 +272,19 @@ export default function UsersIndex({ users, roles, filters }: UsersIndexProps) {
                             User Management
                         </h1>
                         <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
-                            Manage system users, assign multiple roles, and handle profile credentials.
+                            Manage system users, assign account types (Admin vs Client), and handle profile credentials.
                         </p>
                     </div>
 
-                    <Button
-                        onClick={handleCreateUser}
-                        className="h-11 px-5 text-xs sm:text-sm font-bold rounded-xl bg-gradient-to-r from-[#003796] via-[#0052D4] to-[#1d4ed8] hover:from-[#002a75] hover:to-[#0040b8] text-white shadow-md shadow-blue-600/20 active:scale-[0.99] transition-all inline-flex items-center gap-2"
-                    >
-                        <Plus className="size-4" />
-                        <span>Create New User</span>
-                    </Button>
+                    {hasPermission(authUser, 'create-users') && (
+                        <Button
+                            onClick={handleCreateUser}
+                            className="h-11 px-5 text-xs sm:text-sm font-bold rounded-xl bg-gradient-to-r from-[#003796] via-[#0052D4] to-[#1d4ed8] hover:from-[#002a75] hover:to-[#0040b8] text-white shadow-md shadow-blue-600/20 active:scale-[0.99] transition-all inline-flex items-center gap-2"
+                        >
+                            <Plus className="size-4" />
+                            <span>Create New User</span>
+                        </Button>
+                    )}
                 </div>
 
                 {/* Filter / Search Bar & Stats */}
@@ -273,7 +295,7 @@ export default function UsersIndex({ users, roles, filters }: UsersIndexProps) {
                             type="text"
                             value={searchQuery}
                             onChange={(e) => setSearchQuery(e.target.value)}
-                            placeholder="Search by name, email, or role..."
+                            placeholder="Search by name, email, account type, or role..."
                             className="w-full h-10 pl-10 pr-4 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-xs font-medium text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-600/10 transition-all"
                         />
                     </div>
@@ -290,7 +312,8 @@ export default function UsersIndex({ users, roles, filters }: UsersIndexProps) {
                         <table className="w-full text-left text-xs text-slate-600 dark:text-slate-300">
                             <thead className="bg-slate-50 dark:bg-slate-950/70 border-b border-slate-200/80 dark:border-slate-800 uppercase tracking-wider text-[11px] font-bold text-slate-500 dark:text-slate-400">
                                 <tr>
-                                    <th className="px-6 py-4">User</th>
+                                    <th className="px-6 py-4">User Details</th>
+                                    <th className="px-6 py-4">Account Type</th>
                                     <th className="px-6 py-4">Assigned Roles</th>
                                     <th className="px-6 py-4">Joined Date</th>
                                     <th className="px-6 py-4 text-right">Actions</th>
@@ -301,6 +324,7 @@ export default function UsersIndex({ users, roles, filters }: UsersIndexProps) {
                                     users.data.map((user) => {
                                         const isSelf = user.id === authUser?.id;
                                         const isPrimaryAdmin = user.id === 1 || user.is_primary_admin;
+                                        const isClientUser = user.type === 'client';
 
                                         return (
                                             <tr key={user.id} className="hover:bg-slate-50/70 dark:hover:bg-slate-800/40 transition-colors">
@@ -334,6 +358,26 @@ export default function UsersIndex({ users, roles, filters }: UsersIndexProps) {
                                                     </div>
                                                 </td>
 
+                                                {/* Account Type Badge */}
+                                                <td className="px-6 py-4 whitespace-nowrap">
+                                                    {isClientUser ? (
+                                                        <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-extrabold bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border border-emerald-200/60">
+                                                            <Building className="size-3 text-emerald-600" />
+                                                            <span>Client User</span>
+                                                            {user.client_name && (
+                                                                <span className="text-[11px] font-semibold text-emerald-600/90 dark:text-emerald-400/90">
+                                                                    ({user.client_name})
+                                                                </span>
+                                                            )}
+                                                        </span>
+                                                    ) : (
+                                                        <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-extrabold bg-blue-50 dark:bg-blue-950/60 text-blue-700 dark:text-blue-300 border border-blue-200/60">
+                                                            <UserCog className="size-3 text-blue-600" />
+                                                            <span>Admin / Staff</span>
+                                                        </span>
+                                                    )}
+                                                </td>
+
                                                 {/* Assigned Multiple Roles */}
                                                 <td className="px-6 py-4">
                                                     <div className="flex flex-wrap gap-1.5">
@@ -364,7 +408,7 @@ export default function UsersIndex({ users, roles, filters }: UsersIndexProps) {
                                                     {user.created_at || 'N/A'}
                                                 </td>
 
-                                                {/* Actions Column (Clean Icon-Only Buttons) */}
+                                                {/* Actions Column */}
                                                 <td className="px-6 py-4 text-right">
                                                     {isPrimaryAdmin ? (
                                                         <div className="inline-flex items-center gap-1 px-3 py-1 rounded-xl bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800 text-[11px] font-bold text-amber-700 dark:text-amber-400 select-none">
@@ -373,20 +417,20 @@ export default function UsersIndex({ users, roles, filters }: UsersIndexProps) {
                                                         </div>
                                                     ) : (
                                                         <div className="flex items-center justify-end gap-1.5">
-                                                            {/* Clean Edit Icon Button */}
-                                                            <button
-                                                                onClick={() => handleEditUser(user)}
-                                                                className="size-8 rounded-xl bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400 hover:bg-blue-600 hover:text-white dark:hover:bg-blue-600 dark:hover:text-white transition-all flex items-center justify-center shadow-2xs"
-                                                                title="Edit User"
-                                                            >
-                                                                <Edit2 className="size-3.5" />
-                                                            </button>
+                                                            {hasPermission(authUser, 'edit-users') && (
+                                                                <button
+                                                                    onClick={() => handleEditUser(user)}
+                                                                    className="size-8 rounded-xl bg-purple-50 dark:bg-purple-950/60 text-purple-600 dark:text-purple-400 hover:bg-purple-600 hover:text-white dark:hover:bg-purple-600 dark:hover:text-white transition-all flex items-center justify-center shadow-2xs"
+                                                                    title="Edit User"
+                                                                >
+                                                                    <Edit2 className="size-3.5" />
+                                                                </button>
+                                                            )}
 
-                                                            {/* Clean Delete Icon Button */}
-                                                            {!isSelf && (
+                                                            {!isSelf && hasPermission(authUser, 'delete-users') && (
                                                                 <button
                                                                     onClick={() => handleOpenDeleteModal(user)}
-                                                                    className="size-8 rounded-xl bg-rose-50 dark:bg-rose-950/40 text-rose-600 dark:text-rose-400 hover:bg-rose-600 hover:text-white dark:hover:bg-rose-600 dark:hover:text-white transition-all flex items-center justify-center shadow-2xs"
+                                                                    className="size-8 rounded-xl bg-rose-50 dark:bg-rose-950/40 text-rose-600 dark:rose-400 hover:bg-rose-600 hover:text-white dark:hover:bg-rose-600 dark:hover:text-white transition-all flex items-center justify-center shadow-2xs"
                                                                     title="Delete User"
                                                                 >
                                                                     <Trash2 className="size-3.5" />
@@ -400,7 +444,7 @@ export default function UsersIndex({ users, roles, filters }: UsersIndexProps) {
                                     })
                                 ) : (
                                     <tr>
-                                        <td colSpan={4} className="px-6 py-12 text-center text-slate-400 italic">
+                                        <td colSpan={5} className="px-6 py-12 text-center text-slate-400 italic">
                                             No user accounts found matching your query.
                                         </td>
                                     </tr>
@@ -416,9 +460,9 @@ export default function UsersIndex({ users, roles, filters }: UsersIndexProps) {
                 {/* Create / Edit User Modal */}
                 {isModalOpen && (
                     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs overflow-y-auto">
-                        <div className="w-full max-w-xl rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-6 shadow-2xl space-y-2 my-2">
+                        <div className="w-full max-w-xl rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-6 shadow-2xl space-y-4 my-2">
                             {/* Modal Header */}
-                            <div className="flex items-center justify-between pb-2 border-b border-slate-100 dark:border-slate-800">
+                            <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800">
                                 <div className="flex items-center gap-3">
                                     <div className="p-2.5 rounded-xl bg-blue-50 dark:bg-blue-950 text-blue-600 dark:text-blue-400">
                                         <UserCog className="size-5" />
@@ -428,7 +472,7 @@ export default function UsersIndex({ users, roles, filters }: UsersIndexProps) {
                                             {editingUser ? `Edit User: ${editingUser.name}` : 'Create New User Account'}
                                         </h2>
                                         <p className="text-xs text-slate-500">
-                                            Enter user profile info and assign Spatie system roles.
+                                            Specify account type, basic info, and assign system roles.
                                         </p>
                                     </div>
                                 </div>
@@ -442,16 +486,76 @@ export default function UsersIndex({ users, roles, filters }: UsersIndexProps) {
                             </div>
 
                             {/* Modal Form */}
-                            <form noValidate onSubmit={handleSubmit} className="space-y-2">
+                            <form noValidate onSubmit={handleSubmit} className="space-y-4">
+                                {/* Account Type Selection */}
+                                <div className="space-y-1.5">
+                                    <Label className="text-xs font-bold text-slate-700 dark:text-slate-300 block">
+                                        Account Type <span className="text-rose-500">*</span>
+                                    </Label>
+                                    <div className="grid grid-cols-2 gap-3">
+                                        <button
+                                            type="button"
+                                            onClick={() => form.setData('type', 'admin')}
+                                            className={`p-3 rounded-xl border transition-all text-left flex items-center gap-3 ${
+                                                form.data.type === 'admin'
+                                                    ? 'bg-blue-50/80 dark:bg-blue-950/60 border-blue-400 dark:border-blue-700 text-blue-900 dark:text-blue-200 font-extrabold shadow-xs'
+                                                    : 'bg-slate-50 dark:bg-slate-950 border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400 font-medium hover:border-slate-300'
+                                            }`}
+                                        >
+                                            <div className="p-2 rounded-lg bg-blue-100 dark:bg-blue-900/60 text-blue-600 dark:text-blue-400">
+                                                <UserCog className="size-4" />
+                                            </div>
+                                            <div>
+                                                <span className="text-xs block font-bold">Admin / Staff</span>
+                                                <span className="text-[10px] text-slate-500 block">CRM Control Panel</span>
+                                            </div>
+                                        </button>
+
+                                        <button
+                                            type="button"
+                                            onClick={() => form.setData('type', 'client')}
+                                            className={`p-3 rounded-xl border transition-all text-left flex items-center gap-3 ${
+                                                form.data.type === 'client'
+                                                    ? 'bg-emerald-50/80 dark:bg-emerald-950/60 border-emerald-400 dark:border-emerald-700 text-emerald-900 dark:text-emerald-200 font-extrabold shadow-xs'
+                                                    : 'bg-slate-50 dark:bg-slate-950 border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400 font-medium hover:border-slate-300'
+                                            }`}
+                                        >
+                                            <div className="p-2 rounded-lg bg-emerald-100 dark:bg-emerald-900/60 text-emerald-600 dark:text-emerald-400">
+                                                <Building className="size-4" />
+                                            </div>
+                                            <div>
+                                                <span className="text-xs block font-bold">Client User</span>
+                                                <span className="text-[10px] text-slate-500 block">Client Portal Workspace</span>
+                                            </div>
+                                        </button>
+                                    </div>
+                                </div>
+
+                                {/* Link to Client (If Account Type is Client) */}
+                                {form.data.type === 'client' && (
+                                    <div className="space-y-1">
+                                        <Label htmlFor="client_id" className="text-xs font-bold text-slate-700 dark:text-slate-300">
+                                            Assign Client Organization
+                                        </Label>
+                                        <SearchableSelect
+                                            options={clientOptions}
+                                            value={form.data.client_id}
+                                            onChange={(val) => form.setData('client_id', val)}
+                                            placeholder="Select Client Company..."
+                                            searchPlaceholder="Search client name..."
+                                        />
+                                    </div>
+                                )}
+
                                 {/* Avatar Photo Upload Section */}
-                                <div className="flex items-center gap-4 p-3 rounded-2xl bg-slate-50 dark:bg-slate-950 border border-slate-200/80 dark:border-slate-800">
-                                    <div className="relative size-14 rounded-2xl bg-gradient-to-tr from-[#003796] to-[#0052D4] text-white font-extrabold text-lg flex items-center justify-center shadow-xs overflow-hidden shrink-0 border border-slate-200/80 dark:border-slate-800">
+                                <div className="flex items-center gap-4 p-3 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200/80 dark:border-slate-800">
+                                    <div className="relative size-12 rounded-xl bg-gradient-to-tr from-[#003796] to-[#0052D4] text-white font-extrabold text-base flex items-center justify-center shadow-xs overflow-hidden shrink-0 border border-slate-200/80 dark:border-slate-800">
                                         {avatarPreview ? (
                                             <img src={avatarPreview} alt="Avatar preview" className="size-full object-cover" />
                                         ) : form.data.name ? (
                                             form.data.name.charAt(0).toUpperCase()
                                         ) : (
-                                            <User className="size-6 text-white/80" />
+                                            <User className="size-5 text-white/80" />
                                         )}
                                     </div>
 
@@ -470,7 +574,7 @@ export default function UsersIndex({ users, roles, filters }: UsersIndexProps) {
                                                 className="h-8 px-3 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-xs font-bold text-slate-700 dark:text-slate-200 hover:bg-slate-100 cursor-pointer inline-flex items-center gap-1.5 transition-colors"
                                             >
                                                 <Camera className="size-3.5" />
-                                                <span>Upload Photo</span>
+                                                <span>Upload</span>
                                             </label>
 
                                             {avatarPreview && (
@@ -483,14 +587,13 @@ export default function UsersIndex({ users, roles, filters }: UsersIndexProps) {
                                                 </button>
                                             )}
                                         </div>
-                                        <p className="text-[11px] text-slate-400">JPG, PNG, WEBP max 4MB.</p>
                                     </div>
                                 </div>
 
                                 {/* Full Name */}
                                 <div className="space-y-1">
                                     <Label htmlFor="name" className="text-xs font-bold text-slate-700 dark:text-slate-300">
-                                        Full Name
+                                        Full Name <span className="text-rose-500">*</span>
                                     </Label>
                                     <Input
                                         id="name"
@@ -498,17 +601,15 @@ export default function UsersIndex({ users, roles, filters }: UsersIndexProps) {
                                         value={form.data.name}
                                         onChange={(e) => form.setData('name', e.target.value)}
                                         placeholder="e.g. John Doe"
-                                        className="h-11 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-sm font-medium text-slate-900 dark:text-white placeholder:text-slate-400 focus:bg-white focus:border-blue-600 focus:outline-none focus:ring-4 focus:ring-blue-600/10 transition-all"
+                                        className="h-11 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-sm font-medium text-slate-900 dark:text-white"
                                     />
-                                    {form.errors.name && (
-                                        <p className="text-xs font-semibold text-rose-500 mt-1">{form.errors.name}</p>
-                                    )}
+                                    {form.errors.name && <p className="text-xs font-semibold text-rose-500">{form.errors.name}</p>}
                                 </div>
 
                                 {/* Email Address */}
                                 <div className="space-y-1">
                                     <Label htmlFor="email" className="text-xs font-bold text-slate-700 dark:text-slate-300">
-                                        Email Address
+                                        Email Address <span className="text-rose-500">*</span>
                                     </Label>
                                     <Input
                                         id="email"
@@ -516,18 +617,16 @@ export default function UsersIndex({ users, roles, filters }: UsersIndexProps) {
                                         value={form.data.email}
                                         onChange={(e) => form.setData('email', e.target.value)}
                                         placeholder="john@example.com"
-                                        className="h-11 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-sm font-medium text-slate-900 dark:text-white placeholder:text-slate-400 focus:bg-white focus:border-blue-600 focus:outline-none focus:ring-4 focus:ring-blue-600/10 transition-all"
+                                        className="h-11 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-sm font-medium text-slate-900 dark:text-white"
                                     />
-                                    {form.errors.email && (
-                                        <p className="text-xs font-semibold text-rose-500 mt-1">{form.errors.email}</p>
-                                    )}
+                                    {form.errors.email && <p className="text-xs font-semibold text-rose-500">{form.errors.email}</p>}
                                 </div>
 
                                 {/* Multiple Roles Selection Checklist */}
                                 <div className="space-y-2">
                                     <div className="flex items-center justify-between">
                                         <Label className="text-xs font-bold text-slate-700 dark:text-slate-300 block">
-                                            Assign System Roles (Multiple Allowed)
+                                            Assign System Roles <span className="text-rose-500">*</span>
                                         </Label>
                                         <span className="text-[11px] font-semibold text-blue-600 dark:text-blue-400">
                                             {form.data.roles.length} Selected
@@ -556,9 +655,7 @@ export default function UsersIndex({ users, roles, filters }: UsersIndexProps) {
                                             );
                                         })}
                                     </div>
-                                    {form.errors.roles && (
-                                        <p className="text-xs font-semibold text-rose-500 mt-1">{form.errors.roles}</p>
-                                    )}
+                                    {form.errors.roles && <p className="text-xs font-semibold text-rose-500">{form.errors.roles}</p>}
                                 </div>
 
                                 {/* Password Input */}
@@ -566,28 +663,23 @@ export default function UsersIndex({ users, roles, filters }: UsersIndexProps) {
                                     <Label htmlFor="password" className="text-xs font-bold text-slate-700 dark:text-slate-300">
                                         {editingUser ? 'Password (Leave blank to keep unchanged)' : 'Account Password'}
                                     </Label>
-                                    <div className="relative">
-                                        <Input
-                                            id="password"
-                                            type="password"
-                                            value={form.data.password}
-                                            onChange={(e) => form.setData('password', e.target.value)}
-                                            placeholder={editingUser ? '••••••••' : 'Min 8 characters'}
-                                            className="h-11 pl-10 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-sm font-medium text-slate-900 dark:text-white placeholder:text-slate-400 focus:bg-white focus:border-blue-600 focus:outline-none focus:ring-4 focus:ring-blue-600/10 transition-all"
-                                        />
-                                        <KeyRound className="absolute left-3.5 top-1/2 -translate-y-1/2 size-4 text-slate-400" />
-                                    </div>
-                                    {form.errors.password && (
-                                        <p className="text-xs font-semibold text-rose-500 mt-1">{form.errors.password}</p>
-                                    )}
+                                    <Input
+                                        id="password"
+                                        type="password"
+                                        value={form.data.password}
+                                        onChange={(e) => form.setData('password', e.target.value)}
+                                        placeholder="••••••••"
+                                        className="h-11 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-sm font-medium text-slate-900 dark:text-white"
+                                    />
+                                    {form.errors.password && <p className="text-xs font-semibold text-rose-500">{form.errors.password}</p>}
                                 </div>
 
-                                {/* Modal Actions */}
-                                <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-100 dark:border-slate-800">
+                                {/* Modal Actions Footer */}
+                                <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-100 dark:border-slate-800">
                                     <button
                                         type="button"
                                         onClick={handleCloseModal}
-                                        className="h-11 px-5 text-xs font-semibold rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-200 transition-colors"
+                                        className="h-10 px-4 rounded-xl border border-slate-200 dark:border-slate-800 text-xs font-bold text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
                                     >
                                         Cancel
                                     </button>
@@ -595,15 +687,18 @@ export default function UsersIndex({ users, roles, filters }: UsersIndexProps) {
                                     <Button
                                         type="submit"
                                         disabled={form.processing}
-                                        className="h-11 px-6 text-xs sm:text-sm font-bold rounded-xl bg-gradient-to-r from-[#003796] via-[#0052D4] to-[#1d4ed8] hover:from-[#002a75] hover:to-[#0040b8] text-white shadow-md shadow-blue-600/20 active:scale-[0.99] transition-all flex items-center justify-center gap-2"
+                                        className="h-10 px-5 text-xs font-bold rounded-xl bg-gradient-to-r from-[#003796] via-[#0052D4] to-[#1d4ed8] hover:from-[#002a75] hover:to-[#0040b8] text-white shadow-md shadow-blue-600/20 active:scale-[0.99] transition-all inline-flex items-center gap-2"
                                     >
                                         {form.processing ? (
-                                            <div className="flex items-center gap-2">
+                                            <>
                                                 <LoaderCircle className="size-4 animate-spin" />
-                                                <span>{editingUser ? 'Updating User...' : 'Saving User...'}</span>
-                                            </div>
+                                                <span>Saving User...</span>
+                                            </>
                                         ) : (
-                                            <span>{editingUser ? 'Update User' : 'Create User Account'}</span>
+                                            <>
+                                                <Check className="size-4" />
+                                                <span>{editingUser ? 'Update User' : 'Create User Account'}</span>
+                                            </>
                                         )}
                                     </Button>
                                 </div>
@@ -614,33 +709,35 @@ export default function UsersIndex({ users, roles, filters }: UsersIndexProps) {
 
                 {/* Delete Confirmation Modal */}
                 {isDeleteModalOpen && deletingUser && (
-                    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs overflow-y-auto">
-                        <div className="w-full max-w-md rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-6 shadow-2xl space-y-5 animate-in fade-in zoom-in-95 duration-200">
-                            <div className="flex items-start gap-4">
-                                <div className="p-3 rounded-2xl bg-rose-50 dark:bg-rose-950/50 text-rose-600 dark:text-rose-400 shrink-0">
+                    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs">
+                        <div className="w-full max-w-md rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-6 shadow-2xl space-y-4">
+                            <div className="flex items-center gap-3 text-rose-600 dark:text-rose-400">
+                                <div className="p-3 rounded-2xl bg-rose-50 dark:bg-rose-950/60 border border-rose-100 dark:border-rose-900/40">
                                     <AlertTriangle className="size-6" />
                                 </div>
-                                <div className="space-y-1">
-                                    <h3 className="text-lg font-extrabold text-slate-900 dark:text-white leading-snug">
-                                        Delete User Account?
+                                <div>
+                                    <h3 className="text-base font-extrabold text-slate-900 dark:text-white">
+                                        Delete User Account
                                     </h3>
-                                    <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
-                                        Are you sure you want to delete <span className="font-bold text-slate-800 dark:text-slate-200">"{deletingUser.name}"</span>? This user will no longer be able to log in or access the CRM system.
+                                    <p className="text-xs text-slate-500 dark:text-slate-400">
+                                        This action cannot be undone.
                                     </p>
                                 </div>
                             </div>
+
+                            <p className="text-xs text-slate-600 dark:text-slate-300 leading-relaxed font-medium">
+                                Are you sure you want to permanently delete the user account for{' '}
+                                <strong className="text-slate-900 dark:text-white font-extrabold">{deletingUser.name}</strong> ({deletingUser.email})?
+                            </p>
 
                             <div className="flex items-center justify-end gap-3 pt-2">
                                 <button
                                     type="button"
                                     onClick={() => {
-                                        if (!isDeleting) {
-                                            setIsDeleteModalOpen(false);
-                                            setDeletingUser(null);
-                                        }
+                                        setIsDeleteModalOpen(false);
+                                        setDeletingUser(null);
                                     }}
-                                    disabled={isDeleting}
-                                    className="h-10 px-4 text-xs font-semibold rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-200 transition-colors disabled:opacity-50"
+                                    className="h-10 px-4 rounded-xl border border-slate-200 dark:border-slate-800 text-xs font-bold text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
                                 >
                                     Cancel
                                 </button>
@@ -649,15 +746,18 @@ export default function UsersIndex({ users, roles, filters }: UsersIndexProps) {
                                     type="button"
                                     onClick={handleConfirmDelete}
                                     disabled={isDeleting}
-                                    className="h-10 px-5 text-xs font-bold rounded-xl bg-gradient-to-r from-rose-600 to-red-600 hover:from-rose-700 hover:to-red-700 text-white shadow-md shadow-rose-600/20 active:scale-[0.99] transition-all flex items-center justify-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed"
+                                    className="h-10 px-5 text-xs font-bold rounded-xl bg-rose-600 hover:bg-rose-700 text-white shadow-md shadow-rose-600/20 active:scale-[0.99] transition-all inline-flex items-center gap-2"
                                 >
                                     {isDeleting ? (
-                                        <div className="flex items-center gap-2">
+                                        <>
                                             <LoaderCircle className="size-4 animate-spin" />
-                                            <span>Deleting User...</span>
-                                        </div>
+                                            <span>Deleting...</span>
+                                        </>
                                     ) : (
-                                        <span>Delete User</span>
+                                        <>
+                                            <Trash2 className="size-4" />
+                                            <span>Delete User</span>
+                                        </>
                                     )}
                                 </button>
                             </div>

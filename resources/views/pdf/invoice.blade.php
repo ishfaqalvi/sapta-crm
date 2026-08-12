@@ -276,9 +276,6 @@
                         @if($invoice->client->phone)
                             <br>Phone: {{ $invoice->client->phone }}
                         @endif
-                        @if($invoice->websiteProject)
-                            <br><strong style="color: #0f172a;">Project:</strong> {{ $invoice->websiteProject->project_name }}
-                        @endif
                     </div>
                 </div>
             </td>

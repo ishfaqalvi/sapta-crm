@@ -1,3 +1,4 @@
+import SearchableSelect from '@/components/searchable-select';
 import ClientPortalLayout from '@/layouts/client-portal-layout';
 import { type BreadcrumbItem } from '@/types';
 import { Head, Link, useForm } from '@inertiajs/react';
@@ -22,6 +23,11 @@ interface CurrencyItem {
     symbol: string;
 }
 
+interface ProjectCategoryItem {
+    id: number;
+    name: string;
+}
+
 interface ClientPortalProjectsCreateProps {
     client: {
         id: number;
@@ -32,11 +38,13 @@ interface ClientPortalProjectsCreateProps {
         currency: string;
     };
     currencies: CurrencyItem[];
+    categories?: ProjectCategoryItem[];
 }
 
 export default function ClientPortalProjectsCreate({
     client,
     currencies,
+    categories = [],
 }: ClientPortalProjectsCreateProps) {
     const breadcrumbs: BreadcrumbItem[] = [
         { title: 'Client Portal', href: '/client-portal/overview' },
@@ -44,8 +52,9 @@ export default function ClientPortalProjectsCreate({
         { title: 'Create Project', href: '/client-portal/projects/create' },
     ];
 
-    const { data, setData, post, processing, errors } = useForm({
+    const { data, setData, post, processing, errors } = useForm<{ [key: string]: any; project_name: string; category_id: string; total_budget: string; currency: string; exchange_rate: string; start_date: string; deadline: string; status: string; progress_percentage: number; notes: string }>({
         project_name: '',
+        category_id: '',
         total_budget: '',
         currency: client.currency || 'USD',
         exchange_rate: '',
@@ -60,6 +69,11 @@ export default function ClientPortalProjectsCreate({
         e.preventDefault();
         post('/client-portal/projects/store');
     };
+
+    const categoryOptions = categories.map((cat) => ({
+        value: String(cat.id),
+        label: cat.name,
+    }));
 
     return (
         <ClientPortalLayout client={client} breadcrumbs={breadcrumbs} activeTab="projects">
@@ -91,23 +105,23 @@ export default function ClientPortalProjectsCreate({
                     </Link>
                 </div>
 
-                {/* Main Full Width Form (Server Side Validation, no HTML browser validation) */}
+                {/* Main Full Width Form */}
                 <form noValidate onSubmit={handleSubmit} className="bg-white dark:bg-slate-900 rounded-2xl p-6 md:p-8 border border-slate-200/80 dark:border-slate-800 shadow-xs space-y-8">
-                    {/* Section 1: Project Information */}
+                    {/* Section 1: Project Identity & Classification */}
                     <div className="space-y-4">
                         <div className="flex items-center gap-2.5 pb-3 border-b border-slate-100 dark:border-slate-800">
                             <div className="p-2 rounded-xl bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400">
                                 <Sparkles className="size-4" />
                             </div>
                             <div>
-                                <h2 className="text-sm font-extrabold text-slate-900 dark:text-white">Project Identity & Budget</h2>
-                                <p className="text-[11px] text-slate-400 font-medium">Basic details and financial contract value</p>
+                                <h2 className="text-sm font-extrabold text-slate-900 dark:text-white">Project Identity & Classification</h2>
+                                <p className="text-[11px] text-slate-400 font-medium">Basic project name and category classification</p>
                             </div>
                         </div>
 
-                        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 pt-2">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-2">
                             {/* Project Name */}
-                            <div className="lg:col-span-1">
+                            <div>
                                 <label className="block text-xs font-extrabold text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-2">
                                     Project Title <span className="text-rose-500">*</span>
                                 </label>
@@ -124,6 +138,37 @@ export default function ClientPortalProjectsCreate({
                                 {errors.project_name && <p className="text-rose-500 text-xs font-medium mt-1.5">{errors.project_name}</p>}
                             </div>
 
+                            {/* Project Category (SearchableSelect) */}
+                            <div>
+                                <label className="block text-xs font-extrabold text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-2">
+                                    Project Category <span className="text-rose-500">*</span>
+                                </label>
+                                <SearchableSelect
+                                    options={categoryOptions}
+                                    value={data.category_id}
+                                    onChange={(val) => setData('category_id', val)}
+                                    placeholder="Select Project Category..."
+                                    searchPlaceholder="Search project categories..."
+                                    required={true}
+                                />
+                                {errors.category_id && <p className="text-rose-500 text-xs font-medium mt-1.5">{errors.category_id}</p>}
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Section 2: Contract Budget & Billing Currency */}
+                    <div className="space-y-4">
+                        <div className="flex items-center gap-2.5 pb-3 border-b border-slate-100 dark:border-slate-800">
+                            <div className="p-2 rounded-xl bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400">
+                                <DollarSign className="size-4" />
+                            </div>
+                            <div>
+                                <h2 className="text-sm font-extrabold text-slate-900 dark:text-white">Financial & Contract Budget</h2>
+                                <p className="text-[11px] text-slate-400 font-medium">Contract value and billing currency configuration</p>
+                            </div>
+                        </div>
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-2">
                             {/* Budget Amount */}
                             <div>
                                 <label className="block text-xs font-extrabold text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-2">
@@ -173,7 +218,7 @@ export default function ClientPortalProjectsCreate({
                         </div>
                     </div>
 
-                    {/* Section 2: Timeline & Dates */}
+                    {/* Section 3: Timeline & Dates */}
                     <div className="space-y-4">
                         <div className="flex items-center gap-2.5 pb-3 border-b border-slate-100 dark:border-slate-800">
                             <div className="p-2 rounded-xl bg-purple-50 dark:bg-purple-950/60 text-purple-600 dark:text-purple-400">
@@ -220,10 +265,10 @@ export default function ClientPortalProjectsCreate({
                         </div>
                     </div>
 
-                    {/* Section 3: Status & Progress */}
+                    {/* Section 4: Status & Progress */}
                     <div className="space-y-4">
                         <div className="flex items-center gap-2.5 pb-3 border-b border-slate-100 dark:border-slate-800">
-                            <div className="p-2 rounded-xl bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400">
+                            <div className="p-2 rounded-xl bg-amber-50 dark:bg-amber-950/60 text-amber-600 dark:text-amber-400">
                                 <Layers className="size-4" />
                             </div>
                             <div>
@@ -290,10 +335,10 @@ export default function ClientPortalProjectsCreate({
                         </div>
                     </div>
 
-                    {/* Section 4: Specifications & Notes */}
+                    {/* Section 5: Specifications & Notes */}
                     <div className="space-y-4">
                         <div className="flex items-center gap-2.5 pb-3 border-b border-slate-100 dark:border-slate-800">
-                            <div className="p-2 rounded-xl bg-amber-50 dark:bg-amber-950/60 text-amber-600 dark:text-amber-400">
+                            <div className="p-2 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400">
                                 <FileText className="size-4" />
                             </div>
                             <div>

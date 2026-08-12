@@ -54,6 +54,12 @@ export interface ProjectPaymentItem {
 export interface WebsiteProjectItem {
     id: number;
     client_id: number;
+    category_id?: number | null;
+    category?: {
+        id: number;
+        name: string;
+        color?: string | null;
+    } | null;
     project_name: string;
     total_budget: number;
     currency: string;
@@ -85,10 +91,12 @@ interface WebsiteProjectsIndexProps {
         on_hold: number;
         completed: number;
     };
+    categories?: Array<{ id: number; name: string }>;
     filters?: {
         search?: string;
         status?: string;
         currency?: string;
+        category_id?: string;
     };
 }
 
@@ -109,10 +117,11 @@ const formatDateOnly = (dateStr: string | null) => {
     return cleanDate;
 };
 
-export default function WebsiteProjectsIndex({ projects, stats, filters }: WebsiteProjectsIndexProps) {
+export default function WebsiteProjectsIndex({ projects, stats, categories = [], filters }: WebsiteProjectsIndexProps) {
     const [searchQuery, setSearchQuery] = useState(filters?.search || '');
     const [selectedStatusFilter, setSelectedStatusFilter] = useState(filters?.status || '');
     const [selectedCurrencyFilter, setSelectedCurrencyFilter] = useState(filters?.currency || '');
+    const [selectedCategoryFilter, setSelectedCategoryFilter] = useState(filters?.category_id || '');
 
     // View Mode State (Grid vs Table)
     const [viewMode, setViewMode] = useState<'grid' | 'table'>('grid');
@@ -138,12 +147,13 @@ export default function WebsiteProjectsIndex({ projects, stats, filters }: Websi
                     search: searchQuery,
                     status: selectedStatusFilter,
                     currency: selectedCurrencyFilter,
+                    category_id: selectedCategoryFilter,
                 },
                 { preserveState: true, replace: true }
             );
         }, 300);
         return () => clearTimeout(timer);
-    }, [searchQuery, selectedStatusFilter, selectedCurrencyFilter]);
+    }, [searchQuery, selectedStatusFilter, selectedCurrencyFilter, selectedCategoryFilter]);
 
     // Confirm Delete
     const handleConfirmDelete = () => {
@@ -165,20 +175,12 @@ export default function WebsiteProjectsIndex({ projects, stats, filters }: Websi
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                     <div>
                         <h1 className="text-xl sm:text-2xl font-extrabold text-slate-900 dark:text-white tracking-tight">
-                            Website Projects Hub
+                            Website Projects Directory
                         </h1>
                         <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 mt-0.5">
-                            Track client website developments, milestones, budgets, deadlines, and live completion progress.
+                            Overview of client website projects, milestones, budgets, deadlines, and live status (read-only view; management is handled via Client Portal).
                         </p>
                     </div>
-
-                    <Link
-                        href="/website-projects/create"
-                        className="h-11 px-5 text-xs sm:text-sm font-bold rounded-xl bg-gradient-to-r from-[#003796] via-[#0052D4] to-[#1d4ed8] hover:from-[#002a75] hover:to-[#0040b8] text-white shadow-md shadow-blue-600/20 active:scale-[0.99] transition-all inline-flex items-center gap-2 shrink-0"
-                    >
-                        <Plus className="size-4" />
-                        <span>Add Website Project</span>
-                    </Link>
                 </div>
 
                 {/* KPI Stat Cards */}
@@ -238,6 +240,19 @@ export default function WebsiteProjectsIndex({ projects, stats, filters }: Websi
                     </div>
 
                     <div className="flex flex-wrap items-center gap-3 w-full md:w-auto">
+                        <select
+                            value={selectedCategoryFilter}
+                            onChange={(e) => setSelectedCategoryFilter(e.target.value)}
+                            className="h-10 px-3 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-xs font-semibold text-slate-700 dark:text-slate-300 focus:outline-none focus:border-blue-600"
+                        >
+                            <option value="">All Categories</option>
+                            {categories.map((cat) => (
+                                <option key={cat.id} value={cat.id}>
+                                    {cat.name}
+                                </option>
+                            ))}
+                        </select>
+
                         <select
                             value={selectedStatusFilter}
                             onChange={(e) => setSelectedStatusFilter(e.target.value)}
@@ -343,6 +358,11 @@ export default function WebsiteProjectsIndex({ projects, stats, filters }: Websi
 
                                             {/* Project Name & Notes */}
                                             <div>
+                                                {proj.category && (
+                                                    <span className="inline-block px-2 py-0.5 mb-1.5 rounded-md text-[10px] font-black uppercase tracking-wider bg-blue-50 text-blue-700 dark:bg-blue-950/60 dark:text-blue-300 border border-blue-200 dark:border-blue-800">
+                                                        {proj.category.name}
+                                                    </span>
+                                                )}
                                                 <Link
                                                     href={`/website-projects/${proj.id}`}
                                                     className="font-extrabold text-slate-900 dark:text-white text-base hover:text-blue-600 dark:hover:text-blue-400 transition-colors text-left line-clamp-1 block"
@@ -407,20 +427,6 @@ export default function WebsiteProjectsIndex({ projects, stats, filters }: Websi
                                                 >
                                                     <Eye className="size-3.5" />
                                                 </Link>
-                                                <Link
-                                                    href={`/website-projects/${proj.id}/edit`}
-                                                    className="size-8 rounded-xl bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400 hover:bg-blue-600 hover:text-white dark:hover:bg-blue-600 dark:hover:text-white transition-all flex items-center justify-center shadow-2xs"
-                                                    title="Edit Website Project"
-                                                >
-                                                    <Edit2 className="size-3.5" />
-                                                </Link>
-                                                <button
-                                                    onClick={() => setDeletingProject(proj)}
-                                                    className="size-8 rounded-xl bg-rose-50 dark:bg-rose-950/40 text-rose-600 dark:text-rose-400 hover:bg-rose-600 hover:text-white dark:hover:bg-rose-600 dark:hover:text-white transition-all flex items-center justify-center shadow-2xs"
-                                                    title="Delete Website Project"
-                                                >
-                                                    <Trash2 className="size-3.5" />
-                                                </button>
                                             </div>
                                         </div>
                                     </div>
@@ -477,6 +483,11 @@ export default function WebsiteProjectsIndex({ projects, stats, filters }: Websi
 
                                                 {/* Project Title */}
                                                 <td className="px-4 py-3 sm:px-6 sm:py-4">
+                                                    {proj.category && (
+                                                        <span className="inline-block px-2 py-0.5 mb-1 rounded-md text-[9px] font-black uppercase tracking-wider bg-blue-50 text-blue-700 dark:bg-blue-950/60 dark:text-blue-300 border border-blue-200 dark:border-blue-800">
+                                                            {proj.category.name}
+                                                        </span>
+                                                    )}
                                                     <Link
                                                         href={`/website-projects/${proj.id}`}
                                                         className="font-extrabold text-slate-900 dark:text-white text-xs hover:text-blue-600 dark:hover:text-blue-400 transition-colors text-left block"
@@ -580,20 +591,6 @@ export default function WebsiteProjectsIndex({ projects, stats, filters }: Websi
                                                         >
                                                             <Eye className="size-3.5" />
                                                         </Link>
-                                                        <Link
-                                                            href={`/website-projects/${proj.id}/edit`}
-                                                            className="size-8 rounded-xl bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400 hover:bg-blue-600 hover:text-white dark:hover:bg-blue-600 dark:hover:text-white transition-all flex items-center justify-center shadow-2xs"
-                                                            title="Edit Website Project"
-                                                        >
-                                                            <Edit2 className="size-3.5" />
-                                                        </Link>
-                                                        <button
-                                                            onClick={() => setDeletingProject(proj)}
-                                                            className="size-8 rounded-xl bg-rose-50 dark:bg-rose-950/40 text-rose-600 dark:text-rose-400 hover:bg-rose-600 hover:text-white dark:hover:bg-rose-600 dark:hover:text-white transition-all flex items-center justify-center shadow-2xs"
-                                                            title="Delete Website Project"
-                                                        >
-                                                            <Trash2 className="size-3.5" />
-                                                        </button>
                                                     </div>
                                                 </td>
                                             </tr>

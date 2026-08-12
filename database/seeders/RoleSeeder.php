@@ -46,7 +46,9 @@ class RoleSeeder extends Seeder
             'view-website-projects',
             'view-project-tasks',
             'edit-project-tasks',
-            'view-seo-retainers',
+            'view-services',
+            'view-service-categories',
+            'view-service-payments',
             'view-employees',
         ];
         $employeeRole->syncPermissions($employeePermissions);
@@ -64,8 +66,10 @@ class RoleSeeder extends Seeder
             'view-client-portal-milestones',
             'create-client-portal-milestones',
             'edit-client-portal-milestones',
-            'view-client-portal-seo',
-            'view-client-portal-seo-payments',
+            'view-client-portal-services',
+            'create-client-portal-services',
+            'edit-client-portal-services',
+            'delete-client-portal-services',
             'view-client-portal-credentials',
             'create-client-portal-credentials',
             'edit-client-portal-credentials',
@@ -74,6 +78,7 @@ class RoleSeeder extends Seeder
             'download-client-portal-invoices',
             'view-client-portal-profile',
             'edit-client-portal-profile',
+            'view-client-portal-reports',
         ];
         $clientRole->syncPermissions($clientPermissions);
     }

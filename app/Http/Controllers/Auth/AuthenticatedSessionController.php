@@ -67,17 +67,4 @@ class AuthenticatedSessionController extends Controller
 
         return redirect()->route('dashboard');
     }
-
-    /**
-     * Destroy an authenticated session.
-     */
-    public function destroy(Request $request): RedirectResponse
-    {
-        Auth::logout();
-
-        $request->session()->invalidate();
-        $request->session()->regenerateToken();
-
-        return redirect('/');
-    }
 }

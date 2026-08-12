@@ -83,7 +83,7 @@ export function UserMenuContent({ user }: UserMenuContentProps) {
                 )}
 
                 {/* Roles & Permissions Link (ADMIN ONLY) */}
-                {!isClientUser && (
+                {!isClientUser && hasPermission(user, 'view-roles') && (
                     <DropdownMenuItem asChild className="focus:bg-slate-100 dark:focus:bg-slate-800 rounded-xl cursor-pointer p-2 transition-colors">
                         <Link className="flex items-center gap-3 w-full" href={route('roles.index')} prefetch onClick={cleanup}>
                             <div className="p-2 rounded-xl bg-purple-50 dark:bg-purple-950/60 text-purple-600 dark:text-purple-400 shrink-0">
@@ -102,7 +102,7 @@ export function UserMenuContent({ user }: UserMenuContentProps) {
                 )}
 
                 {/* System Settings Link (ADMIN ONLY) */}
-                {!isClientUser && (
+                {!isClientUser && hasPermission(user, 'view-settings') && (
                     <DropdownMenuItem asChild className="focus:bg-slate-100 dark:focus:bg-slate-800 rounded-xl cursor-pointer p-2 transition-colors">
                         <Link className="flex items-center gap-3 w-full" href={route('settings.index')} prefetch onClick={cleanup}>
                             <div className="p-2 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 shrink-0">
@@ -128,7 +128,7 @@ export function UserMenuContent({ user }: UserMenuContentProps) {
                 <Link
                     className="flex items-center gap-3 w-full text-rose-600 dark:text-rose-400"
                     method="post"
-                    href={route('logout')}
+                    href={route('profile.logout')}
                     as="button"
                     onClick={cleanup}
                 >

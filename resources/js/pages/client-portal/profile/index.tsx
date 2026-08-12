@@ -1,7 +1,7 @@
 import ClientPortalLayout from '@/layouts/client-portal-layout';
 import { type BreadcrumbItem, type SharedData } from '@/types';
 import { hasPermission } from '@/utils/permissions';
-import { Head, useForm, usePage } from '@inertiajs/react';
+import { Head, router, useForm, usePage } from '@inertiajs/react';
 import {
     AlertTriangle,
     Building2,
@@ -112,13 +112,16 @@ export default function ClientPortalProfileIndex({ client, currencies = [], isAd
     };
 
     const handleRemoveAvatar = () => {
-        avatarForm.post('/client-portal/profile/avatar', {
-            preserveScroll: true,
-            data: { remove_avatar: true },
-            onSuccess: () => {
-                avatarForm.reset();
-            },
-        });
+        router.post(
+            '/client-portal/profile/avatar',
+            { remove_avatar: true },
+            {
+                preserveScroll: true,
+                onSuccess: () => {
+                    avatarForm.reset();
+                },
+            }
+        );
     };
 
     // Admin Reset Password Form
@@ -183,7 +186,7 @@ export default function ClientPortalProfileIndex({ client, currencies = [], isAd
         <ClientPortalLayout client={client} breadcrumbs={breadcrumbs} activeTab="settings">
             <Head title={`Account Profile & Settings | ${client.name}`} />
 
-            <div className="p-6 w-full space-y-6">
+            <div className="p-2 md:p-6 w-full space-y-6">
                 {/* Header Title Section */}
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                     <div>
@@ -699,8 +702,8 @@ export default function ClientPortalProfileIndex({ client, currencies = [], isAd
 
                 {/* CONFIRM REVOKE ACCESS MODAL */}
                 {showRevokeModal && (
-                    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs overflow-y-auto">
-                        <div className="w-full max-w-md rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-6 shadow-2xl space-y-5 animate-in fade-in zoom-in-95 duration-200">
+                    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-900/60 backdrop-blur-xs overflow-y-auto">
+                        <div className="w-full max-w-md max-h-[90vh] my-auto overflow-y-auto rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-4 sm:p-6 shadow-2xl space-y-5 animate-in fade-in zoom-in-95 duration-200">
                             <div className="flex items-start gap-4">
                                 <div className="p-3 rounded-2xl bg-rose-50 dark:bg-rose-950/50 text-rose-600 dark:text-rose-400 shrink-0">
                                     <AlertTriangle className="size-6" />
