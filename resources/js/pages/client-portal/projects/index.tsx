@@ -140,12 +140,13 @@ export default function ClientPortalProjectsIndex({
     };
 
     const handleDelete = () => {
-        if (!deletingProject) return;
+        if (!deletingProject || isDeleting) return;
         setIsDeleting(true);
         router.delete(`/client-portal/projects/destroy/${deletingProject.id}`, {
+            preserveScroll: true,
+            onFinish: () => setIsDeleting(false),
             onSuccess: () => {
                 setDeletingProject(null);
-                setIsDeleting(false);
             },
             onError: () => {
                 setIsDeleting(false);
@@ -182,7 +183,7 @@ export default function ClientPortalProjectsIndex({
                     {hasPermission(user, 'create-client-portal-projects') && (
                         <Link
                             href="/client-portal/projects/create"
-                            className="h-11 px-5 text-xs sm:text-sm font-bold rounded-xl bg-gradient-to-r from-[#003796] via-[#0052D4] to-[#1d4ed8] hover:from-[#002a75] hover:to-[#0040b8] text-white shadow-md shadow-blue-600/20 active:scale-[0.99] transition-all inline-flex items-center gap-2 shrink-0 self-start sm:self-auto cursor-pointer"
+                            className="h-10 px-3 rounded-xl bg-gradient-to-r from-[#003796] via-[#0052D4] to-[#1d4ed8] hover:opacity-95 text-white text-xs font-bold transition-all shadow-md shadow-blue-500/20 flex items-center justify-center gap-2 self-start sm:self-auto cursor-pointer"
                         >
                             <Plus className="size-4" />
                             <span>Create New Project</span>
@@ -396,7 +397,7 @@ export default function ClientPortalProjectsIndex({
                                             <div className="flex items-center gap-1.5">
                                                 <Link
                                                     href={`/client-portal/projects/${proj.id}`}
-                                                    className="px-3 py-1.5 rounded-xl bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400 hover:bg-blue-600 hover:text-white dark:hover:bg-blue-600 dark:hover:text-white transition-all text-xs font-bold inline-flex items-center gap-1 cursor-pointer"
+                                                    className="px-3 py-1.5 rounded-xl bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400 hover:bg-gradient-to-r hover:from-[#003796] hover:via-[#0052D4] hover:to-[#1d4ed8] hover:text-white dark:hover:text-white hover:shadow-md hover:shadow-blue-600/20 active:scale-[0.99] transition-all text-xs font-bold inline-flex items-center gap-1.5 cursor-pointer"
                                                 >
                                                     <Eye className="size-3.5" />
                                                     <span>Open Project</span>
@@ -510,7 +511,7 @@ export default function ClientPortalProjectsIndex({
                                                         <div className="flex items-center justify-end gap-1.5">
                                                             <Link
                                                                 href={`/client-portal/projects/${proj.id}`}
-                                                                className="size-8 rounded-xl bg-purple-50 dark:bg-purple-950/60 text-purple-600 dark:text-purple-400 hover:bg-purple-600 hover:text-white transition-all flex items-center justify-center shadow-2xs"
+                                                                className="size-8 rounded-xl bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400 hover:bg-gradient-to-r hover:from-[#003796] hover:via-[#0052D4] hover:to-[#1d4ed8] hover:text-white dark:hover:text-white hover:shadow-md hover:shadow-blue-600/20 active:scale-[0.99] transition-all flex items-center justify-center shadow-2xs"
                                                                 title="View Project Hub"
                                                             >
                                                                 <Eye className="size-3.5" />
@@ -576,7 +577,7 @@ export default function ClientPortalProjectsIndex({
                                     type="button"
                                     onClick={() => setDeletingProject(null)}
                                     disabled={isDeleting}
-                                    className="h-11 px-5 rounded-xl border border-slate-200 dark:border-slate-800 text-xs font-bold text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800"
+                                    className="h-10 px-3 rounded-xl border border-slate-200 dark:border-slate-800 text-xs font-bold text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none"
                                 >
                                     Cancel
                                 </button>
@@ -584,7 +585,7 @@ export default function ClientPortalProjectsIndex({
                                     type="button"
                                     onClick={handleDelete}
                                     disabled={isDeleting}
-                                    className="h-11 px-5 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold shadow-md shadow-rose-600/20 active:scale-[0.99] transition-all cursor-pointer inline-flex items-center gap-2"
+                                    className="h-10 px-3 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold shadow-md shadow-rose-600/20 active:scale-[0.99] transition-all inline-flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none"
                                 >
                                     {isDeleting ? (
                                         <>

@@ -9,6 +9,7 @@ import {
     Briefcase,
     Building,
     Building2,
+    CheckSquare,
     Coins,
     FileText,
     FolderKanban,
@@ -19,6 +20,9 @@ import {
     LineChart,
     Settings,
     ShieldCheck,
+    Tag,
+    TrendingDown,
+    TrendingUp,
     User as UserIcon,
     UserCog,
     Users,
@@ -39,12 +43,13 @@ interface PermissionNavGroup {
 
 const rawNavGroups: PermissionNavGroup[] = [
     {
-        title: 'Main Navigation',
+        title: 'Core & Operations',
         items: [
             {
                 title: 'Dashboard',
                 url: '/dashboard',
                 icon: LayoutGrid,
+                permission: 'view-dashboard',
             },
             {
                 title: 'Client Hub',
@@ -52,39 +57,51 @@ const rawNavGroups: PermissionNavGroup[] = [
                 icon: Building,
                 permission: 'view-clients',
             },
+            {
+                title: 'Credentials Vault',
+                url: '/credentials',
+                icon: Key,
+                permission: 'view-credentials',
+            },
+            {
+                title: 'General Tasks',
+                url: '/tasks',
+                icon: CheckSquare,
+                permission: 'view-tasks',
+            },
         ],
     },
     {
-        title: 'Client Operations',
+        title: 'Finance & Billing',
         items: [
             {
-                title: 'Projects',
-                url: '/website-projects',
-                icon: Globe,
-                permission: 'view-website-projects',
-            },
-            {
-                title: 'Services',
-                url: '/services',
-                icon: LineChart,
-                permission: 'view-services',
-            },
-            {
-                title: 'Invoices',
+                title: 'Invoices & Billing',
                 url: '/invoices',
                 icon: FileText,
                 permission: 'view-invoices',
             },
             {
-                title: 'Credentials',
-                url: '/credentials',
-                icon: Key,
-                permission: 'view-credentials',
+                title: 'Financial Reports',
+                url: '/reports',
+                icon: LineChart,
+                permission: 'view-reports',
+            },
+            {
+                title: 'Income Tracker',
+                url: '/incomes',
+                icon: TrendingUp,
+                permission: 'view-incomes',
+            },
+            {
+                title: 'Expense Tracker',
+                url: '/expenses',
+                icon: TrendingDown,
+                permission: 'view-expenses',
             },
         ],
     },
     {
-        title: 'HR & Payroll',
+        title: 'HR & Workforce',
         items: [
             {
                 title: 'Employees Directory',
@@ -98,10 +115,22 @@ const rawNavGroups: PermissionNavGroup[] = [
                 icon: Banknote,
                 permission: 'view-payroll',
             },
+            {
+                title: 'Departments',
+                url: '/departments',
+                icon: Building2,
+                permission: 'view-departments',
+            },
+            {
+                title: 'Job Designations',
+                url: '/designations',
+                icon: Briefcase,
+                permission: 'view-designations',
+            },
         ],
     },
     {
-        title: 'Master Data',
+        title: 'Master Categories',
         items: [
             {
                 title: 'Project Categories',
@@ -116,16 +145,22 @@ const rawNavGroups: PermissionNavGroup[] = [
                 permission: 'view-service-categories',
             },
             {
-                title: 'Departments',
-                url: '/departments',
-                icon: Building2,
-                permission: 'view-departments',
+                title: 'Task Categories',
+                url: '/task-categories',
+                icon: Tag,
+                permission: 'view-task-categories',
             },
             {
-                title: 'Job Designations',
-                url: '/designations',
-                icon: Briefcase,
-                permission: 'view-designations',
+                title: 'Income Categories',
+                url: '/income-categories',
+                icon: TrendingUp,
+                permission: 'view-income-categories',
+            },
+            {
+                title: 'Expense Categories',
+                url: '/expense-categories',
+                icon: TrendingDown,
+                permission: 'view-expense-categories',
             },
             {
                 title: 'Currencies',
@@ -149,11 +184,6 @@ const rawNavGroups: PermissionNavGroup[] = [
                 url: '/roles',
                 icon: ShieldCheck,
                 permission: 'view-roles',
-            },
-            {
-                title: 'My Profile',
-                url: '/profile',
-                icon: UserIcon,
             },
             {
                 title: 'CRM Settings',

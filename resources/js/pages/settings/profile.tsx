@@ -8,9 +8,9 @@ import { Head, useForm, usePage } from '@inertiajs/react';
 import {
     Camera,
     Check,
-    CheckCircle2,
     KeyRound,
     LoaderCircle,
+    Lock,
     Mail,
     ShieldCheck,
     Sparkles,
@@ -21,7 +21,7 @@ import { ChangeEvent, FormEventHandler, useRef, useState } from 'react';
 
 const breadcrumbs: BreadcrumbItem[] = [
     {
-        title: 'Profile',
+        title: 'Profile Settings',
         href: '/profile',
     },
 ];
@@ -54,7 +54,7 @@ export default function UserProfile({ status }: { mustVerifyEmail?: boolean; sta
         email: user.email,
         avatar: null,
         remove_avatar: false,
-        _method: 'POST',
+        _method: 'PATCH',
     });
 
     // Password Form
@@ -107,10 +107,10 @@ export default function UserProfile({ status }: { mustVerifyEmail?: boolean; sta
         });
     };
 
-    // Submit Password Form
+    // Submit Password Form (routed to profile.password.update)
     const submitPassword: FormEventHandler = (e) => {
         e.preventDefault();
-        passwordForm.put(route('password.update'), {
+        passwordForm.put(route('profile.password.update'), {
             preserveScroll: true,
             onSuccess: () => passwordForm.reset(),
             onError: (errors) => {
@@ -128,287 +128,361 @@ export default function UserProfile({ status }: { mustVerifyEmail?: boolean; sta
 
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
-            <Head title="User Profile" />
+            <Head title="Profile Settings" />
 
             <div className="flex h-full flex-1 flex-col gap-6 p-4 sm:p-6 bg-slate-50/50 dark:bg-slate-950">
-                {/* Top Profile Hero Header Banner */}
-                <div className="relative rounded-3xl bg-gradient-to-r from-[#003796] via-[#0052D4] to-[#1d4ed8] p-6 sm:p-8 text-white shadow-xl shadow-blue-950/15 overflow-hidden">
-                    {/* Glowing Mesh Circles */}
-                    <div className="pointer-events-none absolute -top-24 -right-24 size-96 rounded-full bg-white/10 blur-[80px]" />
-                    <div className="pointer-events-none absolute -bottom-24 -left-24 size-96 rounded-full bg-cyan-400/20 blur-[80px]" />
-
-                    <div className="relative z-10 flex flex-col md:flex-row items-center md:items-start gap-6">
-                        {/* Avatar Container with Camera Badge */}
-                        <div className="relative group shrink-0">
-                            <div className="size-28 sm:size-32 rounded-full overflow-hidden bg-white/20 backdrop-blur-md text-white flex items-center justify-center font-extrabold text-3xl shadow-2xl ring-4 ring-white/30">
-                                {avatarPreview ? (
-                                    <img src={avatarPreview} alt={user.name} className="size-full object-cover" />
-                                ) : (
-                                    user.name?.charAt(0) || 'A'
-                                )}
-                            </div>
-                            <button
-                                type="button"
-                                onClick={() => fileInputRef.current?.click()}
-                                className="absolute bottom-1 right-1 p-2.5 rounded-full bg-white text-blue-700 hover:bg-blue-50 shadow-lg transition-transform active:scale-95"
-                                title="Change Profile Photo"
-                            >
-                                <Camera className="size-4" />
-                            </button>
+                {/* Page Header matching Standard Design */}
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                    <div>
+                        <div className="flex items-center gap-3">
+                            <span className="h-7 px-3 rounded-lg bg-indigo-50 dark:bg-indigo-950/60 text-xs font-mono font-bold text-indigo-600 dark:text-indigo-400 border border-indigo-200/50 dark:border-indigo-800/50 inline-flex items-center">
+                                ACCOUNT SETTINGS
+                            </span>
+                            <h1 className="text-xl sm:text-2xl font-extrabold text-slate-900 dark:text-white tracking-tight">
+                                Profile & Security
+                            </h1>
                         </div>
-
-                        {/* User Details & Spatie Role Badges */}
-                        <div className="space-y-3 text-center md:text-left my-auto">
-                            <div className="flex flex-wrap items-center justify-center md:justify-start gap-2.5">
-                                <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-white">
-                                    {user.name}
-                                </h1>
-                                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/20 backdrop-blur-sm text-white text-xs font-bold uppercase tracking-wider border border-white/20">
-                                    <ShieldCheck className="size-3.5 text-cyan-300" />
-                                    {roleDisplayName}
-                                </span>
-                            </div>
-
-                            <p className="text-sm text-blue-100/90 flex items-center justify-center md:justify-start gap-2 font-medium">
-                                <Mail className="size-4 text-blue-200" />
-                                <span>{user.email}</span>
-                            </p>
-
-                            <div className="flex flex-wrap items-center justify-center md:justify-start gap-3 pt-1">
-                                <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl bg-white/10 text-white text-xs font-medium backdrop-blur-sm border border-white/15">
-                                    <CheckCircle2 className="size-3.5 text-emerald-400" />
-                                    <span>Account Active</span>
-                                </div>
-                                {/* Only display Full CRM Access badge for Spatie super-admin users */}
-                                {isSuperAdmin && (
-                                    <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl bg-white/10 text-white text-xs font-medium backdrop-blur-sm border border-white/15">
-                                        <Sparkles className="size-3.5 text-yellow-300" />
-                                        <span>Full CRM Access</span>
-                                    </div>
-                                )}
-                            </div>
-                        </div>
+                        <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 mt-1">
+                            Manage your personal profile details, avatar, and authentication security credentials.
+                        </p>
                     </div>
                 </div>
 
                 {/* Status Alert Banner */}
                 {status === 'profile-updated' && (
-                    <div className="p-4 rounded-2xl bg-emerald-50 border border-emerald-200 text-emerald-700 text-sm font-semibold flex items-center gap-2 shadow-xs">
-                        <Check className="size-5 text-emerald-600" />
-                        <span>Your profile details have been updated successfully!</span>
+                    <div className="p-4 rounded-xl bg-emerald-50 dark:bg-emerald-950/50 border border-emerald-200 dark:border-emerald-800 text-emerald-700 dark:text-emerald-300 text-xs font-semibold flex items-center gap-2.5 shadow-2xs">
+                        <Check className="size-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
+                        <span>Your profile information has been updated successfully.</span>
                     </div>
                 )}
 
-                {/* Main 2-Column Grid Layout */}
-                <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-                    {/* Left Column: Personal Info & Avatar Management (lg:col-span-7) */}
-                    <div className="lg:col-span-7 rounded-3xl bg-white dark:bg-slate-900 border border-slate-200/90 dark:border-slate-800 p-6 sm:p-8 shadow-xs space-y-6">
-                        <div className="flex items-center gap-3 pb-4 border-b border-slate-100 dark:border-slate-800">
-                            <div className="p-2.5 rounded-xl bg-blue-50 dark:bg-blue-950 text-blue-600 dark:text-blue-400">
-                                <UserIcon className="size-5" />
+                {/* Realistic, Clean User Identity Summary Card */}
+                <div className="p-5 sm:p-6 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/90 dark:border-slate-800 shadow-xs">
+                    <div className="flex flex-col sm:flex-row items-center sm:items-start justify-between gap-5">
+                        <div className="flex flex-col sm:flex-row items-center sm:items-start gap-4 sm:gap-5 text-center sm:text-left">
+                            {/* Avatar with subtle edit trigger */}
+                            <div className="relative group shrink-0">
+                                <div className="size-20 sm:size-22 rounded-2xl overflow-hidden bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 flex items-center justify-center font-extrabold text-2xl shadow-inner border border-slate-200 dark:border-slate-700">
+                                    {avatarPreview ? (
+                                        <img
+                                            src={avatarPreview}
+                                            alt={user.name}
+                                            className="size-full object-cover"
+                                        />
+                                    ) : (
+                                        user.name?.charAt(0).toUpperCase() || 'U'
+                                    )}
+                                </div>
+                                <button
+                                    type="button"
+                                    onClick={() => fileInputRef.current?.click()}
+                                    className="absolute -bottom-1 -right-1 size-7 rounded-xl bg-[#003796] hover:bg-[#002a75] text-white shadow-md flex items-center justify-center transition-all cursor-pointer"
+                                    title="Change photo"
+                                >
+                                    <Camera className="size-3.5" />
+                                </button>
                             </div>
-                            <div>
-                                <h2 className="text-lg font-bold text-slate-900 dark:text-white">Personal Information</h2>
-                                <p className="text-xs text-slate-500">Update your photo, full name, and email address.</p>
+
+                            {/* User Info Details */}
+                            <div className="space-y-2">
+                                <div className="flex flex-wrap items-center justify-center sm:justify-start gap-2">
+                                    <h2 className="text-lg sm:text-xl font-extrabold text-slate-900 dark:text-white tracking-tight">
+                                        {user.name}
+                                    </h2>
+                                    <span className="px-2.5 py-0.5 rounded-md text-[11px] font-bold bg-blue-50 text-blue-700 dark:bg-blue-950/60 dark:text-blue-300 border border-blue-200/60 dark:border-blue-800/60 inline-flex items-center gap-1">
+                                        <ShieldCheck className="size-3 text-blue-600 dark:text-blue-400" />
+                                        <span>{roleDisplayName}</span>
+                                    </span>
+                                    {isSuperAdmin && (
+                                        <span className="px-2.5 py-0.5 rounded-md text-[11px] font-bold bg-amber-50 text-amber-700 dark:bg-amber-950/60 dark:text-amber-300 border border-amber-200/60 dark:border-amber-800/60 inline-flex items-center gap-1">
+                                            <Sparkles className="size-3 text-amber-500" />
+                                            <span>Full Access</span>
+                                        </span>
+                                    )}
+                                </div>
+
+                                <div className="flex flex-wrap items-center justify-center sm:justify-start gap-4 text-xs text-slate-500 dark:text-slate-400 font-medium">
+                                    <span className="flex items-center gap-1.5">
+                                        <Mail className="size-3.5 text-slate-400" />
+                                        <span>{user.email}</span>
+                                    </span>
+                                    <span className="flex items-center gap-1.5 text-emerald-600 dark:text-emerald-400 font-semibold">
+                                        <span className="size-1.5 rounded-full bg-emerald-500 inline-block" />
+                                        <span>Active Account</span>
+                                    </span>
+                                </div>
                             </div>
                         </div>
 
-                        <form onSubmit={submitProfile} className="space-y-6">
-                            {/* Avatar File Manager Box */}
-                            <div className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-950 border border-slate-200/80 dark:border-slate-800 flex flex-col sm:flex-row items-center justify-between gap-4">
-                                <div className="space-y-1 text-center sm:text-left">
-                                    <span className="text-xs font-bold text-slate-800 dark:text-white block">
-                                        Profile Photo
-                                    </span>
-                                    <p className="text-[11px] text-slate-500">
-                                        JPG, PNG, GIF or WebP. Max 4MB.
-                                    </p>
-                                </div>
+                        {/* Quick Photo Upload & Remove Buttons */}
+                        <div className="flex items-center gap-2 shrink-0 self-center sm:self-start">
+                            <input
+                                ref={fileInputRef}
+                                type="file"
+                                accept="image/jpeg,image/png,image/gif,image/webp"
+                                onChange={handleAvatarChange}
+                                className="hidden"
+                            />
+                            <button
+                                type="button"
+                                onClick={() => fileInputRef.current?.click()}
+                                className="h-9 px-3.5 text-xs font-bold rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-750 transition-colors inline-flex items-center gap-1.5 shadow-2xs cursor-pointer"
+                            >
+                                <Camera className="size-3.5 text-blue-600 dark:text-blue-400" />
+                                <span>Change Photo</span>
+                            </button>
+                            {avatarPreview && (
+                                <button
+                                    type="button"
+                                    onClick={handleRemoveAvatar}
+                                    className="h-9 px-3 text-xs font-bold rounded-xl bg-rose-50 text-rose-600 dark:bg-rose-950/40 dark:text-rose-400 hover:bg-rose-100 dark:hover:bg-rose-900/50 transition-colors inline-flex items-center gap-1.5 border border-rose-200/60 dark:border-rose-900 cursor-pointer"
+                                    title="Remove photo"
+                                >
+                                    <Trash2 className="size-3.5" />
+                                    <span>Remove</span>
+                                </button>
+                            )}
+                        </div>
+                    </div>
+                </div>
 
-                                <div className="flex items-center gap-2">
-                                    <input
-                                        ref={fileInputRef}
-                                        type="file"
-                                        accept="image/jpeg,image/png,image/gif,image/webp"
-                                        onChange={handleAvatarChange}
-                                        className="hidden"
-                                    />
-                                    <button
-                                        type="button"
-                                        onClick={() => fileInputRef.current?.click()}
-                                        className="px-3.5 py-2 text-xs font-semibold rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-200 shadow-xs hover:bg-slate-100 transition-all"
-                                    >
-                                        Upload New Photo
-                                    </button>
-                                    {avatarPreview && (
-                                        <button
-                                            type="button"
-                                            onClick={handleRemoveAvatar}
-                                            className="px-3 py-2 text-xs font-semibold rounded-xl bg-rose-50 text-rose-600 dark:bg-rose-950/40 dark:text-rose-400 hover:bg-rose-100 transition-all"
-                                            title="Remove photo"
-                                        >
-                                            <Trash2 className="size-3.5" />
-                                        </button>
-                                    )}
+                {/* 2-Column Responsive Layout for Forms */}
+                <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+                    {/* Left Column: Personal Information (lg:col-span-7) */}
+                    <div className="lg:col-span-7 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/90 dark:border-slate-800 p-5 sm:p-6 shadow-xs space-y-5 flex flex-col justify-between">
+                        <div className="space-y-5">
+                            <div className="flex items-center gap-3 pb-4 border-b border-slate-100 dark:border-slate-800">
+                                <div className="p-2.5 rounded-xl bg-blue-50 dark:bg-blue-950 text-[#003796] dark:text-blue-400">
+                                    <UserIcon className="size-5" />
+                                </div>
+                                <div>
+                                    <h2 className="text-base font-extrabold text-slate-900 dark:text-white">
+                                        Personal Information
+                                    </h2>
+                                    <p className="text-xs text-slate-400">
+                                        Update your display name and primary contact email address.
+                                    </p>
                                 </div>
                             </div>
 
-                            {/* Name & Email Inputs */}
-                            <div className="space-y-4">
+                            <form id="profile-form" onSubmit={submitProfile} noValidate className="space-y-4">
+                                {/* Name Input */}
                                 <div className="space-y-1.5">
-                                    <Label htmlFor="name" className="text-xs font-bold text-slate-700 dark:text-slate-300 block">
-                                        Full Name
+                                    <Label htmlFor="name" className="text-xs font-bold text-slate-700 dark:text-slate-300">
+                                        Full Name <span className="text-rose-500">*</span>
                                     </Label>
                                     <Input
                                         id="name"
-                                        className="h-11 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-sm font-medium text-slate-900 dark:text-white placeholder:text-slate-400 focus:bg-white focus:border-blue-600 focus:outline-none focus:ring-4 focus:ring-blue-600/10 transition-all"
+                                        type="text"
                                         value={profileForm.data.name}
                                         onChange={(e) => profileForm.setData('name', e.target.value)}
                                         placeholder="Full Name"
-                                        required
+                                        className={`h-11 rounded-xl bg-slate-50 dark:bg-slate-950 text-sm font-medium text-slate-900 dark:text-white transition-all ${
+                                            profileForm.errors.name
+                                                ? 'border-rose-500 ring-2 ring-rose-500/20 focus:border-rose-500 focus:ring-rose-500/20'
+                                                : 'border-slate-200 dark:border-slate-800 focus:bg-white focus:border-blue-600 focus:ring-4 focus:ring-blue-600/10'
+                                        }`}
                                     />
                                     {profileForm.errors.name && (
-                                        <p className="text-xs text-rose-500">{profileForm.errors.name}</p>
+                                        <p className="text-xs text-rose-500 font-semibold">{profileForm.errors.name}</p>
                                     )}
                                 </div>
 
+                                {/* Email Input */}
                                 <div className="space-y-1.5">
-                                    <Label htmlFor="email" className="text-xs font-bold text-slate-700 dark:text-slate-300 block">
-                                        Email Address
+                                    <Label htmlFor="email" className="text-xs font-bold text-slate-700 dark:text-slate-300">
+                                        Email Address <span className="text-rose-500">*</span>
                                     </Label>
                                     <Input
                                         id="email"
                                         type="email"
-                                        className="h-11 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-sm font-medium text-slate-900 dark:text-white placeholder:text-slate-400 focus:bg-white focus:border-blue-600 focus:outline-none focus:ring-4 focus:ring-blue-600/10 transition-all"
                                         value={profileForm.data.email}
                                         onChange={(e) => profileForm.setData('email', e.target.value)}
-                                        placeholder="admin@sapta.com"
-                                        required
+                                        placeholder="your.email@example.com"
+                                        className={`h-11 rounded-xl bg-slate-50 dark:bg-slate-950 text-sm font-medium text-slate-900 dark:text-white transition-all ${
+                                            profileForm.errors.email
+                                                ? 'border-rose-500 ring-2 ring-rose-500/20 focus:border-rose-500 focus:ring-rose-500/20'
+                                                : 'border-slate-200 dark:border-slate-800 focus:bg-white focus:border-blue-600 focus:ring-4 focus:ring-blue-600/10'
+                                        }`}
                                     />
                                     {profileForm.errors.email && (
-                                        <p className="text-xs text-rose-500">{profileForm.errors.email}</p>
+                                        <p className="text-xs text-rose-500 font-semibold">{profileForm.errors.email}</p>
                                     )}
+                                </div>
+                            </form>
+                        </div>
+
+                        <div className="flex items-center justify-between pt-4 border-t border-slate-100 dark:border-slate-800">
+                            <Transition
+                                show={profileForm.recentlySuccessful}
+                                enter="transition ease-in-out duration-300"
+                                enterFrom="opacity-0"
+                                leave="transition ease-in-out duration-300"
+                                leaveTo="opacity-0"
+                            >
+                                <span className="text-xs font-bold text-emerald-600 dark:text-emerald-400 flex items-center gap-1.5">
+                                    <Check className="size-4" />
+                                    Changes saved
+                                </span>
+                            </Transition>
+
+                            <Button
+                                type="submit"
+                                form="profile-form"
+                                disabled={profileForm.processing}
+                                className="h-10 px-5 text-xs font-bold rounded-xl bg-gradient-to-r from-[#003796] via-[#0052D4] to-[#1d4ed8] hover:from-[#002a75] hover:to-[#0040b8] text-white shadow-md shadow-blue-600/20 active:scale-[0.99] transition-all ml-auto inline-flex items-center gap-2 cursor-pointer"
+                            >
+                                {profileForm.processing ? (
+                                    <>
+                                        <LoaderCircle className="size-3.5 animate-spin" />
+                                        <span>Saving Profile...</span>
+                                    </>
+                                ) : (
+                                    <span>Save Profile Details</span>
+                                )}
+                            </Button>
+                        </div>
+                    </div>
+
+                    {/* Right Column: Password & Credentials (lg:col-span-5) */}
+                    <div className="lg:col-span-5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/90 dark:border-slate-800 p-5 sm:p-6 shadow-xs space-y-5 flex flex-col justify-between">
+                        <div className="space-y-5">
+                            <div className="flex items-center gap-3 pb-4 border-b border-slate-100 dark:border-slate-800">
+                                <div className="p-2.5 rounded-xl bg-indigo-50 dark:bg-indigo-950 text-indigo-600 dark:text-indigo-400">
+                                    <KeyRound className="size-5" />
+                                </div>
+                                <div>
+                                    <h2 className="text-base font-extrabold text-slate-900 dark:text-white">
+                                        Security Credentials
+                                    </h2>
+                                    <p className="text-xs text-slate-400">
+                                        Ensure your account uses a secure password.
+                                    </p>
                                 </div>
                             </div>
 
-                            <div className="flex items-center gap-4 pt-2">
-                                <Button
-                                    type="submit"
-                                    disabled={profileForm.processing}
-                                    className="h-11 px-6 text-xs sm:text-sm font-bold rounded-xl bg-gradient-to-r from-[#003796] via-[#0052D4] to-[#1d4ed8] hover:from-[#002a75] hover:to-[#0040b8] text-white shadow-md shadow-blue-600/20 active:scale-[0.99] transition-all"
-                                >
-                                    {profileForm.processing ? (
-                                        <div className="flex items-center gap-2">
-                                            <LoaderCircle className="size-4 animate-spin" />
-                                            <span>Saving Profile...</span>
-                                        </div>
-                                    ) : (
-                                        <span>Save Changes</span>
+                            <form id="password-form" onSubmit={submitPassword} noValidate className="space-y-3.5">
+                                {/* Current Password */}
+                                <div className="space-y-1.5">
+                                    <Label
+                                        htmlFor="current_password"
+                                        className="text-xs font-bold text-slate-700 dark:text-slate-300"
+                                    >
+                                        Current Password <span className="text-rose-500">*</span>
+                                    </Label>
+                                    <Input
+                                        id="current_password"
+                                        ref={currentPasswordInput}
+                                        value={passwordForm.data.current_password}
+                                        onChange={(e) => passwordForm.setData('current_password', e.target.value)}
+                                        type="password"
+                                        autoComplete="current-password"
+                                        placeholder="••••••••"
+                                        className={`h-10 rounded-xl bg-slate-50 dark:bg-slate-950 text-xs font-medium text-slate-900 dark:text-white transition-all ${
+                                            passwordForm.errors.current_password
+                                                ? 'border-rose-500 ring-2 ring-rose-500/20 focus:border-rose-500 focus:ring-rose-500/20'
+                                                : 'border-slate-200 dark:border-slate-800 focus:bg-white focus:border-blue-600 focus:ring-4 focus:ring-blue-600/10'
+                                        }`}
+                                    />
+                                    {passwordForm.errors.current_password && (
+                                        <p className="text-xs text-rose-500 font-semibold">
+                                            {passwordForm.errors.current_password}
+                                        </p>
                                     )}
-                                </Button>
+                                </div>
 
-                                <Transition
-                                    show={profileForm.recentlySuccessful}
-                                    enter="transition ease-in-out"
-                                    enterFrom="opacity-0"
-                                    leave="transition ease-in-out"
-                                    leaveTo="opacity-0"
-                                >
-                                    <span className="text-xs font-semibold text-emerald-600 flex items-center gap-1">
-                                        <Check className="size-4" />
-                                        Saved
-                                    </span>
-                                </Transition>
-                            </div>
-                        </form>
-                    </div>
+                                {/* New Password */}
+                                <div className="space-y-1.5">
+                                    <Label
+                                        htmlFor="password"
+                                        className="text-xs font-bold text-slate-700 dark:text-slate-300"
+                                    >
+                                        New Password <span className="text-rose-500">*</span>
+                                    </Label>
+                                    <Input
+                                        id="password"
+                                        ref={passwordInput}
+                                        value={passwordForm.data.password}
+                                        onChange={(e) => passwordForm.setData('password', e.target.value)}
+                                        type="password"
+                                        autoComplete="new-password"
+                                        placeholder="••••••••"
+                                        className={`h-10 rounded-xl bg-slate-50 dark:bg-slate-950 text-xs font-medium text-slate-900 dark:text-white transition-all ${
+                                            passwordForm.errors.password
+                                                ? 'border-rose-500 ring-2 ring-rose-500/20 focus:border-rose-500 focus:ring-rose-500/20'
+                                                : 'border-slate-200 dark:border-slate-800 focus:bg-white focus:border-blue-600 focus:ring-4 focus:ring-blue-600/10'
+                                        }`}
+                                    />
+                                    {passwordForm.errors.password && (
+                                        <p className="text-xs text-rose-500 font-semibold">
+                                            {passwordForm.errors.password}
+                                        </p>
+                                    )}
+                                </div>
 
-                    {/* Right Column: Account Security & Password (lg:col-span-5) */}
-                    <div className="lg:col-span-5 rounded-3xl bg-white dark:bg-slate-900 border border-slate-200/90 dark:border-slate-800 p-6 sm:p-8 shadow-xs space-y-6">
-                        <div className="flex items-center gap-3 pb-4 border-b border-slate-100 dark:border-slate-800">
-                            <div className="p-2.5 rounded-xl bg-amber-50 dark:bg-amber-950 text-amber-600 dark:text-amber-400">
-                                <KeyRound className="size-5" />
-                            </div>
-                            <div>
-                                <h2 className="text-lg font-bold text-slate-900 dark:text-white">Security Credentials</h2>
-                                <p className="text-xs text-slate-500">Update your account login password.</p>
-                            </div>
+                                {/* Confirm Password */}
+                                <div className="space-y-1.5">
+                                    <Label
+                                        htmlFor="password_confirmation"
+                                        className="text-xs font-bold text-slate-700 dark:text-slate-300"
+                                    >
+                                        Confirm New Password <span className="text-rose-500">*</span>
+                                    </Label>
+                                    <Input
+                                        id="password_confirmation"
+                                        value={passwordForm.data.password_confirmation}
+                                        onChange={(e) => passwordForm.setData('password_confirmation', e.target.value)}
+                                        type="password"
+                                        autoComplete="new-password"
+                                        placeholder="••••••••"
+                                        className={`h-10 rounded-xl bg-slate-50 dark:bg-slate-950 text-xs font-medium text-slate-900 dark:text-white transition-all ${
+                                            passwordForm.errors.password_confirmation
+                                                ? 'border-rose-500 ring-2 ring-rose-500/20 focus:border-rose-500 focus:ring-rose-500/20'
+                                                : 'border-slate-200 dark:border-slate-800 focus:bg-white focus:border-blue-600 focus:ring-4 focus:ring-blue-600/10'
+                                        }`}
+                                    />
+                                    {passwordForm.errors.password_confirmation && (
+                                        <p className="text-xs text-rose-500 font-semibold">
+                                            {passwordForm.errors.password_confirmation}
+                                        </p>
+                                    )}
+                                </div>
+                            </form>
                         </div>
 
-                        <form onSubmit={submitPassword} className="space-y-4">
-                            <div className="space-y-1.5">
-                                <Label htmlFor="current_password" className="text-xs font-bold text-slate-700 dark:text-slate-300 block">
-                                    Current Password
-                                </Label>
-                                <Input
-                                    id="current_password"
-                                    ref={currentPasswordInput}
-                                    value={passwordForm.data.current_password}
-                                    onChange={(e) => passwordForm.setData('current_password', e.target.value)}
-                                    type="password"
-                                    autoComplete="current-password"
-                                    className="h-11 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-sm font-medium text-slate-900 dark:text-white placeholder:text-slate-400 focus:bg-white focus:border-blue-600 focus:outline-none focus:ring-4 focus:ring-blue-600/10 transition-all"
-                                    placeholder="••••••••"
-                                />
-                                {passwordForm.errors.current_password && (
-                                    <p className="text-xs text-rose-500">{passwordForm.errors.current_password}</p>
-                                )}
-                            </div>
+                        <div className="pt-4 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between">
+                            <Transition
+                                show={passwordForm.recentlySuccessful}
+                                enter="transition ease-in-out duration-300"
+                                enterFrom="opacity-0"
+                                leave="transition ease-in-out duration-300"
+                                leaveTo="opacity-0"
+                            >
+                                <span className="text-xs font-bold text-emerald-600 dark:text-emerald-400 flex items-center gap-1.5">
+                                    <Check className="size-4" />
+                                    Password updated
+                                </span>
+                            </Transition>
 
-                            <div className="space-y-1.5">
-                                <Label htmlFor="password" className="text-xs font-bold text-slate-700 dark:text-slate-300 block">
-                                    New Password
-                                </Label>
-                                <Input
-                                    id="password"
-                                    ref={passwordInput}
-                                    value={passwordForm.data.password}
-                                    onChange={(e) => passwordForm.setData('password', e.target.value)}
-                                    type="password"
-                                    autoComplete="new-password"
-                                    className="h-11 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-sm font-medium text-slate-900 dark:text-white placeholder:text-slate-400 focus:bg-white focus:border-blue-600 focus:outline-none focus:ring-4 focus:ring-blue-600/10 transition-all"
-                                    placeholder="••••••••"
-                                />
-                                {passwordForm.errors.password && (
-                                    <p className="text-xs text-rose-500">{passwordForm.errors.password}</p>
-                                )}
-                            </div>
-
-                            <div className="space-y-1.5">
-                                <Label htmlFor="password_confirmation" className="text-xs font-bold text-slate-700 dark:text-slate-300 block">
-                                    Confirm New Password
-                                </Label>
-                                <Input
-                                    id="password_confirmation"
-                                    value={passwordForm.data.password_confirmation}
-                                    onChange={(e) => passwordForm.setData('password_confirmation', e.target.value)}
-                                    type="password"
-                                    autoComplete="new-password"
-                                    className="h-11 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-sm font-medium text-slate-900 dark:text-white placeholder:text-slate-400 focus:bg-white focus:border-blue-600 focus:outline-none focus:ring-4 focus:ring-blue-600/10 transition-all"
-                                    placeholder="••••••••"
-                                />
-                                {passwordForm.errors.password_confirmation && (
-                                    <p className="text-xs text-rose-500">{passwordForm.errors.password_confirmation}</p>
-                                )}
-                            </div>
-
-                            <div className="pt-2">
-                                <Button
-                                    type="submit"
-                                    disabled={passwordForm.processing}
-                                    className="h-11 w-full text-xs sm:text-sm font-bold rounded-xl bg-gradient-to-r from-[#003796] via-[#0052D4] to-[#1d4ed8] hover:from-[#002a75] hover:to-[#0040b8] text-white shadow-md shadow-blue-600/20 active:scale-[0.99] transition-all"
-                                >
-                                    {passwordForm.processing ? (
-                                        <div className="flex items-center justify-center gap-2">
-                                            <LoaderCircle className="size-4 animate-spin" />
-                                            <span>Updating Password...</span>
-                                        </div>
-                                    ) : (
+                            <Button
+                                type="submit"
+                                form="password-form"
+                                disabled={passwordForm.processing}
+                                className="h-10 px-5 text-xs font-bold rounded-xl bg-gradient-to-r from-[#003796] via-[#0052D4] to-[#1d4ed8] hover:from-[#002a75] hover:to-[#0040b8] text-white shadow-md shadow-blue-600/20 active:scale-[0.99] transition-all ml-auto inline-flex items-center gap-2 cursor-pointer"
+                            >
+                                {passwordForm.processing ? (
+                                    <>
+                                        <LoaderCircle className="size-3.5 animate-spin" />
+                                        <span>Updating Password...</span>
+                                    </>
+                                ) : (
+                                    <>
+                                        <Lock className="size-3.5" />
                                         <span>Update Password</span>
-                                    )}
-                                </Button>
-                            </div>
-                        </form>
+                                    </>
+                                )}
+                            </Button>
+                        </div>
                     </div>
                 </div>
             </div>

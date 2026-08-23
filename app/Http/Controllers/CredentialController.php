@@ -4,6 +4,8 @@ namespace App\Http\Controllers;
 
 use App\Models\Client;
 use App\Models\ClientCredential;
+use App\Models\ClientService;
+use App\Models\WebsiteProject;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
@@ -19,8 +21,10 @@ class CredentialController extends Controller
         $search = $request->query('search');
         $type = $request->query('type');
         $clientId = $request->query('client_id');
+        $projectId = $request->query('website_project_id') ?? $request->query('project_id');
+        $serviceId = $request->query('client_service_id') ?? $request->query('service_id');
 
-        $credentials = ClientCredential::with(['client:id,name,company_name,client_code', 'project:id,project_name'])
+        $credentials = ClientCredential::with(['client:id,name,company_name,client_code', 'project:id,project_name', 'service:id,service_name'])
             ->when($search, function ($query, $search) {
                 $query->where(function ($q) use ($search) {
                     $q->where('title', 'like', "%{$search}%")
@@ -34,6 +38,9 @@ class CredentialController extends Controller
                         })
                         ->orWhereHas('project', function ($pq) use ($search) {
                             $pq->where('project_name', 'like', "%{$search}%");
+                        })
+                        ->orWhereHas('service', function ($sq) use ($search) {
+                            $sq->where('service_name', 'like', "%{$search}%");
                         });
                 });
             })
@@ -42,6 +49,12 @@ class CredentialController extends Controller
             })
             ->when($clientId, function ($query, $clientId) {
                 $query->where('client_id', $clientId);
+            })
+            ->when($projectId, function ($query, $projectId) {
+                $query->where('website_project_id', $projectId);
+            })
+            ->when($serviceId, function ($query, $serviceId) {
+                $query->where('client_service_id', $serviceId);
             })
             ->latest('id')
             ->paginate(15)
@@ -57,16 +70,37 @@ class CredentialController extends Controller
             'other' => ClientCredential::where('type', 'other')->count(),
         ];
 
-        $clients = Client::select('id', 'name', 'company_name', 'client_code')->orderBy('name')->get();
+        $clients = Client::select('id', 'name', 'company_name', 'client_code')
+            ->with(['websiteProjects:id,client_id,project_name', 'services:id,client_id,service_name'])
+            ->orderBy('name')
+            ->get();
+
+        $projects = WebsiteProject::select('id', 'client_id', 'project_name')
+            ->when($clientId, function ($q) use ($clientId) {
+                $q->where('client_id', $clientId);
+            })
+            ->orderBy('project_name')
+            ->get();
+
+        $services = ClientService::select('id', 'client_id', 'service_name')
+            ->when($clientId, function ($q) use ($clientId) {
+                $q->where('client_id', $clientId);
+            })
+            ->orderBy('service_name')
+            ->get();
 
         return Inertia::render('credentials/index', [
             'credentials' => $credentials,
             'stats' => $stats,
             'clients' => $clients,
+            'projects' => $projects,
+            'services' => $services,
             'filters' => [
                 'search' => $search ?? '',
                 'type' => $type ?? '',
                 'client_id' => $clientId ?? '',
+                'website_project_id' => $projectId ?? '',
+                'client_service_id' => $serviceId ?? '',
             ],
         ]);
     }
@@ -78,10 +112,12 @@ class CredentialController extends Controller
     {
         $validated = $request->validate([
             'client_id' => ['required', 'exists:clients,id'],
+            'website_project_id' => ['nullable', 'exists:website_projects,id'],
+            'client_service_id' => ['nullable', 'exists:client_services,id'],
             'title' => ['required', 'string', 'max:255'],
             'type' => ['required', 'string', 'in:hosting,cms,database,domain,api,other'],
-            'username' => ['required', 'string', 'max:255'],
-            'password' => ['required', 'string', 'max:255'],
+            'username' => ['nullable', 'string', 'max:255'],
+            'password' => ['nullable', 'string', 'max:255'],
             'url' => ['nullable', 'string', 'max:255'],
             'notes' => ['nullable', 'string'],
         ]);
@@ -98,10 +134,12 @@ class CredentialController extends Controller
     {
         $validated = $request->validate([
             'client_id' => ['required', 'exists:clients,id'],
+            'website_project_id' => ['nullable', 'exists:website_projects,id'],
+            'client_service_id' => ['nullable', 'exists:client_services,id'],
             'title' => ['required', 'string', 'max:255'],
             'type' => ['required', 'string', 'in:hosting,cms,database,domain,api,other'],
-            'username' => ['required', 'string', 'max:255'],
-            'password' => ['required', 'string', 'max:255'],
+            'username' => ['nullable', 'string', 'max:255'],
+            'password' => ['nullable', 'string', 'max:255'],
             'url' => ['nullable', 'string', 'max:255'],
             'notes' => ['nullable', 'string'],
         ]);

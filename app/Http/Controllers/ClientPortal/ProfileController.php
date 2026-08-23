@@ -159,7 +159,7 @@ class ProfileController extends Controller
      */
     public function createAccount(Request $request): RedirectResponse
     {
-        $this->authorizePermission('edit-client-portal-profile');
+        $this->authorizePermission('manage-client-portal-account');
 
         $clientId = $this->getClientId();
         $client = Client::findOrFail($clientId);
@@ -192,7 +192,7 @@ class ProfileController extends Controller
      */
     public function resetPassword(Request $request): RedirectResponse
     {
-        $this->authorizePermission('edit-client-portal-profile');
+        $this->authorizePermission('manage-client-portal-account');
 
         $clientId = $this->getClientId();
         $client = Client::with('user')->findOrFail($clientId);
@@ -217,7 +217,7 @@ class ProfileController extends Controller
      */
     public function revokeAccount(): RedirectResponse
     {
-        $this->authorizePermission('edit-client-portal-profile');
+        $this->authorizePermission('manage-client-portal-account');
 
         $clientId = $this->getClientId();
         $client = Client::with('user')->findOrFail($clientId);

@@ -1,32 +1,46 @@
 <?php
 
 use Illuminate\Support\Facades\Route;
-use App\Http\Controllers\Auth\AuthenticatedSessionController;
+use App\Http\Controllers\Auth\{
+    AuthenticatedSessionController,
+    PasswordResetLinkController,
+    NewPasswordController
+};
 use App\Http\Controllers\ClientPortal\{
     OverviewController,
-    ProjectController as ClientProjectController,
-    ClientServiceController as ClientPortalServiceController,
-    CredentialController as ClientCredentialController,
+    ProjectController,
+    ClientServiceController,
     InvoiceController as ClientInvoiceController,
+    CredentialController as ClientCredentialController,
     ProfileController as ClientProfileController,
-    ReportController as ClientReportController
+    ReportController as ClientReportController,
+    DomainController as ClientDomainPortalController,
+    HostingController as ClientHostingPortalController
 };
 use App\Http\Controllers\{
     DashboardController,
     ClientController,
-    ProjectController,
-    ClientServiceController,
-    InvoiceController,
     CredentialController,
     EmployeeController,
     PayrollController,
     ProjectCategoryController,
     ServiceCategoryController,
+    IncomeCategoryController,
+    ExpenseCategoryController,
+    IncomeController,
+    ExpenseController,
     DesignationController,
     DepartmentController,
     CurrencyController,
     UserController,
-    RoleController
+    RoleController,
+    TaskCategoryController,
+    TaskController,
+    ClientDomainController,
+    ClientHostingController,
+    InvoiceController,
+    ReportController,
+    NotificationController
 };
 use App\Http\Controllers\Settings\{
     ProfileController,
@@ -35,12 +49,45 @@ use App\Http\Controllers\Settings\{
 
 /*
 |--------------------------------------------------------------------------
-| Login Routes
+| Authentication & Password Reset Routes (Guest)
 |--------------------------------------------------------------------------
 */
-Route::controller(AuthenticatedSessionController::class)->group(function () {
-    Route::get('/', 'create')->name('login');
-    Route::post('/', 'store')->name('login.store');
+Route::middleware('guest')->group(function () {
+    Route::controller(AuthenticatedSessionController::class)->group(function () {
+        Route::get('/', 'create')->name('login');
+        Route::post('/', 'store')->name('login.store');
+        Route::get('login', fn() => redirect('/'));
+        Route::post('login', 'store');
+    });
+
+    Route::controller(PasswordResetLinkController::class)->group(function () {
+        Route::get('forgot-password', 'create')->name('password.request');
+        Route::post('forgot-password', 'store')->name('password.email');
+    });
+
+    Route::controller(NewPasswordController::class)->group(function () {
+        Route::get('reset-password/{token}', 'create')->name('password.reset');
+        Route::post('reset-password', 'store')->name('password.store');
+    });
+});
+
+/*
+|--------------------------------------------------------------------------
+| Common Authenticated Routes (Accessible to all authenticated users)
+|--------------------------------------------------------------------------
+*/
+Route::middleware(['web', 'auth'])->group(function () {
+    Route::post('profile/logout', [ProfileController::class, 'logout'])->name('profile.logout');
+    Route::post('logout', [ProfileController::class, 'logout'])->name('logout');
+
+    // Notification Center & Actions
+    Route::controller(NotificationController::class)->prefix('notifications')->as('notifications.')->group(function () {
+        Route::get('/', 'index')->name('index');
+        Route::post('{id}/read', 'markAsRead')->name('read');
+        Route::post('mark-all-read', 'markAllAsRead')->name('markAllRead');
+        Route::delete('{id}', 'destroy')->name('destroy');
+        Route::delete('clear-all', 'clearAll')->name('clearAll');
+    });
 });
 
 /*
@@ -63,7 +110,7 @@ Route::group(['prefix' => 'client-portal', 'as' => 'client-portal.', 'middleware
     | Projects Routes (Full CRUD)
     |--------------------------------------------------------------------------
     */
-    Route::controller(ClientProjectController::class)->group(function () {
+    Route::controller(ProjectController::class)->group(function () {
         Route::prefix('projects')->as('projects.')->group(function () {
             Route::get('/', 'index')->name('index');
             Route::get('create', 'create')->name('create');
@@ -84,11 +131,16 @@ Route::group(['prefix' => 'client-portal', 'as' => 'client-portal.', 'middleware
             Route::post('milestones/update/{milestone}', 'updateMilestone');
             Route::put('milestones/update/{milestone}', 'updateMilestone')->name('milestones.update');
             Route::delete('milestones/destroy/{milestone}', 'destroyMilestone')->name('milestones.destroy');
+            Route::post('milestones/{milestone}/generate-invoice', 'generateMilestoneInvoice')->name('milestones.generate-invoice');
 
             // Credentials Sub-routes
             Route::post('credentials/store', 'storeCredential')->name('credentials.store');
             Route::put('credentials/update/{credential}', 'updateCredential')->name('credentials.update');
             Route::delete('credentials/destroy/{credential}', 'destroyCredential')->name('credentials.destroy');
+
+            // Documents Sub-routes
+            Route::post('{project}/documents/store', 'storeDocument')->name('documents.store');
+            Route::delete('{project}/documents/destroy/{document}', 'destroyDocument')->name('documents.destroy');
         });
     });
 
@@ -97,18 +149,26 @@ Route::group(['prefix' => 'client-portal', 'as' => 'client-portal.', 'middleware
     | Services Routes (Full CRUD)
     |--------------------------------------------------------------------------
     */
-    Route::controller(ClientPortalServiceController::class)->group(function () {
+    Route::controller(ClientServiceController::class)->group(function () {
         Route::prefix('services')->as('services.')->group(function () {
             Route::get('/', 'index')->name('index');
             Route::post('store', 'store')->name('store');
 
             Route::post('payments/generate', 'generateMonthlyBatch')->name('payments.generate');
+            Route::post('payments/{servicePayment}/generate-invoice', 'generatePaymentInvoice')->name('payments.generate-invoice');
             Route::put('payments/update/{servicePayment}', 'updatePayment')->name('payments.update');
             Route::delete('payments/destroy/{servicePayment}', 'destroyPayment')->name('payments.destroy');
 
             Route::get('{service}', 'show')->name('show');
             Route::put('update/{service}', 'update')->name('update');
             Route::delete('destroy/{service}', 'destroy')->name('destroy');
+
+            Route::post('credentials/store', 'storeCredential')->name('credentials.store');
+            Route::put('credentials/update/{credential}', 'updateCredential')->name('credentials.update');
+            Route::delete('credentials/destroy/{credential}', 'destroyCredential')->name('credentials.destroy');
+
+            Route::post('{service}/documents/store', 'storeDocument')->name('documents.store');
+            Route::delete('{service}/documents/destroy/{document}', 'destroyDocument')->name('documents.destroy');
         });
     });
 
@@ -120,10 +180,12 @@ Route::group(['prefix' => 'client-portal', 'as' => 'client-portal.', 'middleware
     Route::controller(ClientInvoiceController::class)->prefix('invoices')->as('invoices.')->group(function () {
         Route::get('/', 'index')->name('index');
         Route::get('create', 'create')->name('create');
+        Route::post('/', 'store');
         Route::post('store', 'store')->name('store');
         Route::get('{invoice}', 'show')->name('show');
         Route::get('{invoice}/edit', 'edit')->name('edit');
         Route::put('update/{invoice}', 'update')->name('update');
+        Route::patch('{invoice}/status', 'updateStatus')->name('status');
         Route::delete('destroy/{invoice}', 'destroy')->name('destroy');
         Route::get('{invoice}/pdf', 'pdf')->name('pdf');
     });
@@ -141,12 +203,53 @@ Route::group(['prefix' => 'client-portal', 'as' => 'client-portal.', 'middleware
     });
 
     /*
+    |--------------------------------------------------------------------------
+    | Client Portal Domains Routes
+    |--------------------------------------------------------------------------
+    */
+    Route::controller(ClientDomainPortalController::class)->prefix('domains')->as('domains.')->group(function () {
+        Route::get('/', 'index')->name('index');
+        Route::post('store', 'store')->name('store');
+        Route::get('{domain}', 'show')->name('show');
+        Route::put('update/{domain}', 'update')->name('update');
+        Route::post('{domain}/generate-invoice', 'generateInvoice')->name('generate-invoice');
+        Route::delete('destroy/{domain}', 'destroy')->name('destroy');
+
+        // Domain Payments & Renewals Flow (Aligned with Projects)
+        Route::post('payments/store', 'storePayment')->name('payments.store');
+        Route::put('payments/update/{payment}', 'updatePayment')->name('payments.update');
+        Route::delete('payments/destroy/{payment}', 'destroyPayment')->name('payments.destroy');
+        Route::post('payments/{payment}/generate-invoice', 'generatePaymentInvoice')->name('payments.generate-invoice');
+    });
+
+    /*
+    |--------------------------------------------------------------------------
+    | Client Portal Hostings Routes
+    |--------------------------------------------------------------------------
+    */
+    Route::controller(ClientHostingPortalController::class)->prefix('hostings')->as('hostings.')->group(function () {
+        Route::get('/', 'index')->name('index');
+        Route::post('store', 'store')->name('store');
+        Route::get('{hosting}', 'show')->name('show');
+        Route::put('update/{hosting}', 'update')->name('update');
+        Route::post('{hosting}/generate-invoice', 'generateInvoice')->name('generate-invoice');
+        Route::delete('destroy/{hosting}', 'destroy')->name('destroy');
+
+        // Hosting Payments & Renewals Flow (Aligned with Projects & Domains)
+        Route::post('payments/store', 'storePayment')->name('payments.store');
+        Route::put('payments/update/{payment}', 'updatePayment')->name('payments.update');
+        Route::delete('payments/destroy/{payment}', 'destroyPayment')->name('payments.destroy');
+        Route::post('payments/{payment}/generate-invoice', 'generatePaymentInvoice')->name('payments.generate-invoice');
+    });
+
+    /*
    |--------------------------------------------------------------------------
    | Client Reports & Financial Statements Routes
    |--------------------------------------------------------------------------
    */
     Route::controller(ClientReportController::class)->prefix('reports')->as('reports.')->group(function () {
         Route::get('/', 'index')->name('index');
+        Route::get('pdf', 'pdf')->name('pdf');
     });
 
     /*
@@ -186,52 +289,76 @@ Route::middleware(['web', 'admin.access'])->group(function () {
     Route::controller(ClientController::class)->prefix('clients')->as('clients.')->group(function () {
         Route::get('/', 'index')->name('index');
         Route::get('create', 'create')->name('create');
-        Route::post('store', 'store')->name('store');
-        Route::get('view/{client}', 'show')->name('show');
-        Route::get('edit/{client}', 'edit')->name('edit');
-        Route::post('update/{client}', 'update')->name('update');
-        Route::delete('destroy/{client}', 'destroy')->name('destroy');
+        Route::post('/', 'store')->name('store');
+        Route::post('store', 'store');
+        Route::get('{client}', 'show')->name('show');
+        Route::get('view/{client}', 'show');
+        Route::get('{client}/edit', 'edit')->name('edit');
+        Route::get('edit/{client}', 'edit');
+        Route::put('{client}', 'update')->name('update');
+        Route::post('update/{client}', 'update');
+        Route::put('update/{client}', 'update');
+        Route::delete('{client}', 'destroy')->name('destroy');
+        Route::delete('destroy/{client}', 'destroy');
     });
 
     /*
     |--------------------------------------------------------------------------
-    | Project Routes (Read-Only Directory & Detail View)
-    |--------------------------------------------------------------------------
-    */
-    Route::controller(ProjectController::class)->prefix('website-projects')->as('website-projects.')->group(function () {
-        Route::get('/', 'index')->name('index');
-        Route::get('/{websiteProject}', 'show')->name('show');
-    });
-
-    /*
-    |--------------------------------------------------------------------------
-    | Client Services Directory Routes (Read-Only Directory & Detail View)
-    |--------------------------------------------------------------------------
-    */
-    Route::controller(ClientServiceController::class)->prefix('services')->as('services.')->group(function () {
-        Route::get('/', 'index')->name('index');
-        Route::get('/{service}', 'show')->name('show');
-    });
-
-
-    /*
-    |--------------------------------------------------------------------------
-    | Invoices Directory Routes (Read-Only Directory & Detail View)
-    |--------------------------------------------------------------------------
-    */
-    Route::controller(InvoiceController::class)->prefix('invoices')->as('invoices.')->group(function () {
-        Route::get('/', 'index')->name('index');
-        Route::get('/{invoice}', 'show')->name('show');
-        Route::get('/{invoice}/pdf', 'pdf')->name('pdf');
-    });
-
-    /*
-    |--------------------------------------------------------------------------
-    | Credentials Directory Routes (Read-Only Directory Listing)
+    | Credentials Directory Routes (Read-Only Directory Listing & Full CRUD)
     |--------------------------------------------------------------------------
     */
     Route::controller(CredentialController::class)->prefix('credentials')->as('credentials.')->group(function () {
         Route::get('/', 'index')->name('index');
+        Route::post('store', 'store')->name('store');
+        Route::put('update/{credential}', 'update')->name('update');
+        Route::delete('destroy/{credential}', 'destroy')->name('destroy');
+    });
+
+    /*
+    |--------------------------------------------------------------------------
+    | Admin Invoices & Billing Routes (Read-Only Directory & View)
+    |--------------------------------------------------------------------------
+    */
+    Route::controller(InvoiceController::class)->prefix('invoices')->as('invoices.')->group(function () {
+        Route::get('/', 'index')->name('index');
+        Route::get('{invoice}', 'show')->name('show');
+        Route::get('{invoice}/pdf', 'downloadPdf')->name('pdf');
+    });
+
+    /*
+    |--------------------------------------------------------------------------
+    | Financial Reports & Ledger Routes
+    |--------------------------------------------------------------------------
+    */
+    Route::controller(ReportController::class)->prefix('reports')->as('reports.')->group(function () {
+        Route::get('/', 'index')->name('index');
+        Route::get('/pdf', 'pdf')->name('pdf');
+    });
+
+    /*
+    |--------------------------------------------------------------------------
+    | Income Tracker Routes
+    |--------------------------------------------------------------------------
+    */
+    Route::controller(IncomeController::class)->prefix('incomes')->as('incomes.')->group(function () {
+        Route::get('/', 'index')->name('index');
+        Route::get('/export', 'export')->name('export');
+        Route::post('/', 'store')->name('store');
+        Route::put('/{income}', 'update')->name('update');
+        Route::delete('/{income}', 'destroy')->name('destroy');
+    });
+
+    /*
+    |--------------------------------------------------------------------------
+    | Expense Tracker Routes
+    |--------------------------------------------------------------------------
+    */
+    Route::controller(ExpenseController::class)->prefix('expenses')->as('expenses.')->group(function () {
+        Route::get('/', 'index')->name('index');
+        Route::get('/export', 'export')->name('export');
+        Route::post('/', 'store')->name('store');
+        Route::put('/{expense}', 'update')->name('update');
+        Route::delete('/{expense}', 'destroy')->name('destroy');
     });
 
     /*
@@ -259,6 +386,67 @@ Route::middleware(['web', 'admin.access'])->group(function () {
         Route::post('generate', 'generateBatch')->name('generate');
         Route::put('/{payroll}', 'update')->name('update');
         Route::patch('/{payroll}/status', 'updateStatus')->name('status');
+        Route::get('/payslip/{payroll}', 'showPayslip')->name('payslip');
+        Route::get('/payslips-bulk', 'bulkPayslips')->name('payslips-bulk');
+        Route::delete('/{payroll}', 'destroy')->name('destroy');
+    });
+
+    /*
+    |--------------------------------------------------------------------------
+    | General Tasks Routes
+    |--------------------------------------------------------------------------
+    */
+    Route::controller(TaskController::class)->prefix('tasks')->as('tasks.')->group(function () {
+        Route::get('/', 'index')->name('index');
+        Route::get('/create', 'create')->name('create');
+        Route::post('/', 'store')->name('store');
+        Route::get('/{task}/edit', 'edit')->name('edit');
+        Route::put('/{task}', 'update')->name('update');
+        Route::get('/{task}/download-attachment', 'downloadAttachment')->name('download-attachment');
+        Route::patch('/{task}/status', 'updateStatus')->name('status');
+        Route::delete('/{task}', 'destroy')->name('destroy');
+    });
+
+    /*
+    |--------------------------------------------------------------------------
+    | Client Domains Routes
+    |--------------------------------------------------------------------------
+    */
+    Route::controller(ClientDomainController::class)->prefix('client-domains')->as('client-domains.')->group(function () {
+        Route::get('/', 'index')->name('index');
+        Route::get('/create', 'create')->name('create');
+        Route::post('/', 'store')->name('store');
+        Route::get('/{clientDomain}/edit', 'edit')->name('edit');
+        Route::put('/{clientDomain}', 'update')->name('update');
+        Route::patch('/{clientDomain}/status', 'updateStatus')->name('status');
+        Route::delete('/{clientDomain}', 'destroy')->name('destroy');
+    });
+
+    /*
+    |--------------------------------------------------------------------------
+    | Client Hostings Routes
+    |--------------------------------------------------------------------------
+    */
+    Route::controller(ClientHostingController::class)->prefix('client-hostings')->as('client-hostings.')->group(function () {
+        Route::get('/', 'index')->name('index');
+        Route::get('/create', 'create')->name('create');
+        Route::post('/', 'store')->name('store');
+        Route::get('/{clientHosting}/edit', 'edit')->name('edit');
+        Route::put('/{clientHosting}', 'update')->name('update');
+        Route::patch('/{clientHosting}/status', 'updateStatus')->name('status');
+        Route::delete('/{clientHosting}', 'destroy')->name('destroy');
+    });
+
+    /*
+    |--------------------------------------------------------------------------
+    | Task Categories Routes
+    |--------------------------------------------------------------------------
+    */
+    Route::controller(TaskCategoryController::class)->prefix('task-categories')->as('task-categories.')->group(function () {
+        Route::get('/', 'index')->name('index');
+        Route::post('/', 'store')->name('store');
+        Route::put('/{taskCategory}', 'update')->name('update');
+        Route::delete('/{taskCategory}', 'destroy')->name('destroy');
     });
 
     /*
@@ -283,6 +471,30 @@ Route::middleware(['web', 'admin.access'])->group(function () {
         Route::post('/', 'store')->name('store');
         Route::put('/{service_category}', 'update')->name('update');
         Route::delete('/{service_category}', 'destroy')->name('destroy');
+    });
+
+    /*
+    |--------------------------------------------------------------------------
+    | Income Categories Routes
+    |--------------------------------------------------------------------------
+    */
+    Route::controller(IncomeCategoryController::class)->prefix('income-categories')->as('income-categories.')->group(function () {
+        Route::get('/', 'index')->name('index');
+        Route::post('/', 'store')->name('store');
+        Route::put('/{incomeCategory}', 'update')->name('update');
+        Route::delete('/{incomeCategory}', 'destroy')->name('destroy');
+    });
+
+    /*
+    |--------------------------------------------------------------------------
+    | Expense Categories Routes
+    |--------------------------------------------------------------------------
+    */
+    Route::controller(ExpenseCategoryController::class)->prefix('expense-categories')->as('expense-categories.')->group(function () {
+        Route::get('/', 'index')->name('index');
+        Route::post('/', 'store')->name('store');
+        Route::put('/{expenseCategory}', 'update')->name('update');
+        Route::delete('/{expenseCategory}', 'destroy')->name('destroy');
     });
 
     /*
@@ -331,7 +543,9 @@ Route::middleware(['web', 'admin.access'])->group(function () {
     */
     Route::controller(UserController::class)->prefix('users')->as('users.')->group(function () {
         Route::get('/', 'index')->name('index');
+        Route::get('create', 'create')->name('create');
         Route::post('store', 'store')->name('store');
+        Route::get('edit/{user}', 'edit')->name('edit');
         Route::post('update/{user}', 'update')->name('update');
         Route::delete('destroy/{user}', 'destroy')->name('destroy');
     });
@@ -343,7 +557,9 @@ Route::middleware(['web', 'admin.access'])->group(function () {
     */
     Route::controller(RoleController::class)->prefix('roles')->as('roles.')->group(function () {
         Route::get('/', 'index')->name('index');
+        Route::get('/create', 'create')->name('create');
         Route::post('/store', 'store')->name('store');
+        Route::get('/edit/{role}', 'edit')->name('edit');
         Route::put('/update/{role}', 'update')->name('update');
         Route::delete('/destroy/{role}', 'destroy')->name('destroy');
     });
@@ -357,7 +573,6 @@ Route::middleware(['web', 'admin.access'])->group(function () {
         Route::get('profile', 'edit')->name('edit');
         Route::patch('profile', 'update')->name('update');
         Route::put('profile/password', 'updatePassword')->name('password.update');
-        Route::post('profile/logout', 'logout')->name('logout');
     });
 
     /*

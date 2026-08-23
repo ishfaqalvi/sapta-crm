@@ -36,7 +36,7 @@ export default function ClientPortalLayout({
                 <ClientSidebar client={client} activeTab={activeTab} isPortal={true} />
                 <AppContent variant="sidebar" className="!bg-transparent relative z-10 min-w-0 max-w-full">
                     <AppSidebarHeader breadcrumbs={breadcrumbs} />
-                    <div className="flex-1 w-full min-w-0 overflow-x-auto p-2 md:p-2">{children}</div>
+                    <div className="flex-1 w-full min-w-0 overflow-x-auto">{children}</div>
                 </AppContent>
                 <AppToaster />
             </AppShell>

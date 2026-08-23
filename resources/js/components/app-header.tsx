@@ -1,3 +1,4 @@
+import NotificationBell from '@/components/notification-bell';
 import AppearanceToggleDropdown from '@/components/appearance-dropdown';
 import { Breadcrumbs } from '@/components/breadcrumbs';
 import { Icon } from '@/components/icon';
@@ -153,6 +154,9 @@ export function AppHeader({ breadcrumbs = [] }: AppHeaderProps) {
                                 ))}
                             </div>
                         </div>
+
+                        {/* Dynamic Notification Bell */}
+                        <NotificationBell />
 
                         {/* Theme Switcher Toggle */}
                         <AppearanceToggleDropdown />

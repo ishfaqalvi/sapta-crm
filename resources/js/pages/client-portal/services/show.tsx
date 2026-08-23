@@ -1,6 +1,8 @@
+import DocumentsTab, { type ClientDocumentItem } from '@/components/documents-tab';
 import ClientPortalLayout from '@/layouts/client-portal-layout';
 import { type BreadcrumbItem, type SharedData } from '@/types';
-import { Head, Link, router, usePage } from '@inertiajs/react';
+import { hasPermission } from '@/utils/permissions';
+import { Head, Link, router, useForm, usePage } from '@inertiajs/react';
 import {
     AlertTriangle,
     ArrowLeft,
@@ -8,9 +10,14 @@ import {
     Calendar,
     CheckCircle2,
     Clock,
+    Copy,
     CreditCard,
     DollarSign,
+    Edit2,
+    Eye,
+    EyeOff,
     FileText,
+    Key,
     Layers,
     LoaderCircle,
     Lock,
@@ -20,6 +27,8 @@ import {
     Printer,
     Receipt,
     RefreshCw,
+    Shield,
+    ShieldCheck,
     StopCircle,
     Trash2,
     User,
@@ -35,9 +44,25 @@ export interface ServicePaymentItem {
     amount_due: number | string;
     amount_paid: number | string;
     payment_date: string | null;
-    status: 'paid' | 'due_pending' | 'overdue';
+    status: 'paid' | 'due' | 'due_pending' | 'overdue';
     payment_method: string | null;
     notes: string | null;
+    invoice?: {
+        id: number;
+        invoice_number: string;
+        status: string;
+    } | null;
+}
+
+export interface ServiceCredentialItem {
+    id: number;
+    title: string;
+    type?: string;
+    username?: string | null;
+    password?: string | null;
+    url?: string | null;
+    notes?: string | null;
+    created_at?: string;
 }
 
 export interface ClientServiceDetailItem {
@@ -58,6 +83,8 @@ export interface ClientServiceDetailItem {
     notes: string | null;
     created_at?: string;
     payments?: ServicePaymentItem[];
+    credentials?: ServiceCredentialItem[];
+    documents?: ClientDocumentItem[];
 }
 
 interface ClientPortalServiceShowProps {
@@ -80,17 +107,9 @@ interface ClientPortalServiceShowProps {
     };
 }
 
-export default function ClientPortalServiceShow({ client, service, company }: ClientPortalServiceShowProps) {
+export default function ClientPortalServiceShow({ client, service }: ClientPortalServiceShowProps) {
     const { auth } = usePage().props as unknown as SharedData;
-
-    const companyInfo = company || {
-        name: 'Sapta Technologies',
-        email: 'contact@saptatechnologies.com',
-        phone: '+92 300 1234567',
-        address: 'Office #402, Software Technology Park, Lahore, Pakistan',
-        tax_id: 'NTN-892415-0',
-        logo: '/app-logo-icon.png',
-    };
+    const user = auth?.user;
 
     const breadcrumbs: BreadcrumbItem[] = [
         { title: 'Client Portal', href: '/client-portal/overview' },
@@ -98,21 +117,21 @@ export default function ClientPortalServiceShow({ client, service, company }: Cl
         { title: service.service_name, href: `/client-portal/services/${service.id}` },
     ];
 
-    // URL Tab persistence support ('details' | 'payments')
-    const getInitialTab = (): 'details' | 'payments' => {
+    // URL Tab persistence support ('details' | 'payments' | 'credentials' | 'documents')
+    const getInitialTab = (): 'details' | 'payments' | 'credentials' | 'documents' => {
         if (typeof window !== 'undefined') {
             const params = new URLSearchParams(window.location.search);
             const tab = params.get('tab');
-            if (tab === 'payments' || tab === 'details') {
+            if (tab === 'payments' || tab === 'credentials' || tab === 'details' || tab === 'documents') {
                 return tab;
             }
         }
         return 'details';
     };
 
-    const [activeTab, setActiveTabState] = useState<'details' | 'payments'>(getInitialTab);
+    const [activeTab, setActiveTabState] = useState<'details' | 'payments' | 'credentials' | 'documents'>(getInitialTab);
 
-    const setActiveTab = (tab: 'details' | 'payments') => {
+    const setActiveTab = (tab: 'details' | 'payments' | 'credentials' | 'documents') => {
         setActiveTabState(tab);
         if (typeof window !== 'undefined') {
             const url = new URL(window.location.href);
@@ -121,18 +140,152 @@ export default function ClientPortalServiceShow({ client, service, company }: Cl
         }
     };
 
+    // Credentials Modal State & Handlers via Inertia useForm
+    const [copiedId, setCopiedId] = useState<string | null>(null);
+    const [isCredModalOpen, setIsCredModalOpen] = useState(false);
+    const [editingCred, setEditingCred] = useState<ServiceCredentialItem | null>(null);
+    const [deletingCred, setDeletingCred] = useState<ServiceCredentialItem | null>(null);
+    const [isDeletingCred, setIsDeletingCred] = useState(false);
+    const [visiblePasswords, setVisiblePasswords] = useState<{ [key: number]: boolean }>({});
+
+    const {
+        data: credData,
+        setData: setCredData,
+        post: postCred,
+        put: putCred,
+        processing: isSavingCred,
+        errors: credErrors,
+        reset: resetCredForm,
+        clearErrors: clearCredErrors,
+    } = useForm({
+        title: '',
+        type: 'hosting',
+        client_service_id: service.id as number | string,
+        username: '',
+        password: '',
+        url: '',
+        notes: '',
+    });
+
+    const handleCopy = (text: string, idStr: string) => {
+        navigator.clipboard.writeText(text);
+        setCopiedId(idStr);
+        setTimeout(() => setCopiedId(null), 2000);
+    };
+
+    const togglePasswordVisibility = (id: number) => {
+        setVisiblePasswords((prev) => ({ ...prev, [id]: !prev[id] }));
+    };
+
+    const openCreateCredModal = () => {
+        setEditingCred(null);
+        resetCredForm();
+        clearCredErrors();
+        setCredData({
+            title: '',
+            type: 'hosting',
+            client_service_id: service.id,
+            username: '',
+            password: '',
+            url: '',
+            notes: '',
+        });
+        setIsCredModalOpen(true);
+    };
+
+    const openEditCredModal = (cred: ServiceCredentialItem) => {
+        setEditingCred(cred);
+        clearCredErrors();
+        const initialNotes =
+            cred.notes ||
+            [
+                cred.username ? `Username: ${cred.username}` : '',
+                cred.password ? `Password: ${cred.password}` : '',
+                cred.url ? `URL: ${cred.url}` : '',
+            ]
+                .filter(Boolean)
+                .join('\n');
+
+        setCredData({
+            title: cred.title,
+            type: cred.type || 'hosting',
+            client_service_id: service.id,
+            username: cred.username || '',
+            password: cred.password || '',
+            url: cred.url || '',
+            notes: initialNotes,
+        });
+        setIsCredModalOpen(true);
+    };
+
+    const closeCredModal = () => {
+        setIsCredModalOpen(false);
+        setEditingCred(null);
+        resetCredForm();
+        clearCredErrors();
+    };
+
+    const handleSaveCredential = (e: FormEvent) => {
+        e.preventDefault();
+        credData.client_service_id = service.id;
+
+        if (editingCred) {
+            putCred(`/client-portal/services/credentials/update/${editingCred.id}`, {
+                onSuccess: () => closeCredModal(),
+            });
+        } else {
+            postCred('/client-portal/services/credentials/store', {
+                onSuccess: () => closeCredModal(),
+            });
+        }
+    };
+
+    const handleDeleteCredential = () => {
+        if (!deletingCred) return;
+        setIsDeletingCred(true);
+        router.delete(`/client-portal/services/credentials/destroy/${deletingCred.id}`, {
+            onSuccess: () => {
+                setDeletingCred(null);
+                setIsDeletingCred(false);
+            },
+            onError: () => setIsDeletingCred(false),
+        });
+    };
+
     // Generate Payment Modal State (Asking ONLY for Billing Month)
     const [isGenerateModalOpen, setIsGenerateModalOpen] = useState(false);
     const [generateMonth, setGenerateMonth] = useState(new Date().toISOString().slice(0, 7));
     const [isGenerating, setIsGenerating] = useState(false);
 
-    // Mark Paid Confirmation Modal State
-    const [markingPaidPayment, setMarkingPaidPayment] = useState<ServicePaymentItem | null>(null);
-    const [isMarkingPaid, setIsMarkingPaid] = useState(false);
-
     // Delete Payment Confirmation State
     const [deletingPayment, setDeletingPayment] = useState<ServicePaymentItem | null>(null);
     const [isDeletingPayment, setIsDeletingPayment] = useState(false);
+
+    // Generate Official Invoice Confirmation State
+    const [confirmingInvoicePayment, setConfirmingInvoicePayment] = useState<ServicePaymentItem | null>(null);
+    const [isGeneratingInvoice, setIsGeneratingInvoice] = useState(false);
+
+    const handleGenerateInvoiceSubmit = () => {
+        if (!confirmingInvoicePayment) return;
+        setIsGeneratingInvoice(true);
+        router.post(
+            `/client-portal/services/payments/${confirmingInvoicePayment.id}/generate-invoice`,
+            {},
+            {
+                preserveScroll: true,
+                onSuccess: () => {
+                    setConfirmingInvoicePayment(null);
+                    setIsGeneratingInvoice(false);
+                },
+                onError: () => {
+                    setIsGeneratingInvoice(false);
+                },
+                onFinish: () => {
+                    setIsGeneratingInvoice(false);
+                },
+            }
+        );
+    };
 
     const formatDateOnly = (dateString?: string | null) => {
         if (!dateString) return 'N/A';
@@ -196,33 +349,6 @@ export default function ClientPortalServiceShow({ client, service, company }: Cl
         );
     };
 
-    // Handle Mark Paid
-    const handleConfirmMarkPaid = () => {
-        if (!markingPaidPayment) return;
-        setIsMarkingPaid(true);
-
-        const payload = {
-            amount_due: markingPaidPayment.amount_due,
-            amount_paid: markingPaidPayment.amount_due,
-            payment_date: new Date().toISOString().split('T')[0],
-            status: 'paid',
-        };
-
-        router.put(`/client-portal/services/payments/update/${markingPaidPayment.id}`, payload, {
-            preserveScroll: true,
-            onSuccess: () => {
-                setMarkingPaidPayment(null);
-                setIsMarkingPaid(false);
-            },
-            onError: () => {
-                setIsMarkingPaid(false);
-            },
-            onFinish: () => {
-                setIsMarkingPaid(false);
-            },
-        });
-    };
-
     // Handle Delete Payment
     const handleDeletePayment = () => {
         if (!deletingPayment) return;
@@ -242,320 +368,6 @@ export default function ClientPortalServiceShow({ client, service, company }: Cl
         });
     };
 
-    // Dedicated Professional Print Window Invoice Receipt (Project Payments Pattern)
-    const handlePrintInvoice = (pay: ServicePaymentItem) => {
-        const printWindow = window.open('', '_blank');
-        if (!printWindow) return;
-
-        const invoiceHtml = `
-            <!DOCTYPE html>
-            <html>
-            <head>
-                <title>Service Invoice Statement - #${pay.id}</title>
-                <style>
-                    @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@600;800&display=swap');
-                    
-                    * { box-sizing: border-box; margin: 0; padding: 0; }
-                    body {
-                        font-family: 'Plus Jakarta Sans', sans-serif;
-                        background: #ffffff;
-                        color: #0f172a;
-                        padding: 40px;
-                        -webkit-print-color-adjust: exact;
-                    }
-
-                    .invoice-container {
-                        max-width: 800px;
-                        margin: 0 auto;
-                        border: 1px solid #e2e8f0;
-                        border-radius: 24px;
-                        padding: 40px;
-                    }
-
-                    .header {
-                        display: flex;
-                        justify-content: space-between;
-                        align-items: flex-start;
-                        padding-bottom: 24px;
-                        border-bottom: 2px solid #f1f5f9;
-                        margin-bottom: 32px;
-                    }
-
-                    .brand-name {
-                        font-size: 22px;
-                        font-weight: 900;
-                        color: #003796;
-                        letter-spacing: -0.5px;
-                    }
-
-                    .brand-sub {
-                        font-size: 12px;
-                        color: #64748b;
-                        font-weight: 500;
-                        margin-top: 2px;
-                    }
-
-                    .invoice-title {
-                        font-size: 24px;
-                        font-weight: 900;
-                        color: #0f172a;
-                        text-align: right;
-                        letter-spacing: -0.5px;
-                    }
-
-                    .invoice-num {
-                        font-family: 'JetBrains Mono', monospace;
-                        font-size: 13px;
-                        color: #0052D4;
-                        font-weight: 800;
-                        text-align: right;
-                        margin-top: 4px;
-                    }
-
-                    .meta-grid {
-                        display: grid;
-                        grid-template-columns: 1fr 1fr;
-                        gap: 24px;
-                        margin-bottom: 32px;
-                    }
-
-                    .meta-label {
-                        font-size: 10px;
-                        font-weight: 800;
-                        text-transform: uppercase;
-                        letter-spacing: 0.5px;
-                        color: #94a3b8;
-                        margin-bottom: 6px;
-                    }
-
-                    .meta-title {
-                        font-size: 15px;
-                        font-weight: 800;
-                        color: #0f172a;
-                    }
-
-                    .meta-text {
-                        font-size: 12px;
-                        color: #475569;
-                        margin-top: 2px;
-                        font-weight: 500;
-                    }
-
-                    .table-container {
-                        border: 1px solid #e2e8f0;
-                        border-radius: 16px;
-                        overflow: hidden;
-                        margin-bottom: 32px;
-                    }
-
-                    table {
-                        width: 100%;
-                        border-collapse: collapse;
-                        text-align: left;
-                    }
-
-                    th {
-                        background: #f8fafc;
-                        padding: 14px 18px;
-                        font-size: 10px;
-                        font-weight: 800;
-                        text-transform: uppercase;
-                        letter-spacing: 0.5px;
-                        color: #64748b;
-                        border-bottom: 1px solid #e2e8f0;
-                    }
-
-                    td {
-                        padding: 16px 18px;
-                        font-size: 12px;
-                        font-weight: 600;
-                        color: #1e293b;
-                        border-bottom: 1px solid #f1f5f9;
-                    }
-
-                    tr:last-child td {
-                        border-bottom: none;
-                    }
-
-                    .mono-val {
-                        font-family: 'JetBrains Mono', monospace;
-                        font-weight: 800;
-                    }
-
-                    .status-pill {
-                        display: inline-block;
-                        padding: 4px 12px;
-                        border-radius: 20px;
-                        font-size: 10px;
-                        font-weight: 800;
-                        text-transform: uppercase;
-                        letter-spacing: 0.5px;
-                    }
-
-                    .status-paid {
-                        background: #dcfce7;
-                        color: #15803d;
-                        border: 1px solid #bbf7d0;
-                    }
-
-                    .status-pending {
-                        background: #fef3c7;
-                        color: #b45309;
-                        border: 1px solid #fde68a;
-                    }
-
-                    .totals-section {
-                        display: flex;
-                        justify-content: flex-end;
-                        margin-bottom: 40px;
-                    }
-
-                    .totals-box {
-                        width: 320px;
-                        background: #f8fafc;
-                        border: 1px solid #e2e8f0;
-                        border-radius: 16px;
-                        padding: 20px;
-                    }
-
-                    .totals-row {
-                        display: flex;
-                        justify-content: space-between;
-                        align-items: center;
-                        margin-bottom: 10px;
-                        font-size: 12px;
-                        color: #64748b;
-                        font-weight: 600;
-                    }
-
-                    .totals-row.final {
-                        margin-top: 12px;
-                        padding-top: 12px;
-                        border-top: 2px solid #e2e8f0;
-                        font-size: 14px;
-                        font-weight: 800;
-                        color: #0f172a;
-                    }
-
-                    .final-amount {
-                        font-family: 'JetBrains Mono', monospace;
-                        font-size: 20px;
-                        font-weight: 900;
-                        color: #0052D4;
-                    }
-
-                    .footer {
-                        padding-top: 24px;
-                        border-top: 1px solid #f1f5f9;
-                        font-size: 11px;
-                        color: #94a3b8;
-                        text-align: center;
-                        font-weight: 500;
-                    }
-
-                    @media print {
-                        body { padding: 0; background: white; }
-                        .invoice-container { max-width: 100%; }
-                    }
-                </style>
-            </head>
-            <body>
-                <div class="invoice-container">
-                    <div class="header">
-                        <div style="display: flex; align-items: center; gap: 14px;">
-                            <img src="${companyInfo.logo || '/app-logo-icon.png'}" alt="Company Logo" style="height: 48px; width: auto; object-fit: contain;" />
-                            <div>
-                                <div class="brand-name">${companyInfo.name}</div>
-                                <div class="brand-sub">${companyInfo.email} ${companyInfo.phone ? ' • ' + companyInfo.phone : ''}</div>
-                                ${companyInfo.address ? `<div style="font-size: 11px; color: #64748b; font-weight: 500; margin-top: 2px;">${companyInfo.address}${companyInfo.tax_id ? ' • NTN: ' + companyInfo.tax_id : ''}</div>` : ''}
-                            </div>
-                        </div>
-                        <div>
-                            <div class="invoice-title">SERVICE INVOICE</div>
-                            <div class="invoice-num">#INV-SRV-${pay.id}</div>
-                        </div>
-                    </div>
-
-                    <div class="meta-grid">
-                        <div>
-                            <div class="meta-label">Billed To:</div>
-                            <div class="meta-title">${client.company_name || client.name}</div>
-                            <div class="meta-text"><strong>Attn:</strong> ${client.name}</div>
-                            <div class="meta-text"><strong>Client Code:</strong> ${client.client_code}</div>
-                        </div>
-
-                        <div style="text-align: right;">
-                            <div class="meta-label">Invoice & Service Details:</div>
-                            <div class="meta-text"><strong>Service:</strong> ${service.service_name}</div>
-                            <div class="meta-text"><strong>Category:</strong> ${service.category?.name || 'General'}</div>
-                            <div class="meta-text"><strong>Billing Month:</strong> ${pay.billing_month}</div>
-                            <div class="meta-text"><strong>Date:</strong> ${pay.payment_date ? formatDateOnly(pay.payment_date) : new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</div>
-                        </div>
-                    </div>
-
-                    <div class="table-container">
-                        <table>
-                            <thead>
-                                <tr>
-                                    <th>Description / Billing Month</th>
-                                    <th>Status</th>
-                                    <th style="text-align: right;">Amount Due</th>
-                                    <th style="text-align: right;">Amount Paid</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                <tr>
-                                    <td>
-                                        <div style="font-weight: 800; color: #0f172a;">${service.service_name} (${pay.billing_month})</div>
-                                        ${pay.notes ? `<div style="font-size: 11px; color: #64748b; font-weight: 500; margin-top: 2px;">${pay.notes}</div>` : ''}
-                                    </td>
-                                    <td>
-                                        <span class="status-pill ${pay.status === 'paid' ? 'status-paid' : 'status-pending'}">
-                                            ${pay.status === 'paid' ? 'Paid' : pay.status === 'overdue' ? 'Overdue' : 'Pending'}
-                                        </span>
-                                    </td>
-                                    <td style="text-align: right;" class="mono-val">${formatCurrency(pay.amount_due)}</td>
-                                    <td style="text-align: right;" class="mono-val" style="color: #16a34a;">${formatCurrency(pay.amount_paid)}</td>
-                                </tr>
-                            </tbody>
-                        </table>
-                    </div>
-
-                    <div class="totals-section">
-                        <div class="totals-box">
-                            <div class="totals-row">
-                                <span>Amount Due:</span>
-                                <span class="mono-val" style="color: #0f172a;">${formatCurrency(pay.amount_due)}</span>
-                            </div>
-                            <div class="totals-row">
-                                <span>Amount Paid:</span>
-                                <span class="mono-val" style="color: #16a34a;">${formatCurrency(pay.amount_paid)}</span>
-                            </div>
-                            <div class="totals-row final">
-                                <span>Total Paid:</span>
-                                <span class="final-amount">${formatCurrency(pay.amount_paid)}</span>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="footer">
-                        Thank you for your business! This is an official system-generated service invoice statement.
-                    </div>
-                </div>
-
-                <script>
-                    window.onload = function() {
-                        window.print();
-                    };
-                </script>
-            </body>
-            </html>
-        `;
-
-        printWindow.document.write(invoiceHtml);
-        printWindow.document.close();
-    };
-
     return (
         <ClientPortalLayout client={client} breadcrumbs={breadcrumbs}>
             <Head title={`${service.service_name} | ${client.name}`} />
@@ -569,7 +381,7 @@ export default function ClientPortalServiceShow({ client, service, company }: Cl
                         <button
                             type="button"
                             onClick={() => setActiveTab('details')}
-                            className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${activeTab === 'details'
+                            className={`flex items-center gap-2 h-10 px-3 rounded-xl text-xs font-bold transition-all cursor-pointer ${activeTab === 'details'
                                 ? 'bg-gradient-to-r from-[#003796] via-[#0052D4] to-[#1d4ed8] text-white shadow-md shadow-blue-600/20'
                                 : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'
                                 }`}
@@ -579,23 +391,55 @@ export default function ClientPortalServiceShow({ client, service, company }: Cl
                         </button>
 
                         {/* TAB 2: Payments */}
-                        <button
-                            type="button"
-                            onClick={() => setActiveTab('payments')}
-                            className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${activeTab === 'payments'
-                                ? 'bg-gradient-to-r from-[#003796] via-[#0052D4] to-[#1d4ed8] text-white shadow-md shadow-blue-600/20'
-                                : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'
-                                }`}
-                        >
-                            <Receipt className="size-4" />
-                            <span>2. Payments ({paymentsList.length})</span>
-                        </button>
+                        {hasPermission(user, 'view-client-portal-service-payments') && (
+                            <button
+                                type="button"
+                                onClick={() => setActiveTab('payments')}
+                                className={`flex items-center gap-2 h-10 px-3 rounded-xl text-xs font-bold transition-all cursor-pointer ${activeTab === 'payments'
+                                    ? 'bg-gradient-to-r from-[#003796] via-[#0052D4] to-[#1d4ed8] text-white shadow-md shadow-blue-600/20'
+                                    : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'
+                                    }`}
+                            >
+                                <Receipt className="size-4" />
+                                <span>2. Payments ({paymentsList.length})</span>
+                            </button>
+                        )}
+
+                        {/* TAB 3: Credentials */}
+                        {hasPermission(user, 'view-client-portal-service-credentials') && (
+                            <button
+                                type="button"
+                                onClick={() => setActiveTab('credentials')}
+                                className={`flex items-center gap-2 h-10 px-3 rounded-xl text-xs font-bold transition-all cursor-pointer ${activeTab === 'credentials'
+                                    ? 'bg-gradient-to-r from-[#003796] via-[#0052D4] to-[#1d4ed8] text-white shadow-md shadow-blue-600/20'
+                                    : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'
+                                    }`}
+                            >
+                                <Key className="size-4" />
+                                <span>3. Credentials ({service.credentials?.length || 0})</span>
+                            </button>
+                        )}
+
+                        {/* TAB 4: Documents */}
+                        {hasPermission(user, 'view-client-portal-service-documents') && (
+                            <button
+                                type="button"
+                                onClick={() => setActiveTab('documents')}
+                                className={`flex items-center gap-2 h-10 px-3 rounded-xl text-xs font-bold transition-all cursor-pointer ${activeTab === 'documents'
+                                    ? 'bg-gradient-to-r from-[#003796] via-[#0052D4] to-[#1d4ed8] text-white shadow-md shadow-blue-600/20'
+                                    : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'
+                                    }`}
+                            >
+                                <FileText className="size-4" />
+                                <span>4. Documents ({service.documents?.length || 0})</span>
+                            </button>
+                        )}
                     </div>
 
                     {/* Right: Back Button */}
                     <Link
                         href="/client-portal/services"
-                        className="px-4 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 text-xs font-bold transition-all flex items-center justify-center gap-2 cursor-pointer shrink-0"
+                        className="h-10 px-4 rounded-xl bg-slate-200 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 text-xs font-bold transition-all flex items-center justify-center gap-2 cursor-pointer shrink-0"
                     >
                         <ArrowLeft className="size-4" />
                         <span>Back to Services</span>
@@ -811,14 +655,16 @@ export default function ClientPortalServiceShow({ client, service, company }: Cl
                                 <span>Monthly Billing & Payment History</span>
                             </h3>
 
-                            <button
-                                type="button"
-                                onClick={openGenerateModal}
-                                className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold transition-all shadow-md shadow-emerald-600/20 flex items-center gap-1.5 cursor-pointer"
-                            >
-                                <Plus className="size-4" />
-                                <span>Generate Monthly Bill</span>
-                            </button>
+                            {hasPermission(user, 'create-client-portal-service-payments') && (
+                                <button
+                                    type="button"
+                                    onClick={openGenerateModal}
+                                    className="h-10 px-3 rounded-xl bg-gradient-to-r from-[#003796] via-[#0052D4] to-[#1d4ed8] hover:opacity-95 text-white text-xs font-bold transition-all shadow-md shadow-blue-600/20 flex items-center gap-1.5 cursor-pointer"
+                                >
+                                    <Plus className="size-4" />
+                                    <span>Generate Monthly Bill</span>
+                                </button>
+                            )}
                         </div>
 
                         <div className="rounded-xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 overflow-hidden shadow-2xs w-full min-w-0">
@@ -856,7 +702,7 @@ export default function ClientPortalServiceShow({ client, service, company }: Cl
                                                                     : 'bg-amber-50 text-amber-700 dark:bg-amber-950/60 dark:text-amber-300 border border-amber-200 dark:border-amber-800'
                                                                 }`}
                                                         >
-                                                            {pay.status === 'paid' ? 'Paid / Cleared' : pay.status === 'overdue' ? 'Overdue' : 'Due Pending'}
+                                                            {pay.status === 'paid' ? 'Paid / Cleared' : pay.status === 'overdue' ? 'Overdue' : 'Due'}
                                                         </span>
                                                     </td>
                                                     <td className="px-2 py-4 text-slate-500 font-medium">
@@ -864,53 +710,54 @@ export default function ClientPortalServiceShow({ client, service, company }: Cl
                                                     </td>
                                                     <td className="px-2 py-4 text-right">
                                                         <div className="flex items-center justify-end gap-1.5">
-                                                            {/* Printable Invoice */}
-                                                            <button
-                                                                type="button"
-                                                                onClick={() => handlePrintInvoice(pay)}
-                                                                className="h-8 px-2.5 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-blue-600 hover:text-white transition-all font-bold text-[11px] inline-flex items-center gap-1.5 cursor-pointer"
-                                                                title="View / Print Dedicated Statement Invoice"
-                                                            >
-                                                                <Printer className="size-3.5" />
-                                                                <span>Print</span>
-                                                            </button>
-
-                                                            {/* Mark Paid Button */}
-                                                            {pay.status !== 'paid' ? (
-                                                                <button
-                                                                    type="button"
-                                                                    onClick={() => setMarkingPaidPayment(pay)}
-                                                                    className="h-8 px-3 rounded-xl bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-600 hover:text-white transition-all font-extrabold text-[11px] inline-flex items-center gap-1 cursor-pointer border border-emerald-200/80 dark:border-emerald-800"
-                                                                    title="Mark payment as Paid"
-                                                                >
-                                                                    <CheckCircle2 className="size-3.5" />
-                                                                    <span>Mark Paid</span>
-                                                                </button>
+                                                            {/* GENERATE OR PRINT INVOICE BUTTON */}
+                                                            {pay.invoice ? (
+                                                                hasPermission(user, 'print-client-portal-invoices') && (
+                                                                    <a
+                                                                        href={`/client-portal/invoices/${pay.invoice.id}/pdf`}
+                                                                        target="_blank"
+                                                                        rel="noopener noreferrer"
+                                                                        className="h-8 px-2.5 rounded-lg bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400 hover:bg-gradient-to-r hover:from-[#003796] hover:via-[#0052D4] hover:to-[#1d4ed8] hover:text-white text-xs font-bold inline-flex items-center gap-1.5 transition-all cursor-pointer border border-blue-200/50 hover:border-transparent"
+                                                                        title="Open & Print Invoice PDF"
+                                                                    >
+                                                                        <Printer className="size-3.5" />
+                                                                        <span>Print</span>
+                                                                    </a>
+                                                                )
                                                             ) : (
-                                                                <span className="h-8 px-3 rounded-xl bg-emerald-100/70 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 font-extrabold text-[11px] inline-flex items-center gap-1 cursor-default border border-emerald-200 dark:border-emerald-800">
-                                                                    <CheckCircle2 className="size-3.5 text-emerald-600" />
-                                                                    <span>Paid</span>
-                                                                </span>
+                                                                hasPermission(user, 'create-client-portal-invoices') && (
+                                                                    <button
+                                                                        type="button"
+                                                                        onClick={() => setConfirmingInvoicePayment(pay)}
+                                                                        className="h-8 px-2.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-[11px] inline-flex items-center gap-1.5 cursor-pointer shadow-xs transition-all disabled:opacity-50"
+                                                                        title="Generate Invoice for this payment"
+                                                                    >
+                                                                        <FileText className="size-3.5" />
+                                                                        <span>Generate Invoice</span>
+                                                                    </button>
+                                                                )
                                                             )}
 
-                                                            {/* Delete Button (Disabled if Paid) */}
-                                                            {pay.status === 'paid' ? (
-                                                                <button
-                                                                    disabled
-                                                                    className="size-8 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-400 dark:text-slate-600 cursor-not-allowed flex items-center justify-center opacity-60"
-                                                                    title="Paid payment records cannot be deleted"
+                                                            {/* PROTECTION CHECK FOR GENERATED INVOICE OR PAID PAYMENTS */}
+                                                            {pay.invoice || pay.status === 'paid' ? (
+                                                                <span
+                                                                    className="px-2 py-1 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-400 dark:text-slate-500 text-[10px] font-bold inline-flex items-center gap-1 cursor-not-allowed"
+                                                                    title="Payments with generated invoice or paid status cannot be deleted"
                                                                 >
-                                                                    <Lock className="size-3.5" />
-                                                                </button>
+                                                                    <ShieldCheck className="size-3 text-emerald-500" />
+                                                                    <span>Locked</span>
+                                                                </span>
                                                             ) : (
-                                                                <button
-                                                                    type="button"
-                                                                    onClick={() => setDeletingPayment(pay)}
-                                                                    className="size-8 rounded-xl bg-rose-50 dark:bg-rose-950/40 text-rose-600 dark:text-rose-400 hover:bg-rose-600 hover:text-white transition-all flex items-center justify-center cursor-pointer"
-                                                                    title="Delete Payment Record"
-                                                                >
-                                                                    <Trash2 className="size-3.5" />
-                                                                </button>
+                                                                hasPermission(user, 'delete-client-portal-service-payments') && (
+                                                                    <button
+                                                                        type="button"
+                                                                        onClick={() => setDeletingPayment(pay)}
+                                                                        className="p-1.5 rounded-lg bg-rose-50 text-rose-600 dark:bg-rose-950/60 dark:text-rose-400 hover:bg-rose-600 hover:text-white transition-all cursor-pointer"
+                                                                        title="Delete Payment Record"
+                                                                    >
+                                                                        <Trash2 className="size-3.5" />
+                                                                    </button>
+                                                                )
                                                             )}
                                                         </div>
                                                     </td>
@@ -928,6 +775,128 @@ export default function ClientPortalServiceShow({ client, service, company }: Cl
                             </div>
                         </div>
                     </div>
+                )}
+
+                {/* 4. TAB 3 CONTENT: CREDENTIALS */}
+                {activeTab === 'credentials' && (
+                    <div className="space-y-4">
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 rounded-xl bg-white dark:bg-slate-900 border border-slate-200/90 dark:border-slate-800 shadow-xs">
+                            <div>
+                                <h3 className="text-base font-extrabold text-slate-900 dark:text-white">
+                                    Service Credentials & Access Logins ({service.credentials?.length || 0})
+                                </h3>
+                                <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                                    Hosting, CMS, Database, Domain, and API access notes for {service.service_name}.
+                                </p>
+                            </div>
+
+                            {hasPermission(user, 'create-client-portal-service-credentials') && (
+                                <button
+                                    type="button"
+                                    onClick={openCreateCredModal}
+                                    className="h-10 px-3 rounded-xl bg-gradient-to-r from-[#003796] via-[#0052D4] to-[#1d4ed8] text-white text-xs font-bold shadow-md shadow-blue-600/20 inline-flex items-center gap-2 cursor-pointer self-start sm:self-auto"
+                                >
+                                    <Plus className="size-4" />
+                                    <span>Add Service Credential</span>
+                                </button>
+                            )}
+                        </div>
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                            {service.credentials && service.credentials.length > 0 ? (
+                                service.credentials.map((cred) => {
+                                    const fullContent =
+                                        cred.notes ||
+                                        [
+                                            cred.username ? `Username: ${cred.username}` : '',
+                                            cred.password ? `Password: ${cred.password}` : '',
+                                            cred.url ? `URL: ${cred.url}` : '',
+                                        ]
+                                            .filter(Boolean)
+                                            .join('\n');
+
+                                    return (
+                                        <div
+                                            key={cred.id}
+                                            className="p-4 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/90 dark:border-slate-800 shadow-xs space-y-4 flex flex-col justify-between"
+                                        >
+                                            <div className="space-y-3">
+                                                <div className="flex items-center justify-between gap-2 border-b border-slate-100 dark:border-slate-800 pb-3">
+                                                    <div className="flex items-center gap-2.5">
+                                                        <div className="p-2.5 rounded-xl bg-indigo-50 dark:bg-indigo-950 text-indigo-600 dark:text-indigo-400">
+                                                            <Key className="size-4" />
+                                                        </div>
+                                                        <div>
+                                                            <h4 className="font-extrabold text-slate-900 dark:text-white text-sm">
+                                                                {cred.title}
+                                                            </h4>
+                                                        </div>
+                                                    </div>
+
+                                                    <div className="flex items-center gap-1.5">
+                                                        {fullContent && (
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => handleCopy(fullContent, `cred-${cred.id}`)}
+                                                                className="h-8 px-2.5 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 hover:bg-blue-50 dark:hover:bg-blue-950 hover:text-blue-600 transition-all font-bold text-[11px] inline-flex items-center gap-1.5 cursor-pointer"
+                                                                title="Copy All Credentials"
+                                                            >
+                                                                {copiedId === `cred-${cred.id}` ? (
+                                                                    <span className="text-[10px] font-bold text-emerald-600">Copied!</span>
+                                                                ) : (
+                                                                    <>
+                                                                        <Copy className="size-3.5" />
+                                                                        <span>Copy</span>
+                                                                    </>
+                                                                )}
+                                                            </button>
+                                                        )}
+                                                        {hasPermission(user, 'edit-client-portal-service-credentials') && (
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => openEditCredModal(cred)}
+                                                                className="p-1.5 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 transition-all cursor-pointer"
+                                                                title="Edit Credential"
+                                                            >
+                                                                <Edit2 className="size-3.5" />
+                                                            </button>
+                                                        )}
+                                                        {hasPermission(user, 'delete-client-portal-service-credentials') && (
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => setDeletingCred(cred)}
+                                                                className="p-1.5 rounded-lg bg-rose-50 text-rose-600 dark:bg-rose-950/60 dark:text-rose-400 hover:bg-rose-600 hover:text-white transition-all cursor-pointer"
+                                                                title="Delete Credential"
+                                                            >
+                                                                <Trash2 className="size-3.5" />
+                                                            </button>
+                                                        )}
+                                                    </div>
+                                                </div>
+
+                                                <div className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-950 border border-slate-200/80 dark:border-slate-800 font-mono text-xs text-slate-800 dark:text-slate-200 whitespace-pre-wrap break-words leading-relaxed max-h-60 overflow-y-auto">
+                                                    {fullContent || <span className="text-slate-400 italic font-sans">No credentials text stored.</span>}
+                                                </div>
+                                            </div>
+                                        </div>
+                                    );
+                                })
+                            ) : (
+                                <div className="col-span-full p-12 text-center bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 text-slate-400 italic text-sm">
+                                    No credentials linked to this service yet. Click "Add Service Credential" to store logins.
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                )}
+
+                {/* 5. TAB 4 CONTENT: DOCUMENTS */}
+                {activeTab === 'documents' && (
+                    <DocumentsTab
+                        documents={service.documents || []}
+                        uploadUrl={`/client-portal/services/${service.id}/documents/store`}
+                        deleteUrlPrefix={`/client-portal/services/${service.id}/documents/destroy`}
+                    />
                 )}
             </div>
 
@@ -973,14 +942,14 @@ export default function ClientPortalServiceShow({ client, service, company }: Cl
                                 <button
                                     type="button"
                                     onClick={() => setIsGenerateModalOpen(false)}
-                                    className="px-4 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 text-slate-700 dark:text-slate-300 text-xs font-bold transition-all cursor-pointer"
+                                    className="h-10 px-3 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 text-slate-700 dark:text-slate-300 text-xs font-bold transition-all cursor-pointer"
                                 >
                                     Cancel
                                 </button>
                                 <button
                                     type="submit"
                                     disabled={isGenerating}
-                                    className="px-5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold transition-all shadow-md shadow-emerald-600/20 flex items-center gap-2 cursor-pointer disabled:opacity-50"
+                                    className="h-10 px-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold transition-all shadow-md shadow-emerald-600/20 flex items-center gap-2 cursor-pointer disabled:opacity-50"
                                 >
                                     {isGenerating ? (
                                         <>
@@ -997,77 +966,36 @@ export default function ClientPortalServiceShow({ client, service, company }: Cl
                 </div>
             )}
 
-            {/* MARK PAID CONFIRMATION MODAL */}
-            {markingPaidPayment && (
-                <div className="fixed inset-0 z-50 bg-slate-950/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
-                    <div className="bg-white dark:bg-slate-900 rounded-3xl p-4 sm:p-6 max-w-md w-full max-h-[90vh] my-auto overflow-y-auto border border-slate-200 dark:border-slate-800 shadow-2xl space-y-4">
-                        <div className="flex items-center gap-3">
-                            <div className="p-3 rounded-2xl bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400 shrink-0">
-                                <CheckCircle2 className="size-6" />
-                            </div>
-                            <div>
-                                <h3 className="font-extrabold text-slate-900 dark:text-white text-base">Mark Payment as Paid</h3>
-                                <p className="text-xs text-slate-500 font-medium">Confirm payment settlement</p>
-                            </div>
-                        </div>
-
-                        <p className="text-xs text-slate-600 dark:text-slate-400 leading-relaxed">
-                            Are you sure you want to mark billing payment of <strong className="text-emerald-600 dark:text-emerald-400 font-mono font-bold">{formatCurrency(markingPaidPayment.amount_due)}</strong> for <strong className="text-slate-900 dark:text-white font-mono font-bold">{markingPaidPayment.billing_month}</strong> as <strong>Paid / Cleared</strong>?
-                        </p>
-
-                        <div className="flex items-center justify-end gap-3 pt-2">
-                            <button
-                                type="button"
-                                onClick={() => setMarkingPaidPayment(null)}
-                                disabled={isMarkingPaid}
-                                className="px-4 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 text-slate-700 dark:text-slate-300 text-xs font-bold transition-all cursor-pointer"
-                            >
-                                Cancel
-                            </button>
-                            <button
-                                type="button"
-                                onClick={handleConfirmMarkPaid}
-                                disabled={isMarkingPaid}
-                                className="px-5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold transition-all shadow-md shadow-emerald-600/20 flex items-center gap-2 cursor-pointer disabled:opacity-50"
-                            >
-                                {isMarkingPaid ? (
-                                    <>
-                                        <LoaderCircle className="size-4 animate-spin" />
-                                        <span>Updating...</span>
-                                    </>
-                                ) : (
-                                    <span>Confirm & Mark Paid</span>
-                                )}
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            )}
 
             {/* DELETE PAYMENT CONFIRMATION MODAL */}
             {deletingPayment && (
-                <div className="fixed inset-0 z-50 bg-slate-950/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
-                    <div className="bg-white dark:bg-slate-900 rounded-3xl p-4 sm:p-6 max-w-md w-full max-h-[90vh] my-auto overflow-y-auto border border-slate-200 dark:border-slate-800 shadow-2xl space-y-4">
-                        <div className="flex items-center gap-3">
-                            <div className="p-3 rounded-2xl bg-rose-50 dark:bg-rose-950/60 text-rose-600 dark:text-rose-400 shrink-0">
-                                <AlertTriangle className="size-6" />
-                            </div>
-                            <div>
-                                <h3 className="font-extrabold text-slate-900 dark:text-white text-base">Delete Payment Record</h3>
-                                <p className="text-xs text-slate-500 font-medium">This action cannot be undone.</p>
-                            </div>
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-900/60 backdrop-blur-xs overflow-y-auto">
+                    <div className="w-full max-w-md max-h-[90vh] my-auto overflow-y-auto rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-4 sm:p-6 shadow-2xl space-y-4 text-center animate-in fade-in zoom-in-95 duration-200 relative">
+                        <button
+                            type="button"
+                            onClick={() => setDeletingPayment(null)}
+                            className="absolute top-4 right-4 size-8 rounded-xl text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-all flex items-center justify-center cursor-pointer"
+                        >
+                            <X className="size-4" />
+                        </button>
+
+                        <div className="size-12 rounded-2xl bg-rose-50 dark:bg-rose-950/60 text-rose-600 dark:text-rose-400 mx-auto flex items-center justify-center">
+                            <AlertTriangle className="size-6" />
                         </div>
 
-                        <p className="text-xs text-slate-600 dark:text-slate-400 leading-relaxed">
-                            Are you sure you want to delete payment log for <strong className="text-slate-900 dark:text-white">{deletingPayment.billing_month}</strong>?
-                        </p>
+                        <div className="space-y-1">
+                            <h3 className="text-base font-black text-slate-900 dark:text-white">Delete Payment Record?</h3>
+                            <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
+                                Are you sure you want to delete payment log for <strong className="text-slate-900 dark:text-white">"{deletingPayment.billing_month}"</strong>?
+                            </p>
+                        </div>
 
-                        <div className="flex items-center justify-end gap-3 pt-2">
+                        <div className="flex items-center justify-center gap-3 pt-2 border-t border-slate-100 dark:border-slate-800">
                             <button
                                 type="button"
                                 onClick={() => setDeletingPayment(null)}
                                 disabled={isDeletingPayment}
-                                className="px-4 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 text-slate-700 dark:text-slate-300 text-xs font-bold transition-all cursor-pointer"
+                                className="h-10 px-3 rounded-xl border border-slate-200 dark:border-slate-800 text-xs font-bold text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none cursor-pointer"
                             >
                                 Cancel
                             </button>
@@ -1075,7 +1003,7 @@ export default function ClientPortalServiceShow({ client, service, company }: Cl
                                 type="button"
                                 onClick={handleDeletePayment}
                                 disabled={isDeletingPayment}
-                                className="px-5 py-2 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold transition-all shadow-md shadow-rose-600/20 flex items-center gap-2 cursor-pointer disabled:opacity-50"
+                                className="h-10 px-3 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold shadow-md shadow-rose-600/20 active:scale-[0.99] transition-all inline-flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none cursor-pointer"
                             >
                                 {isDeletingPayment ? (
                                     <>
@@ -1085,6 +1013,184 @@ export default function ClientPortalServiceShow({ client, service, company }: Cl
                                 ) : (
                                     <span>Delete Record</span>
                                 )}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* GENERATE OFFICIAL INVOICE CONFIRMATION MODAL */}
+            {confirmingInvoicePayment && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-900/60 backdrop-blur-xs overflow-y-auto">
+                    <div className="w-full max-w-md max-h-[90vh] my-auto overflow-y-auto rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-4 sm:p-6 shadow-2xl space-y-4 text-center animate-in fade-in zoom-in-95 duration-200 relative">
+                        <button
+                            type="button"
+                            onClick={() => setConfirmingInvoicePayment(null)}
+                            className="absolute top-4 right-4 size-8 rounded-xl text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-all flex items-center justify-center cursor-pointer"
+                        >
+                            <X className="size-4" />
+                        </button>
+
+                        <div className="size-12 rounded-2xl bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400 mx-auto flex items-center justify-center">
+                            <FileText className="size-6" />
+                        </div>
+
+                        <div className="space-y-1">
+                            <h3 className="text-base font-black text-slate-900 dark:text-white">Generate Invoice Confirmation</h3>
+                            <p className="text-xs text-slate-500 dark:text-slate-400">
+                                Are you sure you want to generate an official invoice for service billing <strong>"{service.service_name} ({confirmingInvoicePayment.billing_month})"</strong> ({formatCurrency(confirmingInvoicePayment.amount_due)})?
+                            </p>
+                            <p className="text-[11px] text-amber-600 dark:text-amber-400 font-semibold mt-2">
+                                Note: Once generated, this payment record will be locked from deletion.
+                            </p>
+                        </div>
+
+                        <div className="flex items-center justify-center gap-3 pt-2 border-t border-slate-100 dark:border-slate-800">
+                            <button
+                                type="button"
+                                onClick={() => setConfirmingInvoicePayment(null)}
+                                disabled={isGeneratingInvoice}
+                                className="h-10 px-3 rounded-xl border border-slate-200 dark:border-slate-800 text-xs font-bold text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none cursor-pointer"
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                type="button"
+                                onClick={handleGenerateInvoiceSubmit}
+                                disabled={isGeneratingInvoice}
+                                className="h-10 px-3 rounded-xl bg-gradient-to-r from-[#003796] via-[#0052D4] to-[#1d4ed8] hover:opacity-95 text-white text-xs font-bold inline-flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none shadow-md shadow-blue-600/20 cursor-pointer"
+                            >
+                                {isGeneratingInvoice && <LoaderCircle className="size-4 animate-spin" />}
+                                <span>Yes, Generate Invoice</span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* CREATE / EDIT CREDENTIAL MODAL */}
+            {isCredModalOpen && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-900/60 backdrop-blur-xs overflow-y-auto">
+                    <div className="w-full max-w-lg max-h-[90vh] my-auto overflow-y-auto rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-4 sm:p-6 shadow-2xl space-y-4 animate-in fade-in zoom-in-95 duration-200">
+                        <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-3">
+                            <div className="flex items-center gap-2.5">
+                                <div className="p-2.5 rounded-xl bg-indigo-50 dark:bg-indigo-950 text-indigo-600 dark:text-indigo-400">
+                                    <Key className="size-5" />
+                                </div>
+                                <div>
+                                    <h3 className="text-base font-extrabold text-slate-900 dark:text-white">
+                                        {editingCred ? 'Edit Service Credential' : 'Add New Service Credential'}
+                                    </h3>
+                                    <p className="text-xs text-slate-400 font-medium">Copy & paste login details or access notes</p>
+                                </div>
+                            </div>
+                            <button
+                                type="button"
+                                onClick={closeCredModal}
+                                className="size-8 rounded-xl text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-all flex items-center justify-center cursor-pointer"
+                            >
+                                <X className="size-4" />
+                            </button>
+                        </div>
+
+                        <form noValidate onSubmit={handleSaveCredential} className="space-y-4">
+                            <div className="space-y-1.5">
+                                <label className="text-xs font-bold text-slate-700 dark:text-slate-300">Credential Title *</label>
+                                <input
+                                    type="text"
+                                    value={credData.title}
+                                    onChange={(e) => {
+                                        setCredData('title', e.target.value);
+                                        if (credErrors.title) clearCredErrors('title');
+                                    }}
+                                    placeholder="e.g. cPanel & Database Logins / WordPress Admin"
+                                    className={`w-full h-11 px-4 rounded-xl bg-slate-50 dark:bg-slate-950 border text-xs font-medium focus:ring-2 focus:ring-blue-500 focus:outline-none ${credErrors.title ? 'border-rose-500 text-rose-600' : 'border-slate-200 dark:border-slate-800'
+                                        }`}
+                                />
+                                {credErrors.title && (
+                                    <p className="text-[11px] font-bold text-rose-600 dark:text-rose-400 mt-1">{credErrors.title}</p>
+                                )}
+                            </div>
+
+                            <div className="space-y-1.5">
+                                <label className="text-xs font-bold text-slate-700 dark:text-slate-300">Credentials Details / Copy-Paste Text</label>
+                                <textarea
+                                    rows={8}
+                                    value={credData.notes}
+                                    onChange={(e) => {
+                                        setCredData('notes', e.target.value);
+                                        if (credErrors.notes) clearCredErrors('notes');
+                                    }}
+                                    placeholder="Paste all credentials here...&#10;e.g.&#10;URL: https://example.com/cpanel&#10;Username: admin&#10;Password: supersecretpass&#10;Database: db_name"
+                                    className={`w-full p-4 rounded-xl bg-slate-50 dark:bg-slate-950 border font-mono text-xs leading-relaxed focus:ring-2 focus:ring-blue-500 focus:outline-none ${credErrors.notes ? 'border-rose-500 text-rose-600' : 'border-slate-200 dark:border-slate-800'
+                                        }`}
+                                />
+                                {credErrors.notes && (
+                                    <p className="text-[11px] font-bold text-rose-600 dark:text-rose-400 mt-1">{credErrors.notes}</p>
+                                )}
+                            </div>
+
+                            <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-100 dark:border-slate-800">
+                                <button
+                                    type="button"
+                                    onClick={closeCredModal}
+                                    disabled={isSavingCred}
+                                    className="h-10 px-3 rounded-xl border border-slate-200 dark:border-slate-800 text-xs font-bold text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                                >
+                                    Cancel
+                                </button>
+                                <button
+                                    type="submit"
+                                    disabled={isSavingCred}
+                                    className="h-10 px-3 rounded-xl bg-gradient-to-r from-[#003796] via-[#0052D4] to-[#1d4ed8] text-white text-xs font-bold shadow-md shadow-blue-600/20 inline-flex items-center gap-2 cursor-pointer hover:opacity-95 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                                >
+                                    {isSavingCred && <LoaderCircle className="size-4 animate-spin" />}
+                                    <span>{editingCred ? 'Update Credential' : 'Save Credential'}</span>
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            )}
+
+            {/* DELETE CREDENTIAL MODAL */}
+            {deletingCred && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-900/60 backdrop-blur-xs overflow-y-auto">
+                    <div className="w-full max-w-md max-h-[90vh] my-auto overflow-y-auto rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-4 sm:p-6 shadow-2xl space-y-4 text-center animate-in fade-in zoom-in-95 duration-200 relative">
+                        <button
+                            type="button"
+                            onClick={() => setDeletingCred(null)}
+                            className="absolute top-4 right-4 size-8 rounded-xl text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-all flex items-center justify-center cursor-pointer"
+                        >
+                            <X className="size-4" />
+                        </button>
+
+                        <div className="size-12 rounded-2xl bg-rose-50 dark:bg-rose-950/60 text-rose-600 dark:text-rose-400 flex items-center justify-center mx-auto">
+                            <Trash2 className="size-6" />
+                        </div>
+                        <div>
+                            <h3 className="text-base font-extrabold text-slate-900 dark:text-white">Delete Credential?</h3>
+                            <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+                                Are you sure you want to delete <strong className="text-slate-800 dark:text-slate-200">{deletingCred.title}</strong>? This action cannot be undone.
+                            </p>
+                        </div>
+                        <div className="flex items-center justify-center gap-3 pt-2 border-t border-slate-100 dark:border-slate-800">
+                            <button
+                                type="button"
+                                onClick={() => setDeletingCred(null)}
+                                disabled={isDeletingCred}
+                                className="h-10 px-3 rounded-xl border border-slate-200 dark:border-slate-800 text-xs font-bold text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-all disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none cursor-pointer"
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                type="button"
+                                onClick={handleDeleteCredential}
+                                disabled={isDeletingCred}
+                                className="h-10 px-3 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold shadow-md shadow-rose-600/20 active:scale-[0.99] transition-all flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none cursor-pointer"
+                            >
+                                {isDeletingCred && <LoaderCircle className="size-4 animate-spin" />}
+                                <span>{isDeletingCred ? 'Deleting...' : 'Confirm Delete'}</span>
                             </button>
                         </div>
                     </div>

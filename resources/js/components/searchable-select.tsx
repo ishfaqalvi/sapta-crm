@@ -15,8 +15,11 @@ interface SearchableSelectProps {
     placeholder?: string;
     searchPlaceholder?: string;
     className?: string;
+    triggerClassName?: string;
     disabled?: boolean;
     required?: boolean;
+    hasError?: boolean;
+    error?: string | boolean;
     id?: string;
     name?: string;
 }
@@ -28,8 +31,11 @@ export default function SearchableSelect({
     placeholder = 'Select option...',
     searchPlaceholder = 'Search...',
     className = '',
+    triggerClassName = '',
     disabled = false,
     required = false,
+    hasError = false,
+    error,
     id,
     name,
 }: SearchableSelectProps) {
@@ -38,6 +44,7 @@ export default function SearchableSelect({
     const containerRef = useRef<HTMLDivElement>(null);
     const searchInputRef = useRef<HTMLInputElement>(null);
 
+    const isError = Boolean(hasError || error);
     const selectedOption = options.find((opt) => String(opt.value) === String(value));
 
     const filteredOptions = options.filter((opt) => {
@@ -66,9 +73,11 @@ export default function SearchableSelect({
         }
     }, [isOpen]);
 
-    const handleSelect = (val: string | number) => {
+    const handleSelect = (val: string | number, isOptionDisabled?: boolean) => {
+        if (isOptionDisabled) return;
         onChange(String(val));
         setIsOpen(false);
+        setSearchTerm('');
     };
 
     return (
@@ -79,42 +88,37 @@ export default function SearchableSelect({
             {/* Select Trigger Button */}
             <button
                 type="button"
+                id={id}
+                name={name}
                 disabled={disabled}
-                onClick={() => setIsOpen((prev) => !prev)}
-                className={`w-full flex items-center justify-between gap-2 px-3.5 h-10 text-xs sm:text-sm rounded-xl border bg-slate-50/50 dark:bg-slate-950 text-left transition-all ${
-                    isOpen
-                        ? 'border-blue-500 ring-1 ring-blue-500 bg-white dark:bg-slate-900'
-                        : 'border-slate-200 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700'
-                } ${disabled ? 'opacity-50 cursor-not-allowed bg-slate-100 dark:bg-slate-900' : 'cursor-pointer'}`}
+                onClick={() => setIsOpen(!isOpen)}
+                className={`w-full flex items-center justify-between px-3.5 h-10 text-xs rounded-xl bg-slate-50 dark:bg-slate-950 text-left font-semibold transition-all focus:outline-hidden ${
+                    isError
+                        ? 'border border-rose-500 focus:ring-2 focus:ring-rose-500/20'
+                        : 'border border-slate-200 dark:border-slate-800 focus:border-blue-600 focus:ring-2 focus:ring-blue-600/10 hover:border-slate-300 dark:hover:border-slate-700'
+                } ${
+                    disabled ? 'opacity-60 cursor-not-allowed bg-slate-100 dark:bg-slate-900' : 'cursor-pointer'
+                } ${triggerClassName}`}
             >
-                <div className="truncate flex-1">
+                <div className="truncate pr-2">
                     {selectedOption ? (
-                        <div className="flex items-center gap-1.5 truncate">
-                            <span className="font-semibold text-slate-900 dark:text-white truncate">
-                                {selectedOption.label}
-                            </span>
+                        <div className="flex flex-col">
+                            <span className="text-slate-900 dark:text-white font-bold truncate">{selectedOption.label}</span>
                             {selectedOption.subLabel && (
-                                <span className="text-slate-400 dark:text-slate-500 text-xs font-normal truncate">
-                                    ({selectedOption.subLabel})
-                                </span>
+                                <span className="text-[10px] text-slate-400 font-normal truncate">{selectedOption.subLabel}</span>
                             )}
                         </div>
                     ) : (
-                        <span className="text-slate-400 dark:text-slate-500">{placeholder}</span>
+                        <span className="text-slate-400 font-normal">{placeholder}</span>
                     )}
                 </div>
-
-                <ChevronDown
-                    className={`size-4 text-slate-400 shrink-0 transition-transform duration-200 ${
-                        isOpen ? 'rotate-180 text-blue-600' : ''
-                    }`}
-                />
+                <ChevronDown className={`size-4 text-slate-400 shrink-0 transition-transform duration-200 ${isOpen ? 'rotate-180 text-blue-600' : ''}`} />
             </button>
 
-            {/* Dropdown Popover */}
+            {/* Dropdown Menu */}
             {isOpen && (
-                <div className="absolute z-50 left-0 right-0 mt-1.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-xl overflow-hidden animate-in fade-in zoom-in-95 duration-150">
-                    {/* Search Input Box */}
+                <div className="absolute left-0 right-0 top-full mt-1.5 z-50 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-xl overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+                    {/* Search Field */}
                     <div className="p-2 border-b border-slate-100 dark:border-slate-800">
                         <div className="relative flex items-center">
                             <Search className="absolute left-3 size-3.5 text-slate-400" />
@@ -150,22 +154,22 @@ export default function SearchableSelect({
                                         key={String(option.value)}
                                         type="button"
                                         disabled={option.disabled}
-                                        onClick={() => handleSelect(option.value)}
+                                        onClick={() => handleSelect(option.value, option.disabled)}
                                         className={`w-full flex items-center justify-between px-3 py-2 text-xs rounded-xl text-left transition-all ${
-                                            isSelected
-                                                ? 'bg-blue-50 dark:bg-blue-950/60 text-blue-700 dark:text-blue-300 font-bold'
-                                                : 'text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800/80 font-medium'
+                                            option.disabled
+                                                ? 'opacity-50 cursor-not-allowed text-slate-400 bg-slate-50/60 dark:bg-slate-900/40 select-none'
+                                                : isSelected
+                                                ? 'bg-blue-50 dark:bg-blue-950/60 text-blue-700 dark:text-blue-300 font-bold cursor-pointer'
+                                                : 'text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800/80 font-medium cursor-pointer'
                                         }`}
                                     >
                                         <div className="truncate flex-1 pr-2">
-                                            <div className="truncate font-medium">{option.label}</div>
+                                            <div className="truncate font-semibold">{option.label}</div>
                                             {option.subLabel && (
-                                                <div className="text-[10px] text-slate-400 dark:text-slate-500 truncate font-normal">
-                                                    {option.subLabel}
-                                                </div>
+                                                <div className="text-[10px] text-slate-400 truncate mt-0.5 font-normal">{option.subLabel}</div>
                                             )}
                                         </div>
-                                        {isSelected && <Check className="size-4 text-blue-600 dark:text-blue-400 shrink-0" />}
+                                        {isSelected && <Check className="size-3.5 text-blue-600 dark:text-blue-400 shrink-0 stroke-[3]" />}
                                     </button>
                                 );
                             })

@@ -98,7 +98,7 @@ export default function ClientPortalProjectsCreate({
 
                     <Link
                         href="/client-portal/projects"
-                        className="px-4 py-2.5 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 text-xs font-bold transition-all flex items-center gap-2 self-start sm:self-auto"
+                        className="h-10 px-3 py-2.5 rounded-xl bg-slate-200 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 text-xs font-bold transition-all flex items-center gap-2 self-start sm:self-auto"
                     >
                         <ArrowLeft className="size-4" />
                         <span>Back to Projects</span>
@@ -150,29 +150,30 @@ export default function ClientPortalProjectsCreate({
                                     placeholder="Select Project Category..."
                                     searchPlaceholder="Search project categories..."
                                     required={true}
+                                    hasError={Boolean(errors.category_id)}
                                 />
                                 {errors.category_id && <p className="text-rose-500 text-xs font-medium mt-1.5">{errors.category_id}</p>}
                             </div>
                         </div>
                     </div>
 
-                    {/* Section 2: Contract Budget & Billing Currency */}
+                    {/* Section 2: Financial Budget & Project Timeline */}
                     <div className="space-y-4">
                         <div className="flex items-center gap-2.5 pb-3 border-b border-slate-100 dark:border-slate-800">
                             <div className="p-2 rounded-xl bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400">
                                 <DollarSign className="size-4" />
                             </div>
                             <div>
-                                <h2 className="text-sm font-extrabold text-slate-900 dark:text-white">Financial & Contract Budget</h2>
-                                <p className="text-[11px] text-slate-400 font-medium">Contract value and billing currency configuration</p>
+                                <h2 className="text-sm font-extrabold text-slate-900 dark:text-white">Financial Budget & Project Timeline</h2>
+                                <p className="text-[11px] text-slate-400 font-medium">Contract value ({client.currency}) and project delivery schedule</p>
                             </div>
                         </div>
 
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-2">
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 pt-2">
                             {/* Budget Amount */}
                             <div>
                                 <label className="block text-xs font-extrabold text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-2">
-                                    Total Contract Budget <span className="text-rose-500">*</span>
+                                    Total Contract Budget ({client.currency}) <span className="text-rose-500">*</span>
                                 </label>
                                 <div className="relative">
                                     <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-slate-400" />
@@ -191,46 +192,7 @@ export default function ClientPortalProjectsCreate({
                                 {errors.total_budget && <p className="text-rose-500 text-xs font-medium mt-1.5">{errors.total_budget}</p>}
                             </div>
 
-                            {/* Currency Selection */}
-                            <div>
-                                <label className="block text-xs font-extrabold text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-2">
-                                    Billing Currency <span className="text-rose-500">*</span>
-                                </label>
-                                <div className="relative">
-                                    <Coins className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-slate-400" />
-                                    <select
-                                        value={data.currency}
-                                        onChange={(e) => setData('currency', e.target.value)}
-                                        className={`w-full h-10 pl-9 pr-4 rounded-xl bg-slate-50 dark:bg-slate-950 border text-xs font-semibold text-slate-700 dark:text-slate-300 focus:outline-none transition-all ${errors.currency
-                                            ? 'border-rose-500 focus:ring-2 focus:ring-rose-500/20'
-                                            : 'border-slate-200 dark:border-slate-800 focus:border-blue-600'
-                                            }`}
-                                    >
-                                        {currencies.map((c) => (
-                                            <option key={c.code} value={c.code}>
-                                                {c.code} - {c.name} ({c.symbol})
-                                            </option>
-                                        ))}
-                                    </select>
-                                </div>
-                                {errors.currency && <p className="text-rose-500 text-xs font-medium mt-1.5">{errors.currency}</p>}
-                            </div>
-                        </div>
-                    </div>
-
-                    {/* Section 3: Timeline & Dates */}
-                    <div className="space-y-4">
-                        <div className="flex items-center gap-2.5 pb-3 border-b border-slate-100 dark:border-slate-800">
-                            <div className="p-2 rounded-xl bg-purple-50 dark:bg-purple-950/60 text-purple-600 dark:text-purple-400">
-                                <Calendar className="size-4" />
-                            </div>
-                            <div>
-                                <h2 className="text-sm font-extrabold text-slate-900 dark:text-white">Timeline & Delivery Schedules</h2>
-                                <p className="text-[11px] text-slate-400 font-medium">Start date and estimated deadline</p>
-                            </div>
-                        </div>
-
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-2">
+                            {/* Project Start Date */}
                             <div>
                                 <label className="block text-xs font-extrabold text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-2">
                                     Project Start Date
@@ -247,6 +209,7 @@ export default function ClientPortalProjectsCreate({
                                 {errors.start_date && <p className="text-rose-500 text-xs font-medium mt-1.5">{errors.start_date}</p>}
                             </div>
 
+                            {/* Target Completion Deadline */}
                             <div>
                                 <label className="block text-xs font-extrabold text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-2">
                                     Target Completion Deadline

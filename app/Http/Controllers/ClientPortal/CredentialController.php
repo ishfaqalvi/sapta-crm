@@ -39,7 +39,7 @@ class CredentialController extends Controller
     }
 
     /**
-     * Display a listing of general credentials (where website_project_id is null) for the authenticated client.
+     * Display a listing of credentials for the authenticated client.
      */
     public function index(Request $request): Response
     {
@@ -49,7 +49,7 @@ class CredentialController extends Controller
         $client = $this->getClientModel();
 
         $query = ClientCredential::where('client_id', $clientId)
-            ->whereNull('website_project_id');
+            ->with(['project:id,project_name', 'service:id,service_name']);
 
         if ($request->filled('search')) {
             $search = $request->search;
@@ -57,7 +57,13 @@ class CredentialController extends Controller
                 $q->where('title', 'like', "%{$search}%")
                     ->orWhere('notes', 'like', "%{$search}%")
                     ->orWhere('username', 'like', "%{$search}%")
-                    ->orWhere('url', 'like', "%{$search}%");
+                    ->orWhere('url', 'like', "%{$search}%")
+                    ->orWhereHas('project', function ($pq) use ($search) {
+                        $pq->where('project_name', 'like', "%{$search}%");
+                    })
+                    ->orWhereHas('service', function ($sq) use ($search) {
+                        $sq->where('service_name', 'like', "%{$search}%");
+                    });
             });
         }
 
@@ -66,7 +72,7 @@ class CredentialController extends Controller
             ->withQueryString();
 
         $stats = [
-            'total' => ClientCredential::where('client_id', $clientId)->whereNull('website_project_id')->count(),
+            'total' => ClientCredential::where('client_id', $clientId)->count(),
         ];
 
         return Inertia::render('client-portal/credentials/index', [
@@ -78,7 +84,7 @@ class CredentialController extends Controller
     }
 
     /**
-     * Store a newly created general credential for the authenticated client.
+     * Store a newly created credential for the authenticated client.
      */
     public function store(Request $request): RedirectResponse
     {
@@ -89,6 +95,8 @@ class CredentialController extends Controller
         $validated = $request->validate([
             'title' => 'required|string|max:255',
             'type' => 'nullable|string|max:50',
+            'website_project_id' => 'nullable|exists:website_projects,id',
+            'client_service_id' => 'nullable|exists:client_services,id',
             'username' => 'nullable|string|max:255',
             'password' => 'nullable|string|max:500',
             'url' => 'nullable|string|max:500',
@@ -96,7 +104,6 @@ class CredentialController extends Controller
         ]);
 
         $validated['client_id'] = $clientId;
-        $validated['website_project_id'] = null;
         $validated['type'] = $validated['type'] ?? 'other';
 
         ClientCredential::create($validated);
@@ -120,6 +127,8 @@ class CredentialController extends Controller
         $validated = $request->validate([
             'title' => 'required|string|max:255',
             'type' => 'nullable|string|max:50',
+            'website_project_id' => 'nullable|exists:website_projects,id',
+            'client_service_id' => 'nullable|exists:client_services,id',
             'username' => 'nullable|string|max:255',
             'password' => 'nullable|string|max:500',
             'url' => 'nullable|string|max:500',

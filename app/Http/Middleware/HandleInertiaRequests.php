@@ -5,7 +5,6 @@ namespace App\Http\Middleware;
 use Illuminate\Foundation\Inspiring;
 use Illuminate\Http\Request;
 use Inertia\Middleware;
-use Illuminate\Support\Facades\Auth;
 
 class HandleInertiaRequests extends Middleware
 {
@@ -41,6 +40,32 @@ class HandleInertiaRequests extends Middleware
 
         $user = $request->user();
 
+        $unreadNotificationsCount = 0;
+        $recentNotifications = [];
+
+        if ($user) {
+            $unreadNotificationsCount = $user->unreadNotifications()->count();
+            $recentNotifications = $user->notifications()
+                ->latest()
+                ->take(8)
+                ->get()
+                ->map(function ($notification) {
+                    $data = is_array($notification->data) ? $notification->data : (json_decode($notification->data, true) ?: []);
+                    return [
+                        'id' => $notification->id,
+                        'title' => $data['title'] ?? 'System Notification',
+                        'message' => $data['message'] ?? '',
+                        'type' => $data['type'] ?? 'general',
+                        'severity' => $data['severity'] ?? 'info',
+                        'action_url' => $data['action_url'] ?? null,
+                        'metadata' => $data['metadata'] ?? [],
+                        'read_at' => $notification->read_at ? $notification->read_at->toIso8601String() : null,
+                        'created_at' => $notification->created_at ? $notification->created_at->toIso8601String() : null,
+                    ];
+                })
+                ->toArray();
+        }
+
         return array_merge(parent::share($request), [
             'name' => config('app.name'),
             'quote' => ['message' => trim($message), 'author' => trim($author)],
@@ -49,6 +74,8 @@ class HandleInertiaRequests extends Middleware
                     'roles' => $user->getRoleNames()->toArray(),
                     'permissions' => $user->getAllPermissions()->pluck('name')->toArray(),
                 ]) : null,
+                'unread_notifications_count' => $unreadNotificationsCount,
+                'recent_notifications' => $recentNotifications,
             ],
             'flash' => [
                 'success' => session('success') ?? session('status'),

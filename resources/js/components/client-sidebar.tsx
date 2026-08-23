@@ -1,6 +1,7 @@
 import { Sidebar, SidebarContent, SidebarFooter, SidebarHeader } from '@/components/ui/sidebar';
 import { hasPermission } from '@/utils/permissions';
 import { Link, usePage } from '@inertiajs/react';
+import { useEffect, useRef } from 'react';
 import {
     ArrowLeft,
     BarChart3,
@@ -11,6 +12,7 @@ import {
     LayoutDashboard,
     LineChart,
     LogOut,
+    Server,
     Sparkles,
 } from 'lucide-react';
 
@@ -33,6 +35,21 @@ export function ClientSidebar({ client, activeTab }: ClientSidebarProps) {
     const authUser = (page.props.auth as any)?.user;
     const isAdmin = authUser?.type === 'admin';
 
+    const activeRef = useRef<HTMLAnchorElement | null>(null);
+
+    useEffect(() => {
+        if (activeRef.current) {
+            const timer = setTimeout(() => {
+                activeRef.current?.scrollIntoView({
+                    behavior: 'smooth',
+                    block: 'center',
+                    inline: 'nearest',
+                });
+            }, 150);
+            return () => clearTimeout(timer);
+        }
+    }, [currentUrl, activeTab]);
+
     const navItems = [
         {
             id: 'overview',
@@ -40,7 +57,6 @@ export function ClientSidebar({ client, activeTab }: ClientSidebarProps) {
             icon: LayoutDashboard,
             description: 'Financials & Summary',
             href: '/client-portal/overview',
-            permission: 'view-client-portal-overview',
         },
         {
             id: 'projects',
@@ -57,6 +73,22 @@ export function ClientSidebar({ client, activeTab }: ClientSidebarProps) {
             description: 'Active Subscriptions',
             href: '/client-portal/services',
             permission: 'view-client-portal-services',
+        },
+        {
+            id: 'domains',
+            title: 'Domains & DNS',
+            icon: Globe,
+            description: 'Registrations & Expiries',
+            href: '/client-portal/domains',
+            permission: 'view-client-portal-domains',
+        },
+        {
+            id: 'hostings',
+            title: 'Web Hosting',
+            icon: Server,
+            description: 'Servers & Specs',
+            href: '/client-portal/hostings',
+            permission: 'view-client-portal-hostings',
         },
         {
             id: 'payments',
@@ -132,6 +164,7 @@ export function ClientSidebar({ client, activeTab }: ClientSidebarProps) {
 
                         return (
                             <Link
+                                ref={isActive ? activeRef : null}
                                 key={item.id}
                                 href={item.href}
                                 className={`flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all group relative ${isActive

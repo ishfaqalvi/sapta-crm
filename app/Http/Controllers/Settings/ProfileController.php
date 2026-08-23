@@ -91,6 +91,11 @@ class ProfileController extends Controller
         $validated = $request->validate([
             'current_password' => ['required', 'current_password'],
             'password' => ['required', Password::defaults(), 'confirmed'],
+        ], [
+            'current_password.required' => 'Please enter your current password.',
+            'current_password.current_password' => 'The provided current password does not match our records.',
+            'password.required' => 'Please enter a new password.',
+            'password.confirmed' => 'The new password confirmation does not match.',
         ]);
 
         $request->user()->update([

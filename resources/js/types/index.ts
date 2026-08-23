@@ -1,7 +1,21 @@
 import { LucideIcon } from 'lucide-react';
 
+export interface CrmNotificationItem {
+    id: string;
+    title: string;
+    message: string;
+    type: string;
+    severity: 'info' | 'success' | 'warning' | 'urgent';
+    action_url?: string | null;
+    metadata?: Record<string, any>;
+    read_at: string | null;
+    created_at: string;
+}
+
 export interface Auth {
     user: User;
+    unread_notifications_count?: number;
+    recent_notifications?: CrmNotificationItem[];
 }
 
 export interface BreadcrumbItem {

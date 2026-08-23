@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\MorphTo;
 
 class InvoiceItem extends Model
 {
@@ -16,6 +17,8 @@ class InvoiceItem extends Model
         'quantity',
         'unit_price',
         'amount',
+        'invoiceable_type',
+        'invoiceable_id',
     ];
 
     protected $casts = [
@@ -30,5 +33,13 @@ class InvoiceItem extends Model
     public function invoice(): BelongsTo
     {
         return $this->belongsTo(Invoice::class);
+    }
+
+    /**
+     * Polymorphic relation: InvoiceItem belongs to a ProjectPayment, ClientDomain, ClientHosting, etc.
+     */
+    public function invoiceable(): MorphTo
+    {
+        return $this->morphTo();
     }
 }

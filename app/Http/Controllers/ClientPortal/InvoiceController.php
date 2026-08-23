@@ -5,8 +5,14 @@ namespace App\Http\Controllers\ClientPortal;
 use App\Http\Controllers\Controller;
 use App\Models\Client;
 use App\Models\Currency;
+use App\Models\DomainPayment;
+use App\Models\HostingPayment;
 use App\Models\Invoice;
+use App\Models\InvoiceItem;
+use App\Models\ProjectPayment;
+use App\Models\ServicePayment;
 use App\Models\SystemSetting;
+use App\Services\CurrencyService;
 use App\Traits\AuthorizesClientPortalAccess;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\RedirectResponse;
@@ -79,7 +85,7 @@ class InvoiceController extends Controller
         $stats = [
             'total' => $allInvoices->count(),
             'paid_total' => $allInvoices->where('status', 'paid')->sum('total_amount'),
-            'pending_total' => $allInvoices->whereIn('status', ['draft', 'sent'])->sum('total_amount'),
+            'pending_total' => $allInvoices->whereIn('status', ['draft', 'sent', 'due'])->sum('total_amount'),
             'overdue_count' => $allInvoices->where('status', 'overdue')->count(),
         ];
 
@@ -101,11 +107,106 @@ class InvoiceController extends Controller
         $clientId = $this->getClientId();
         $client = $this->getClientModel();
 
-        $currencies = Currency::where('is_active', true)->select('code', 'name', 'symbol')->get();
+        $currencies = Currency::where('is_active', true)->select('code', 'name', 'symbol', 'exchange_rate_to_pkr')->get();
+
+        $pendingProjects = ProjectPayment::where('client_id', $clientId)
+            ->where('status', '!=', 'paid')
+            ->whereDoesntHave('invoiceItems')
+            ->with('websiteProject:id,project_title')
+            ->get()
+            ->map(function ($item) {
+                $projName = $item->websiteProject?->project_title ?? 'Website Project';
+                return [
+                    'id' => $item->id,
+                    'title' => "Project: {$projName} - {$item->milestone_title}",
+                    'subtitle' => $projName,
+                    'amount' => (float) $item->amount,
+                    'amount_pkr' => (float) $item->amount_pkr,
+                    'due_date' => $item->due_date ?? $item->paid_at ?? null,
+                    'category' => 'project',
+                    'category_label' => 'Project Milestone',
+                    'invoiceable_type' => ProjectPayment::class,
+                    'invoiceable_id' => $item->id,
+                ];
+            });
+
+        $pendingServices = ServicePayment::where('client_id', $clientId)
+            ->where('status', '!=', 'paid')
+            ->whereDoesntHave('invoiceItems')
+            ->with('service:id,service_name')
+            ->get()
+            ->map(function ($item) {
+                $serviceName = $item->service?->service_name ?? 'Service';
+                $period = $item->billing_period ?: ($item->billing_month ? date('M Y', strtotime($item->billing_month)) : 'Monthly Retainer');
+                return [
+                    'id' => $item->id,
+                    'title' => "Service: {$serviceName} ({$period})",
+                    'subtitle' => $serviceName,
+                    'amount' => (float) ($item->amount_due ?: $item->amount_paid ?: $item->amount),
+                    'amount_pkr' => (float) ($item->amount_paid_pkr ?: $item->amount_pkr),
+                    'due_date' => $item->payment_date ?? $item->due_date ?? null,
+                    'category' => 'service',
+                    'category_label' => 'Monthly Recurring Service',
+                    'invoiceable_type' => ServicePayment::class,
+                    'invoiceable_id' => $item->id,
+                ];
+            });
+
+        $pendingDomains = DomainPayment::where('client_id', $clientId)
+            ->where('status', '!=', 'paid')
+            ->whereDoesntHave('invoiceItems')
+            ->with('domain:id,domain_name')
+            ->get()
+            ->map(function ($item) {
+                $domainName = $item->domain?->domain_name ?? 'Domain';
+                $type = ucfirst(str_replace('_', ' ', $item->payment_type ?: 'renewal'));
+                return [
+                    'id' => $item->id,
+                    'title' => "Domain {$type}: {$domainName}",
+                    'subtitle' => $domainName,
+                    'amount' => (float) $item->amount,
+                    'amount_pkr' => (float) $item->amount_pkr,
+                    'due_date' => $item->due_date ?? null,
+                    'category' => 'domain',
+                    'category_label' => 'Domain Registration/Renewal',
+                    'invoiceable_type' => DomainPayment::class,
+                    'invoiceable_id' => $item->id,
+                ];
+            });
+
+        $pendingHostings = HostingPayment::where('client_id', $clientId)
+            ->where('status', '!=', 'paid')
+            ->whereDoesntHave('invoiceItems')
+            ->with(['hosting:id,hosting_title,billing_cycle,primary_domain_id', 'hosting.primaryDomain:id,domain_name'])
+            ->get()
+            ->map(function ($item) {
+                $hostingTitle = $item->hosting?->hosting_title ?? 'Web Hosting';
+                $domainName = $item->hosting?->primaryDomain?->domain_name;
+                $type = ucfirst(str_replace('_', ' ', $item->payment_type ?: 'subscription'));
+                $cycle = $item->hosting?->billing_cycle ? ' (' . ucfirst(str_replace('_', ' ', $item->hosting->billing_cycle)) . ')' : '';
+                $domainSuffix = $domainName ? " - {$domainName}" : '';
+                return [
+                    'id' => $item->id,
+                    'title' => "Hosting: {$hostingTitle}{$cycle}{$domainSuffix} - {$type}",
+                    'subtitle' => $hostingTitle,
+                    'amount' => (float) $item->amount,
+                    'amount_pkr' => (float) $item->amount_pkr,
+                    'due_date' => $item->due_date ?? null,
+                    'category' => 'hosting',
+                    'category_label' => 'Hosting Subscription/Renewal',
+                    'invoiceable_type' => HostingPayment::class,
+                    'invoiceable_id' => $item->id,
+                ];
+            });
 
         return Inertia::render('client-portal/invoices/create', [
             'client' => $client,
             'currencies' => $currencies,
+            'nextInvoiceNumber' => Invoice::generateNextInvoiceNumber(),
+            'pendingProjects' => $pendingProjects,
+            'pendingServices' => $pendingServices,
+            'pendingDomains' => $pendingDomains,
+            'pendingHostings' => $pendingHostings,
         ]);
     }
 
@@ -124,7 +225,7 @@ class InvoiceController extends Controller
 
         $client = $this->getClientModel();
 
-        $invoice->load(['client', 'items', 'websiteProject']);
+        $invoice->load(['client', 'items']);
 
         $companySettings = [
             'name' => SystemSetting::get('company_name', 'Sapta Technologies'),
@@ -145,7 +246,7 @@ class InvoiceController extends Controller
     /**
      * Show the form for editing an existing Invoice.
      */
-    public function edit(Invoice $invoice): Response
+    public function edit(Invoice $invoice): Response|RedirectResponse
     {
         $this->authorizePermission('edit-client-portal-invoices');
 
@@ -155,14 +256,155 @@ class InvoiceController extends Controller
             abort(403, 'Unauthorized access to Invoice');
         }
 
+        if ($invoice->status === 'paid') {
+            return redirect()->back()->with('error', 'Paid invoices cannot be edited.');
+        }
+
         $client = $this->getClientModel();
-        $invoice->load('items');
-        $currencies = Currency::where('is_active', true)->select('code', 'name', 'symbol')->get();
+        $invoice->load([
+            'items' => function ($q) {
+                $q->orderBy('id', 'asc');
+            }
+        ]);
+
+        // Enrich existing invoice items with category identifiers
+        $invoice->items->transform(function ($item) {
+            $category = 'manual';
+            $categoryLabel = 'Custom Item';
+
+            if ($item->invoiceable_type) {
+                if (str_contains($item->invoiceable_type, 'ProjectPayment') || str_contains($item->invoiceable_type, 'WebsiteProject')) {
+                    $category = 'project';
+                    $categoryLabel = 'Project Milestone';
+                } elseif (str_contains($item->invoiceable_type, 'ServicePayment') || str_contains($item->invoiceable_type, 'ClientService')) {
+                    $category = 'service';
+                    $categoryLabel = 'Monthly Service';
+                } elseif (str_contains($item->invoiceable_type, 'DomainPayment') || str_contains($item->invoiceable_type, 'ClientDomain')) {
+                    $category = 'domain';
+                    $categoryLabel = 'Domain Registration/Renewal';
+                } elseif (str_contains($item->invoiceable_type, 'HostingPayment') || str_contains($item->invoiceable_type, 'ClientHosting')) {
+                    $category = 'hosting';
+                    $categoryLabel = 'Hosting Renewal';
+                }
+            }
+
+            $item->category = $category;
+            $item->category_label = $categoryLabel;
+            return $item;
+        });
+
+        $currencies = Currency::where('is_active', true)->select('code', 'name', 'symbol', 'exchange_rate_to_pkr')->get();
+
+        $pendingProjects = ProjectPayment::where('client_id', $clientId)
+            ->where('status', '!=', 'paid')
+            ->where(function ($q) use ($invoice) {
+                $q->whereDoesntHave('invoiceItems')
+                    ->orWhereHas('invoiceItems', fn($iq) => $iq->where('invoice_id', $invoice->id));
+            })
+            ->with('websiteProject:id,project_title')
+            ->get()
+            ->map(function ($item) {
+                $projName = $item->websiteProject?->project_title ?? 'Website Project';
+                return [
+                    'id' => $item->id,
+                    'title' => "Project: {$projName} - {$item->milestone_title}",
+                    'subtitle' => $projName,
+                    'amount' => (float) $item->amount,
+                    'amount_pkr' => (float) $item->amount_pkr,
+                    'due_date' => $item->due_date ?? null,
+                    'category' => 'project',
+                    'category_label' => 'Project Milestone',
+                    'invoiceable_type' => ProjectPayment::class,
+                    'invoiceable_id' => $item->id,
+                ];
+            });
+
+        $pendingServices = ServicePayment::where('client_id', $clientId)
+            ->where('status', '!=', 'paid')
+            ->where(function ($q) use ($invoice) {
+                $q->whereDoesntHave('invoiceItems')
+                    ->orWhereHas('invoiceItems', fn($iq) => $iq->where('invoice_id', $invoice->id));
+            })
+            ->with('service:id,service_name')
+            ->get()
+            ->map(function ($item) {
+                $serviceName = $item->service?->service_name ?? 'Service';
+                $period = $item->billing_period ?: ($item->billing_month ? date('M Y', strtotime($item->billing_month)) : 'Monthly Retainer');
+                return [
+                    'id' => $item->id,
+                    'title' => "Service: {$serviceName} ({$period})",
+                    'subtitle' => $serviceName,
+                    'amount' => (float) ($item->amount_due ?: $item->amount_paid ?: $item->amount),
+                    'amount_pkr' => (float) ($item->amount_paid_pkr ?: $item->amount_pkr),
+                    'due_date' => $item->due_date ?? null,
+                    'category' => 'service',
+                    'category_label' => 'Monthly Recurring Service',
+                    'invoiceable_type' => ServicePayment::class,
+                    'invoiceable_id' => $item->id,
+                ];
+            });
+
+        $pendingDomains = DomainPayment::where('client_id', $clientId)
+            ->where('status', '!=', 'paid')
+            ->where(function ($q) use ($invoice) {
+                $q->whereDoesntHave('invoiceItems')
+                    ->orWhereHas('invoiceItems', fn($iq) => $iq->where('invoice_id', $invoice->id));
+            })
+            ->with('domain:id,domain_name')
+            ->get()
+            ->map(function ($item) {
+                $domainName = $item->domain?->domain_name ?? 'Domain';
+                $type = ucfirst(str_replace('_', ' ', $item->payment_type ?: 'renewal'));
+                return [
+                    'id' => $item->id,
+                    'title' => "Domain {$type}: {$domainName}",
+                    'subtitle' => $domainName,
+                    'amount' => (float) $item->amount,
+                    'amount_pkr' => (float) $item->amount_pkr,
+                    'due_date' => $item->due_date ?? null,
+                    'category' => 'domain',
+                    'category_label' => 'Domain Registration/Renewal',
+                    'invoiceable_type' => DomainPayment::class,
+                    'invoiceable_id' => $item->id,
+                ];
+            });
+
+        $pendingHostings = HostingPayment::where('client_id', $clientId)
+            ->where('status', '!=', 'paid')
+            ->where(function ($q) use ($invoice) {
+                $q->whereDoesntHave('invoiceItems')
+                    ->orWhereHas('invoiceItems', fn($iq) => $iq->where('invoice_id', $invoice->id));
+            })
+            ->with(['hosting:id,hosting_title,billing_cycle,primary_domain_id', 'hosting.primaryDomain:id,domain_name'])
+            ->get()
+            ->map(function ($item) {
+                $hostingTitle = $item->hosting?->hosting_title ?? 'Web Hosting';
+                $domainName = $item->hosting?->primaryDomain?->domain_name;
+                $type = ucfirst(str_replace('_', ' ', $item->payment_type ?: 'subscription'));
+                $cycle = $item->hosting?->billing_cycle ? ' (' . ucfirst(str_replace('_', ' ', $item->hosting->billing_cycle)) . ')' : '';
+                $domainSuffix = $domainName ? " - {$domainName}" : '';
+                return [
+                    'id' => $item->id,
+                    'title' => "Hosting: {$hostingTitle}{$cycle}{$domainSuffix} - {$type}",
+                    'subtitle' => $hostingTitle,
+                    'amount' => (float) $item->amount,
+                    'amount_pkr' => (float) $item->amount_pkr,
+                    'due_date' => $item->due_date ?? null,
+                    'category' => 'hosting',
+                    'category_label' => 'Hosting Subscription/Renewal',
+                    'invoiceable_type' => HostingPayment::class,
+                    'invoiceable_id' => $item->id,
+                ];
+            });
 
         return Inertia::render('client-portal/invoices/edit', [
             'client' => $client,
             'invoice' => $invoice,
             'currencies' => $currencies,
+            'pendingProjects' => $pendingProjects,
+            'pendingServices' => $pendingServices,
+            'pendingDomains' => $pendingDomains,
+            'pendingHostings' => $pendingHostings,
         ]);
     }
 
@@ -174,47 +416,75 @@ class InvoiceController extends Controller
         $this->authorizePermission('create-client-portal-invoices');
 
         $clientId = $this->getClientId();
+        $client = $this->getClientModel();
 
         $validated = $request->validate([
             'invoice_number' => 'required|string|max:100|unique:invoices,invoice_number',
-            'website_project_id' => 'nullable|exists:website_projects,id',
             'issue_date' => 'required|date',
             'due_date' => 'required|date',
-            'currency' => 'required|string|max:10',
-            'subtotal' => 'required|numeric|min:0',
-            'tax_amount' => 'nullable|numeric|min:0',
-            'total_amount' => 'required|numeric|min:0',
-            'status' => 'required|in:draft,sent,paid,overdue,cancelled',
+            'tax_rate' => 'nullable|numeric|min:0|max:100',
+            'discount' => 'nullable|numeric|min:0',
+            'status' => 'nullable|in:due,paid,cancelled',
             'notes' => 'nullable|string',
+            'terms' => 'nullable|string',
             'items' => 'required|array|min:1',
             'items.*.description' => 'required|string|max:500',
-            'items.*.quantity' => 'required|numeric|min:1',
+            'items.*.quantity' => 'required|numeric|min:0.01',
             'items.*.unit_price' => 'required|numeric|min:0',
-            'items.*.total_price' => 'required|numeric|min:0',
+            'items.*.invoiceable_type' => 'nullable|string',
+            'items.*.invoiceable_id' => 'nullable|integer',
         ]);
 
-        DB::transaction(function () use ($validated, $clientId) {
+        $currencyCode = $client->currency ?: 'USD';
+        $rate = CurrencyService::getRate($currencyCode);
+        $status = $validated['status'] ?? 'due';
+
+        DB::transaction(function () use ($validated, $clientId, $currencyCode, $rate, $status, &$invoice) {
+            $subtotal = 0;
+            foreach ($validated['items'] as $item) {
+                $subtotal += ((float) $item['quantity'] * (float) $item['unit_price']);
+            }
+
+            $taxRate = (float) ($validated['tax_rate'] ?? 0);
+            $taxAmount = ($subtotal * $taxRate) / 100;
+            $discount = (float) ($validated['discount'] ?? 0);
+            $totalAmount = max(0, $subtotal + $taxAmount - $discount);
+            $totalAmountPkr = round($totalAmount * $rate, 2);
+
             $invoice = Invoice::create([
                 'client_id' => $clientId,
-                'website_project_id' => $validated['website_project_id'] ?? null,
                 'invoice_number' => $validated['invoice_number'],
+                'currency_code' => $currencyCode,
+                'exchange_rate_to_pkr' => $rate,
+                'subtotal' => $subtotal,
+                'tax_rate' => $taxRate,
+                'tax_amount' => $taxAmount,
+                'discount' => $discount,
+                'total_amount' => $totalAmount,
+                'total_amount_pkr' => $totalAmountPkr,
                 'issue_date' => $validated['issue_date'],
                 'due_date' => $validated['due_date'],
-                'currency' => $validated['currency'],
-                'subtotal' => $validated['subtotal'],
-                'tax_amount' => $validated['tax_amount'] ?? 0,
-                'total_amount' => $validated['total_amount'],
-                'status' => $validated['status'],
+                'status' => $status,
                 'notes' => $validated['notes'] ?? null,
+                'terms' => $validated['terms'] ?? null,
+                'created_by' => Auth::id(),
             ]);
 
             foreach ($validated['items'] as $item) {
-                $invoice->items()->create([
+                $amount = (float) $item['quantity'] * (float) $item['unit_price'];
+                InvoiceItem::create([
+                    'invoice_id' => $invoice->id,
                     'description' => $item['description'],
                     'quantity' => $item['quantity'],
                     'unit_price' => $item['unit_price'],
-                    'total_price' => $item['total_price'],
+                    'amount' => $amount,
+                    'invoiceable_type' => $item['invoiceable_type'] ?? null,
+                    'invoiceable_id' => $item['invoiceable_id'] ?? null,
                 ]);
+            }
+
+            if ($status === 'paid') {
+                $invoice->syncPaidStatusForItems();
             }
         });
 
@@ -229,55 +499,111 @@ class InvoiceController extends Controller
         $this->authorizePermission('edit-client-portal-invoices');
 
         $clientId = $this->getClientId();
+        $client = $this->getClientModel();
+
+        if ($invoice->client_id !== $clientId) {
+            abort(403, 'Unauthorized access to Invoice');
+        }
+
+        if ($invoice->status === 'paid') {
+            return redirect()->back()->with('error', 'Paid invoices cannot be edited.');
+        }
+
+        $validated = $request->validate([
+            'invoice_number' => 'required|string|max:100|unique:invoices,invoice_number,' . $invoice->id,
+            'issue_date' => 'required|date',
+            'due_date' => 'required|date',
+            'tax_rate' => 'nullable|numeric|min:0|max:100',
+            'discount' => 'nullable|numeric|min:0',
+            'status' => 'nullable|in:due,paid,cancelled',
+            'notes' => 'nullable|string',
+            'terms' => 'nullable|string',
+            'items' => 'required|array|min:1',
+            'items.*.description' => 'required|string|max:500',
+            'items.*.quantity' => 'required|numeric|min:0.01',
+            'items.*.unit_price' => 'required|numeric|min:0',
+            'items.*.invoiceable_type' => 'nullable|string',
+            'items.*.invoiceable_id' => 'nullable|integer',
+        ]);
+
+        $currencyCode = $client->currency ?: 'USD';
+        $rate = CurrencyService::getRate($currencyCode);
+        $status = $validated['status'] ?? $invoice->status ?? 'due';
+
+        DB::transaction(function () use ($validated, $invoice, $currencyCode, $rate, $status) {
+            $subtotal = 0;
+            foreach ($validated['items'] as $item) {
+                $subtotal += ((float) $item['quantity'] * (float) $item['unit_price']);
+            }
+
+            $taxRate = (float) ($validated['tax_rate'] ?? 0);
+            $taxAmount = ($subtotal * $taxRate) / 100;
+            $discount = (float) ($validated['discount'] ?? 0);
+            $totalAmount = max(0, $subtotal + $taxAmount - $discount);
+            $totalAmountPkr = round($totalAmount * $rate, 2);
+
+            $invoice->update([
+                'invoice_number' => $validated['invoice_number'],
+                'currency_code' => $currencyCode,
+                'exchange_rate_to_pkr' => $rate,
+                'subtotal' => $subtotal,
+                'tax_rate' => $taxRate,
+                'tax_amount' => $taxAmount,
+                'discount' => $discount,
+                'total_amount' => $totalAmount,
+                'total_amount_pkr' => $totalAmountPkr,
+                'issue_date' => $validated['issue_date'],
+                'due_date' => $validated['due_date'],
+                'status' => $status,
+                'notes' => $validated['notes'] ?? null,
+                'terms' => $validated['terms'] ?? null,
+            ]);
+
+            $invoice->items()->delete();
+            foreach ($validated['items'] as $item) {
+                $amount = (float) $item['quantity'] * (float) $item['unit_price'];
+                $invoice->items()->create([
+                    'description' => $item['description'],
+                    'quantity' => $item['quantity'],
+                    'unit_price' => $item['unit_price'],
+                    'amount' => $amount,
+                    'invoiceable_type' => $item['invoiceable_type'] ?? null,
+                    'invoiceable_id' => $item['invoiceable_id'] ?? null,
+                ]);
+            }
+
+            if ($status === 'paid') {
+                $invoice->syncPaidStatusForItems();
+            }
+        });
+
+        return redirect()->route('client-portal.invoices.index')->with('success', 'Invoice updated successfully.');
+    }
+
+    /**
+     * Update status of an invoice.
+     */
+    public function updateStatus(Request $request, Invoice $invoice): RedirectResponse
+    {
+        $this->authorizePermission('edit-client-portal-invoices');
+
+        $clientId = $this->getClientId();
 
         if ($invoice->client_id !== $clientId) {
             abort(403, 'Unauthorized access to Invoice');
         }
 
         $validated = $request->validate([
-            'invoice_number' => 'required|string|max:100|unique:invoices,invoice_number,' . $invoice->id,
-            'website_project_id' => 'nullable|exists:website_projects,id',
-            'issue_date' => 'required|date',
-            'due_date' => 'required|date',
-            'currency' => 'required|string|max:10',
-            'subtotal' => 'required|numeric|min:0',
-            'tax_amount' => 'nullable|numeric|min:0',
-            'total_amount' => 'required|numeric|min:0',
-            'status' => 'required|in:draft,sent,paid,overdue,cancelled',
-            'notes' => 'nullable|string',
-            'items' => 'required|array|min:1',
-            'items.*.description' => 'required|string|max:500',
-            'items.*.quantity' => 'required|numeric|min:1',
-            'items.*.unit_price' => 'required|numeric|min:0',
-            'items.*.total_price' => 'required|numeric|min:0',
+            'status' => ['required', 'in:due,paid,cancelled'],
         ]);
 
-        DB::transaction(function () use ($validated, $invoice) {
-            $invoice->update([
-                'website_project_id' => $validated['website_project_id'] ?? null,
-                'invoice_number' => $validated['invoice_number'],
-                'issue_date' => $validated['issue_date'],
-                'due_date' => $validated['due_date'],
-                'currency' => $validated['currency'],
-                'subtotal' => $validated['subtotal'],
-                'tax_amount' => $validated['tax_amount'] ?? 0,
-                'total_amount' => $validated['total_amount'],
-                'status' => $validated['status'],
-                'notes' => $validated['notes'] ?? null,
-            ]);
+        $invoice->update(['status' => $validated['status']]);
 
-            $invoice->items()->delete();
-            foreach ($validated['items'] as $item) {
-                $invoice->items()->create([
-                    'description' => $item['description'],
-                    'quantity' => $item['quantity'],
-                    'unit_price' => $item['unit_price'],
-                    'total_price' => $item['total_price'],
-                ]);
-            }
-        });
+        if ($validated['status'] === 'paid') {
+            $invoice->syncPaidStatusForItems();
+        }
 
-        return redirect()->route('client-portal.invoices.index')->with('success', 'Invoice updated successfully.');
+        return redirect()->back()->with('success', "Invoice status updated to {$validated['status']}.");
     }
 
     /**
@@ -293,6 +619,10 @@ class InvoiceController extends Controller
             abort(403, 'Unauthorized access to Invoice');
         }
 
+        if ($invoice->status === 'paid') {
+            return redirect()->back()->with('error', 'Paid invoices cannot be deleted.');
+        }
+
         $invoice->items()->delete();
         $invoice->delete();
 
@@ -304,7 +634,7 @@ class InvoiceController extends Controller
      */
     public function pdf(Invoice $invoice)
     {
-        $this->authorizePermission('download-client-portal-invoices');
+        $this->authorizePermission('print-client-portal-invoices');
 
         $clientId = $this->getClientId();
 
@@ -312,7 +642,7 @@ class InvoiceController extends Controller
             abort(403, 'Unauthorized access to Invoice');
         }
 
-        $invoice->load(['client', 'items', 'websiteProject']);
+        $invoice->load(['client', 'items']);
 
         $companySettings = [
             'name' => SystemSetting::get('company_name', 'Sapta Technologies'),
@@ -328,6 +658,6 @@ class InvoiceController extends Controller
             'company' => $companySettings,
         ]);
 
-        return $pdf->download("Invoice-{$invoice->invoice_number}.pdf");
+        return $pdf->stream("Invoice-{$invoice->invoice_number}.pdf");
     }
 }

@@ -1,4 +1,5 @@
 import SearchableSelect from '@/components/searchable-select';
+import DocumentsTab, { type ClientDocumentItem } from '@/components/documents-tab';
 import ClientPortalLayout from '@/layouts/client-portal-layout';
 import { type BreadcrumbItem, type SharedData } from '@/types';
 import { hasPermission } from '@/utils/permissions';
@@ -75,6 +76,11 @@ interface ProjectPaymentItem {
     paid_at?: string;
     payment_method?: string;
     notes?: string;
+    invoice?: {
+        id: number;
+        invoice_number: string;
+        status: string;
+    } | null;
 }
 
 interface WebsiteProjectDetail {
@@ -94,6 +100,7 @@ interface WebsiteProjectDetail {
     payments?: ProjectPaymentItem[];
     tasks?: ProjectTaskItem[];
     credentials?: ProjectCredentialItem[];
+    documents?: ClientDocumentItem[];
 }
 
 interface CompanyInfo {
@@ -123,18 +130,8 @@ interface ClientPortalProjectsShowProps {
 export default function ClientPortalProjectsShow({
     client,
     project,
-    company,
     employees = [],
 }: ClientPortalProjectsShowProps) {
-    const companyInfo = company || {
-        name: 'Sapta Technologies',
-        email: 'contact@saptatechnologies.com',
-        phone: '+92 300 1234567',
-        address: 'Office #402, Software Technology Park, Lahore, Pakistan',
-        tax_id: 'NTN-892415-0',
-        logo: '/app-logo-icon.png',
-    };
-
     const { auth } = usePage().props as unknown as SharedData & { errors?: Record<string, string> };
     const user = auth?.user;
 
@@ -148,20 +145,20 @@ export default function ClientPortalProjectsShow({
     ];
 
     // Active Tab Persistence via URL query param 'tab'
-    const getInitialTab = (): 'details' | 'budget' | 'tasks' | 'credentials' => {
+    const getInitialTab = (): 'details' | 'budget' | 'tasks' | 'credentials' | 'documents' => {
         if (typeof window !== 'undefined') {
             const params = new URLSearchParams(window.location.search);
             const tab = params.get('tab');
-            if (tab === 'budget' || tab === 'tasks' || tab === 'credentials' || tab === 'details') {
+            if (tab === 'budget' || tab === 'tasks' || tab === 'credentials' || tab === 'details' || tab === 'documents') {
                 return tab;
             }
         }
         return 'details';
     };
 
-    const [activeTab, setActiveTabState] = useState<'details' | 'budget' | 'tasks' | 'credentials'>(getInitialTab);
+    const [activeTab, setActiveTabState] = useState<'details' | 'budget' | 'tasks' | 'credentials' | 'documents'>(getInitialTab);
 
-    const setActiveTab = (tab: 'details' | 'budget' | 'tasks' | 'credentials') => {
+    const setActiveTab = (tab: 'details' | 'budget' | 'tasks' | 'credentials' | 'documents') => {
         setActiveTabState(tab);
         if (typeof window !== 'undefined') {
             const url = new URL(window.location.href);
@@ -208,7 +205,25 @@ export default function ClientPortalProjectsShow({
     const [editingMilestone, setEditingMilestone] = useState<ProjectPaymentItem | null>(null);
     const [deletingMilestone, setDeletingMilestone] = useState<ProjectPaymentItem | null>(null);
     const [isMilestoneSubmitting, setIsMilestoneSubmitting] = useState(false);
+    const [milestoneErrors, setMilestoneErrors] = useState<Record<string, string>>({});
     const [amountError, setAmountError] = useState<string | null>(null);
+    const [generatingInvoiceId, setGeneratingInvoiceId] = useState<number | null>(null);
+    const [confirmingInvoiceMilestone, setConfirmingInvoiceMilestone] = useState<ProjectPaymentItem | null>(null);
+
+    const handleExecuteGenerateInvoice = () => {
+        if (!confirmingInvoiceMilestone) return;
+        const milestoneId = confirmingInvoiceMilestone.id;
+        setGeneratingInvoiceId(milestoneId);
+        router.post(
+            `/client-portal/projects/milestones/${milestoneId}/generate-invoice`,
+            {},
+            {
+                preserveScroll: true,
+                onSuccess: () => setConfirmingInvoiceMilestone(null),
+                onFinish: () => setGeneratingInvoiceId(null),
+            }
+        );
+    };
 
     const [milestoneFormData, setMilestoneFormData] = useState({
         milestone_title: '',
@@ -226,7 +241,7 @@ export default function ClientPortalProjectsShow({
     ];
 
     const formatDateOnly = (dateStr?: string | null) => {
-        if (!dateStr) return 'Flexible';
+        if (!dateStr) return '-';
         const cleanDate = dateStr.includes('T') ? dateStr.split('T')[0] : dateStr.split(' ')[0];
         const parts = cleanDate.split('-');
         if (parts.length === 3) {
@@ -284,28 +299,30 @@ export default function ClientPortalProjectsShow({
     // MILESTONE PAYMENT HANDLERS
     const openCreateMilestoneModal = () => {
         setEditingMilestone(null);
+        setMilestoneErrors({});
         setAmountError(null);
         setMilestoneFormData({
             milestone_title: '',
             amount: unallocatedBudget > 0 ? unallocatedBudget.toString() : '',
             payment_stage: 'advance',
             status: 'pending',
-            paid_at: new Date().toISOString().split('T')[0],
+            paid_at: '',
             notes: '',
         });
         setIsMilestoneModalOpen(true);
     };
 
     const openEditMilestoneModal = (m: ProjectPaymentItem) => {
-        if (m.status === 'paid') return; // Protection: Paid milestone cannot be edited
+        if (m.invoice || m.status === 'paid') return; // Protection: Milestone with generated invoice or paid status cannot be edited
         setEditingMilestone(m);
+        setMilestoneErrors({});
         setAmountError(null);
         setMilestoneFormData({
             milestone_title: m.milestone_title || '',
             amount: m.amount || '',
-            payment_stage: m.payment_stage || 'advance',
-            status: m.status || 'pending',
-            paid_at: m.paid_at ? m.paid_at.split('T')[0].split(' ')[0] : '',
+            payment_stage: (m.payment_stage as any) || 'advance',
+            status: (m.status as any) || 'pending',
+            paid_at: m.paid_at || '',
             notes: m.notes || '',
         });
         setIsMilestoneModalOpen(true);
@@ -313,6 +330,7 @@ export default function ClientPortalProjectsShow({
 
     const handleMilestoneSubmit = (e: React.FormEvent) => {
         e.preventDefault();
+        setMilestoneErrors({});
         setAmountError(null);
 
         const enteredAmount = parseFloat(milestoneFormData.amount as string) || 0;
@@ -321,7 +339,9 @@ export default function ClientPortalProjectsShow({
             : unallocatedBudget;
 
         if (enteredAmount > maxAllocatable + 0.01) {
-            setAmountError(`Milestone amount cannot exceed remaining unallocated budget (${formatCurrency(maxAllocatable)})`);
+            const err = `Milestone amount cannot exceed remaining unallocated budget (${formatCurrency(maxAllocatable)})`;
+            setAmountError(err);
+            setMilestoneErrors({ amount: err });
             return;
         }
 
@@ -338,9 +358,11 @@ export default function ClientPortalProjectsShow({
                 onSuccess: () => {
                     setIsMilestoneModalOpen(false);
                     setIsMilestoneSubmitting(false);
+                    setMilestoneErrors({});
                 },
                 onError: (errs) => {
                     setIsMilestoneSubmitting(false);
+                    setMilestoneErrors(errs || {});
                     if (errs?.amount) setAmountError(errs.amount);
                 },
             });
@@ -350,9 +372,11 @@ export default function ClientPortalProjectsShow({
                 onSuccess: () => {
                     setIsMilestoneModalOpen(false);
                     setIsMilestoneSubmitting(false);
+                    setMilestoneErrors({});
                 },
                 onError: (errs) => {
                     setIsMilestoneSubmitting(false);
+                    setMilestoneErrors(errs || {});
                     if (errs?.amount) setAmountError(errs.amount);
                 },
             });
@@ -360,332 +384,16 @@ export default function ClientPortalProjectsShow({
     };
 
     const handleDeleteMilestone = () => {
-        if (!deletingMilestone || deletingMilestone.status === 'paid') return;
+        if (!deletingMilestone || isMilestoneSubmitting || deletingMilestone.status === 'paid') return;
         setIsMilestoneSubmitting(true);
         router.delete(`/client-portal/projects/milestones/destroy/${deletingMilestone.id}`, {
             preserveScroll: true,
+            onFinish: () => setIsMilestoneSubmitting(false),
             onSuccess: () => {
                 setDeletingMilestone(null);
-                setIsMilestoneSubmitting(false);
             },
             onError: () => setIsMilestoneSubmitting(false),
         });
-    };
-
-    // PRINT INVOICE HANDLER (GENERIC CRM INVOICE TEMPLATE MATCH)
-    const handlePrintInvoice = (pay: ProjectPaymentItem) => {
-        const printWindow = window.open('', '_blank', 'width=850,height=950');
-        if (!printWindow) return;
-
-        const invoiceHtml = `
-            <!DOCTYPE html>
-            <html>
-            <head>
-                <meta charset="utf-8" />
-                <title>Invoice #${pay.id} - ${pay.milestone_title}</title>
-                <style>
-                    @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@600;800&display=swap');
-                    
-                    * { box-sizing: border-box; margin: 0; padding: 0; }
-                    body {
-                        font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-                        background: #ffffff;
-                        color: #0f172a;
-                        padding: 40px;
-                        font-size: 13px;
-                        line-height: 1.5;
-                    }
-
-                    .invoice-container {
-                        max-width: 800px;
-                        margin: 0 auto;
-                    }
-
-                    .header {
-                        display: flex;
-                        justify-content: space-between;
-                        align-items: flex-start;
-                        padding-bottom: 24px;
-                        border-bottom: 2px solid #f1f5f9;
-                        margin-bottom: 32px;
-                    }
-
-                    .brand-name {
-                        font-size: 22px;
-                        font-weight: 900;
-                        color: #0052D4;
-                        text-transform: uppercase;
-                        letter-spacing: -0.5px;
-                    }
-
-                    .brand-sub {
-                        font-size: 12px;
-                        color: #64748b;
-                        font-weight: 500;
-                        margin-top: 2px;
-                    }
-
-                    .invoice-title {
-                        font-size: 24px;
-                        font-weight: 900;
-                        text-transform: uppercase;
-                        letter-spacing: 1px;
-                        color: #0f172a;
-                        text-align: right;
-                    }
-
-                    .invoice-num {
-                        font-family: 'JetBrains Mono', monospace;
-                        font-size: 14px;
-                        font-weight: 800;
-                        color: #0052D4;
-                        text-align: right;
-                        margin-top: 2px;
-                    }
-
-                    .meta-grid {
-                        display: grid;
-                        grid-template-columns: 1fr 1fr;
-                        gap: 32px;
-                        margin-bottom: 36px;
-                    }
-
-                    .meta-label {
-                        font-size: 10px;
-                        font-weight: 800;
-                        text-transform: uppercase;
-                        letter-spacing: 0.8px;
-                        color: #94a3b8;
-                        margin-bottom: 6px;
-                    }
-
-                    .meta-title {
-                        font-size: 15px;
-                        font-weight: 800;
-                        color: #0f172a;
-                        margin-bottom: 4px;
-                    }
-
-                    .meta-text {
-                        color: #475569;
-                        font-size: 12px;
-                        font-weight: 500;
-                        margin-bottom: 2px;
-                    }
-
-                    .table-container {
-                        border: 1px solid #e2e8f0;
-                        border-radius: 16px;
-                        overflow: hidden;
-                        margin-bottom: 32px;
-                    }
-
-                    table {
-                        width: 100%;
-                        border-collapse: collapse;
-                        text-align: left;
-                    }
-
-                    th {
-                        background: #f8fafc;
-                        padding: 14px 18px;
-                        font-size: 10px;
-                        font-weight: 800;
-                        text-transform: uppercase;
-                        letter-spacing: 0.8px;
-                        color: #64748b;
-                        border-bottom: 1px solid #e2e8f0;
-                    }
-
-                    td {
-                        padding: 16px 18px;
-                        font-size: 12px;
-                        font-weight: 600;
-                        color: #1e293b;
-                        border-bottom: 1px solid #f1f5f9;
-                    }
-
-                    tr:last-child td {
-                        border-bottom: none;
-                    }
-
-                    .mono-val {
-                        font-family: 'JetBrains Mono', monospace;
-                        font-weight: 800;
-                    }
-
-                    .status-pill {
-                        display: inline-block;
-                        padding: 4px 12px;
-                        border-radius: 20px;
-                        font-size: 10px;
-                        font-weight: 800;
-                        text-transform: uppercase;
-                        letter-spacing: 0.5px;
-                    }
-
-                    .status-paid {
-                        background: #dcfce7;
-                        color: #15803d;
-                        border: 1px solid #bbf7d0;
-                    }
-
-                    .status-pending {
-                        background: #fef3c7;
-                        color: #b45309;
-                        border: 1px solid #fde68a;
-                    }
-
-                    .totals-section {
-                        display: flex;
-                        justify-content: flex-end;
-                        margin-bottom: 40px;
-                    }
-
-                    .totals-box {
-                        width: 320px;
-                        background: #f8fafc;
-                        border: 1px solid #e2e8f0;
-                        border-radius: 16px;
-                        padding: 20px;
-                    }
-
-                    .totals-row {
-                        display: flex;
-                        justify-content: space-between;
-                        align-items: center;
-                        margin-bottom: 10px;
-                        font-size: 12px;
-                        color: #64748b;
-                        font-weight: 600;
-                    }
-
-                    .totals-row.final {
-                        margin-top: 12px;
-                        padding-top: 12px;
-                        border-top: 2px solid #e2e8f0;
-                        font-size: 14px;
-                        font-weight: 800;
-                        color: #0f172a;
-                    }
-
-                    .final-amount {
-                        font-family: 'JetBrains Mono', monospace;
-                        font-size: 20px;
-                        font-weight: 900;
-                        color: #0052D4;
-                    }
-
-                    .footer {
-                        padding-top: 24px;
-                        border-top: 1px solid #f1f5f9;
-                        font-size: 11px;
-                        color: #94a3b8;
-                        text-align: center;
-                        font-weight: 500;
-                    }
-
-                    @media print {
-                        body { padding: 0; background: white; }
-                        .invoice-container { max-width: 100%; }
-                    }
-                </style>
-            </head>
-            <body>
-                <div class="invoice-container">
-                    <div class="header">
-                        <div style="display: flex; align-items: center; gap: 14px;">
-                            <img src="${companyInfo.logo || '/app-logo-icon.png'}" alt="Company Logo" style="height: 48px; width: auto; object-fit: contain;" />
-                            <div>
-                                <div class="brand-name">${companyInfo.name}</div>
-                                <div class="brand-sub">${companyInfo.email} ${companyInfo.phone ? ' • ' + companyInfo.phone : ''}</div>
-                                ${companyInfo.address ? `<div style="font-size: 11px; color: #64748b; font-weight: 500; margin-top: 2px;">${companyInfo.address}${companyInfo.tax_id ? ' • NTN: ' + companyInfo.tax_id : ''}</div>` : ''}
-                            </div>
-                        </div>
-                        <div>
-                            <div class="invoice-title">INVOICE</div>
-                            <div class="invoice-num">#INV-MS-${pay.id}</div>
-                        </div>
-                    </div>
-
-                    <div class="meta-grid">
-                        <div>
-                            <div class="meta-label">Billed To:</div>
-                            <div class="meta-title">${client.company_name || client.name}</div>
-                            <div class="meta-text"><strong>Attn:</strong> ${client.name}</div>
-                            <div class="meta-text"><strong>Client Code:</strong> ${client.client_code}</div>
-                        </div>
-
-                        <div style="text-align: right;">
-                            <div class="meta-label">Invoice & Project Details:</div>
-                            <div class="meta-text"><strong>Project:</strong> ${project.project_name}</div>
-                            <div class="meta-text"><strong>Ref:</strong> #PROJ-${project.id}</div>
-                            <div class="meta-text"><strong>Date:</strong> ${pay.paid_at ? formatDateOnly(pay.paid_at) : new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</div>
-                            <div class="meta-text"><strong>Billing Currency:</strong> ${project.currency || client.currency || 'USD'}</div>
-                        </div>
-                    </div>
-
-                    <div class="table-container">
-                        <table>
-                            <thead>
-                                <tr>
-                                    <th>Description / Milestone Title</th>
-                                    <th>Stage</th>
-                                    <th>Status</th>
-                                    <th style="text-align: right;">Amount</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                <tr>
-                                    <td>
-                                        <div style="font-weight: 800; color: #0f172a;">${pay.milestone_title}</div>
-                                        ${pay.notes ? `<div style="font-size: 11px; color: #64748b; font-weight: 500; margin-top: 2px;">${pay.notes}</div>` : ''}
-                                    </td>
-                                    <td style="text-transform: capitalize;">${pay.payment_stage}</td>
-                                    <td>
-                                        <span class="status-pill ${pay.status === 'paid' ? 'status-paid' : 'status-pending'}">
-                                            ${pay.status}
-                                        </span>
-                                    </td>
-                                    <td style="text-align: right;" class="mono-val">${formatCurrency(pay.amount)}</td>
-                                </tr>
-                            </tbody>
-                        </table>
-                    </div>
-
-                    <div class="totals-section">
-                        <div class="totals-box">
-                            <div class="totals-row">
-                                <span>Milestone Amount:</span>
-                                <span class="mono-val" style="color: #0f172a;">${formatCurrency(pay.amount)}</span>
-                            </div>
-                            <div class="totals-row">
-                                <span>Status:</span>
-                                <span style="font-weight: 800; text-transform: uppercase; ${pay.status === 'paid' ? 'color: #16a34a;' : 'color: #d97706;'}">${pay.status}</span>
-                            </div>
-                            <div class="totals-row final">
-                                <span>Total Settled:</span>
-                                <span class="final-amount">${formatCurrency(pay.amount)}</span>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="footer">
-                        Thank you for your business! This is an official system-generated milestone invoice receipt.
-                    </div>
-                </div>
-
-                <script>
-                    window.onload = function() {
-                        window.print();
-                    };
-                </script>
-            </body>
-            </html>
-        `;
-
-        printWindow.document.write(invoiceHtml);
-        printWindow.document.close();
     };
 
     // TASK HANDLERS
@@ -772,13 +480,13 @@ export default function ClientPortalProjectsShow({
     };
 
     const handleDeleteTask = () => {
-        if (!deletingTask) return;
+        if (!deletingTask || isTaskSubmitting) return;
         setIsTaskSubmitting(true);
         router.delete(`/client-portal/projects/tasks/destroy/${deletingTask.id}`, {
             preserveScroll: true,
+            onFinish: () => setIsTaskSubmitting(false),
             onSuccess: () => {
                 setDeletingTask(null);
-                setIsTaskSubmitting(false);
             },
             onError: () => setIsTaskSubmitting(false),
         });
@@ -855,13 +563,13 @@ export default function ClientPortalProjectsShow({
     };
 
     const handleDeleteCred = () => {
-        if (!deletingCred) return;
+        if (!deletingCred || isCredSubmitting) return;
         setIsCredSubmitting(true);
         router.delete(`/client-portal/projects/credentials/destroy/${deletingCred.id}`, {
             preserveScroll: true,
+            onFinish: () => setIsCredSubmitting(false),
             onSuccess: () => {
                 setDeletingCred(null);
-                setIsCredSubmitting(false);
             },
             onError: () => setIsCredSubmitting(false),
         });
@@ -880,7 +588,7 @@ export default function ClientPortalProjectsShow({
                         <button
                             type="button"
                             onClick={() => setActiveTab('details')}
-                            className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${activeTab === 'details'
+                            className={`flex items-center gap-2 h-10 px-3 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${activeTab === 'details'
                                 ? 'bg-gradient-to-r from-[#003796] via-[#0052D4] to-[#1d4ed8] text-white shadow-md shadow-blue-600/20'
                                 : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'
                                 }`}
@@ -890,43 +598,64 @@ export default function ClientPortalProjectsShow({
                         </button>
 
                         {/* TAB 2: Budget & Invoices */}
-                        <button
-                            type="button"
-                            onClick={() => setActiveTab('budget')}
-                            className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${activeTab === 'budget'
-                                ? 'bg-gradient-to-r from-[#003796] via-[#0052D4] to-[#1d4ed8] text-white shadow-md shadow-blue-600/20'
-                                : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'
-                                }`}
-                        >
-                            <BadgeDollarSign className="size-4" />
-                            <span>2. Budget & Invoices</span>
-                        </button>
+                        {hasPermission(user, 'view-client-portal-project-milestones') && (
+                            <button
+                                type="button"
+                                onClick={() => setActiveTab('budget')}
+                                className={`flex items-center gap-2 h-10 px-3 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${activeTab === 'budget'
+                                    ? 'bg-gradient-to-r from-[#003796] via-[#0052D4] to-[#1d4ed8] text-white shadow-md shadow-blue-600/20'
+                                    : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'
+                                    }`}
+                            >
+                                <BadgeDollarSign className="size-4" />
+                                <span>2. Budget & Invoices</span>
+                            </button>
+                        )}
 
                         {/* TAB 3: Tasks */}
-                        <button
-                            type="button"
-                            onClick={() => setActiveTab('tasks')}
-                            className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${activeTab === 'tasks'
-                                ? 'bg-gradient-to-r from-[#003796] via-[#0052D4] to-[#1d4ed8] text-white shadow-md shadow-blue-600/20'
-                                : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'
-                                }`}
-                        >
-                            <ListTodo className="size-4" />
-                            <span>3. Tasks ({totalTasksCount})</span>
-                        </button>
+                        {hasPermission(user, 'view-client-portal-project-tasks') && (
+                            <button
+                                type="button"
+                                onClick={() => setActiveTab('tasks')}
+                                className={`flex items-center gap-2 h-10 px-3 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${activeTab === 'tasks'
+                                    ? 'bg-gradient-to-r from-[#003796] via-[#0052D4] to-[#1d4ed8] text-white shadow-md shadow-blue-600/20'
+                                    : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'
+                                    }`}
+                            >
+                                <ListTodo className="size-4" />
+                                <span>3. Tasks ({totalTasksCount})</span>
+                            </button>
+                        )}
 
                         {/* TAB 4: Credentials */}
-                        <button
-                            type="button"
-                            onClick={() => setActiveTab('credentials')}
-                            className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${activeTab === 'credentials'
-                                ? 'bg-gradient-to-r from-[#003796] via-[#0052D4] to-[#1d4ed8] text-white shadow-md shadow-blue-600/20'
-                                : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'
-                                }`}
-                        >
-                            <Key className="size-4" />
-                            <span>4. Credentials ({project.credentials?.length || 0})</span>
-                        </button>
+                        {hasPermission(user, 'view-client-portal-project-credentials') && (
+                            <button
+                                type="button"
+                                onClick={() => setActiveTab('credentials')}
+                                className={`flex items-center gap-2 h-10 px-3 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${activeTab === 'credentials'
+                                    ? 'bg-gradient-to-r from-[#003796] via-[#0052D4] to-[#1d4ed8] text-white shadow-md shadow-blue-600/20'
+                                    : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'
+                                    }`}
+                            >
+                                <Key className="size-4" />
+                                <span>4. Credentials ({project.credentials?.length || 0})</span>
+                            </button>
+                        )}
+
+                        {/* TAB 5: Documents */}
+                        {hasPermission(user, 'view-client-portal-project-documents') && (
+                            <button
+                                type="button"
+                                onClick={() => setActiveTab('documents')}
+                                className={`flex items-center gap-2 h-10 px-3 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${activeTab === 'documents'
+                                    ? 'bg-gradient-to-r from-[#003796] via-[#0052D4] to-[#1d4ed8] text-white shadow-md shadow-blue-600/20'
+                                    : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'
+                                    }`}
+                            >
+                                <FileText className="size-4" />
+                                <span>5. Documents ({project.documents?.length || 0})</span>
+                            </button>
+                        )}
                     </div>
 
                     {/* Right: Action Buttons (Edit & Back to Projects on Right) */}
@@ -934,7 +663,7 @@ export default function ClientPortalProjectsShow({
                         {hasPermission(user, 'edit-client-portal-projects') && (
                             <Link
                                 href={`/client-portal/projects/${project.id}/edit`}
-                                className="h-10 px-4 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 text-xs font-bold hover:bg-slate-200 dark:hover:bg-slate-700 transition-all inline-flex items-center gap-2"
+                                className="h-10 px-3 rounded-xl bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-200 text-xs font-bold hover:bg-slate-200 dark:hover:bg-slate-700 transition-all inline-flex items-center gap-2"
                             >
                                 <Edit2 className="size-4" />
                                 <span>Edit Project</span>
@@ -942,7 +671,7 @@ export default function ClientPortalProjectsShow({
                         )}
                         <Link
                             href="/client-portal/projects"
-                            className="h-10 px-4 rounded-xl bg-gradient-to-r from-[#003796] via-[#0052D4] to-[#1d4ed8] text-white text-xs font-bold hover:opacity-95 transition-all shadow-md shadow-blue-500/20 inline-flex items-center gap-2"
+                            className="h-10 px-3 rounded-xl bg-gradient-to-r from-[#003796] via-[#0052D4] to-[#1d4ed8] text-white text-xs font-bold hover:opacity-95 transition-all shadow-md shadow-blue-500/20 inline-flex items-center gap-2"
                         >
                             <ArrowLeft className="size-4" />
                             <span>Back to Projects</span>
@@ -1152,14 +881,16 @@ export default function ClientPortalProjectsShow({
                                     </div>
                                 </div>
 
-                                <button
-                                    type="button"
-                                    onClick={openCreateMilestoneModal}
-                                    className="h-10 px-4 rounded-xl bg-gradient-to-r from-[#003796] via-[#0052D4] to-[#1d4ed8] text-white text-xs font-bold shadow-md shadow-blue-600/20 inline-flex items-center gap-2 cursor-pointer self-start sm:self-auto"
-                                >
-                                    <Plus className="size-4" />
-                                    <span>Add New Milestone</span>
-                                </button>
+                                {hasPermission(user, 'create-client-portal-project-milestones') && (
+                                    <button
+                                        type="button"
+                                        onClick={openCreateMilestoneModal}
+                                        className="h-10 px-3 rounded-xl bg-gradient-to-r from-[#003796] via-[#0052D4] to-[#1d4ed8] text-white text-xs font-bold shadow-md shadow-blue-600/20 inline-flex items-center gap-2 cursor-pointer self-start sm:self-auto"
+                                    >
+                                        <Plus className="size-4" />
+                                        <span>Add New Milestone</span>
+                                    </button>
+                                )}
                             </div>
 
                             <div className="w-full overflow-x-auto scrollbar-thin">
@@ -1203,26 +934,46 @@ export default function ClientPortalProjectsShow({
                                                         </span>
                                                     </td>
                                                     <td className="px-3 py-3.5 font-medium text-slate-500">
-                                                        {pay.paid_at ? formatDateOnly(pay.paid_at) : '-'}
+                                                        {pay.status === 'paid' && pay.paid_at ? formatDateOnly(pay.paid_at) : '-'}
                                                     </td>
                                                     <td className="px-3 py-3.5 text-right">
                                                         <div className="flex items-center justify-end gap-1.5">
-                                                            {/* PRINT INVOICE BUTTON */}
-                                                            <button
-                                                                type="button"
-                                                                onClick={() => handlePrintInvoice(pay)}
-                                                                className="h-8 px-2.5 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 hover:bg-slate-200 transition-all font-bold text-[11px] inline-flex items-center gap-1.5 cursor-pointer"
-                                                                title="Print Invoice / Receipt"
-                                                            >
-                                                                <Printer className="size-3.5 text-blue-600 dark:text-blue-400" />
-                                                                <span>Print</span>
-                                                            </button>
+                                                            {/* GENERATE OR PRINT INVOICE BUTTON */}
+                                                            {pay.invoice ? (
+                                                                <a
+                                                                    href={`/client-portal/invoices/${pay.invoice.id}/pdf`}
+                                                                    target="_blank"
+                                                                    rel="noopener noreferrer"
+                                                                    className="h-8 px-2.5 rounded-lg bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400 hover:bg-gradient-to-r hover:from-[#003796] hover:via-[#0052D4] hover:to-[#1d4ed8] hover:text-white text-xs font-bold inline-flex items-center gap-1.5 transition-all cursor-pointer border border-blue-200/50 hover:border-transparent"
+                                                                    title="Open & Print Invoice PDF"
+                                                                >
+                                                                    <Printer className="size-3.5" />
+                                                                    <span>Print</span>
+                                                                </a>
+                                                            ) : (
+                                                                hasPermission(user, 'create-client-portal-invoices') && (
+                                                                    <button
+                                                                        type="button"
+                                                                        disabled={generatingInvoiceId === pay.id}
+                                                                        onClick={() => setConfirmingInvoiceMilestone(pay)}
+                                                                        className="h-8 px-2.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-[11px] inline-flex items-center gap-1.5 cursor-pointer shadow-xs transition-all disabled:opacity-50"
+                                                                        title="Generate Invoice for this milestone"
+                                                                    >
+                                                                        {generatingInvoiceId === pay.id ? (
+                                                                            <LoaderCircle className="size-3.5 animate-spin" />
+                                                                        ) : (
+                                                                            <FileText className="size-3.5" />
+                                                                        )}
+                                                                        <span>Generate Invoice</span>
+                                                                    </button>
+                                                                )
+                                                            )}
 
-                                                            {/* PROTECTION CHECK FOR PAID MILESTONES */}
-                                                            {pay.status === 'paid' ? (
+                                                            {/* PROTECTION CHECK FOR GENERATED INVOICE OR PAID MILESTONES */}
+                                                            {pay.invoice || pay.status === 'paid' ? (
                                                                 <span
                                                                     className="px-2 py-1 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-400 dark:text-slate-500 text-[10px] font-bold inline-flex items-center gap-1 cursor-not-allowed"
-                                                                    title="Paid/Settled milestone cannot be edited or deleted"
+                                                                    title="Milestone with generated invoice or paid status cannot be edited or deleted"
                                                                 >
                                                                     <ShieldCheck className="size-3 text-emerald-500" />
                                                                     <span>Locked</span>
@@ -1230,24 +981,28 @@ export default function ClientPortalProjectsShow({
                                                             ) : (
                                                                 <>
                                                                     {/* EDIT MILESTONE BUTTON */}
-                                                                    <button
-                                                                        type="button"
-                                                                        onClick={() => openEditMilestoneModal(pay)}
-                                                                        className="p-1.5 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 transition-all cursor-pointer"
-                                                                        title="Edit Milestone"
-                                                                    >
-                                                                        <Edit2 className="size-3.5" />
-                                                                    </button>
+                                                                    {hasPermission(user, 'edit-client-portal-project-milestones') && (
+                                                                        <button
+                                                                            type="button"
+                                                                            onClick={() => openEditMilestoneModal(pay)}
+                                                                            className="p-1.5 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 transition-all cursor-pointer"
+                                                                            title="Edit Milestone"
+                                                                        >
+                                                                            <Edit2 className="size-3.5" />
+                                                                        </button>
+                                                                    )}
 
                                                                     {/* DELETE MILESTONE BUTTON */}
-                                                                    <button
-                                                                        type="button"
-                                                                        onClick={() => setDeletingMilestone(pay)}
-                                                                        className="p-1.5 rounded-lg bg-rose-50 text-rose-600 dark:bg-rose-950/60 dark:text-rose-400 hover:bg-rose-600 hover:text-white transition-all cursor-pointer"
-                                                                        title="Delete Milestone"
-                                                                    >
-                                                                        <Trash2 className="size-3.5" />
-                                                                    </button>
+                                                                    {hasPermission(user, 'delete-client-portal-project-milestones') && (
+                                                                        <button
+                                                                            type="button"
+                                                                            onClick={() => setDeletingMilestone(pay)}
+                                                                            className="p-1.5 rounded-lg bg-rose-50 text-rose-600 dark:bg-rose-950/60 dark:text-rose-400 hover:bg-rose-600 hover:text-white transition-all cursor-pointer"
+                                                                            title="Delete Milestone"
+                                                                        >
+                                                                            <Trash2 className="size-3.5" />
+                                                                        </button>
+                                                                    )}
                                                                 </>
                                                             )}
                                                         </div>
@@ -1287,14 +1042,16 @@ export default function ClientPortalProjectsShow({
                                     </div>
                                 </div>
 
-                                <button
-                                    type="button"
-                                    onClick={openCreateTaskModal}
-                                    className="h-10 px-4 rounded-xl bg-gradient-to-r from-[#003796] via-[#0052D4] to-[#1d4ed8] text-white text-xs font-bold shadow-md shadow-blue-600/20 inline-flex items-center gap-2 cursor-pointer self-start sm:self-auto"
-                                >
-                                    <Plus className="size-4" />
-                                    <span>Add New Task</span>
-                                </button>
+                                {hasPermission(user, 'create-client-portal-project-tasks') && (
+                                    <button
+                                        type="button"
+                                        onClick={openCreateTaskModal}
+                                        className="h-10 px-4 rounded-xl bg-gradient-to-r from-[#003796] via-[#0052D4] to-[#1d4ed8] text-white text-xs font-bold shadow-md shadow-blue-600/20 inline-flex items-center gap-2 cursor-pointer self-start sm:self-auto"
+                                    >
+                                        <Plus className="size-4" />
+                                        <span>Add New Task</span>
+                                    </button>
+                                )}
                             </div>
 
                             <div className="w-full overflow-x-auto scrollbar-thin">
@@ -1348,39 +1105,49 @@ export default function ClientPortalProjectsShow({
                                                         </span>
                                                     </td>
                                                     <td className="px-3 py-3.5 whitespace-nowrap">
-                                                        <select
-                                                            value={task.status}
-                                                            onChange={(e) => handleTaskStatusQuickChange(task, e.target.value)}
-                                                            className="h-8 px-2.5 rounded-lg bg-slate-100 dark:bg-slate-800 text-[11px] font-bold text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700 focus:ring-1 focus:ring-blue-500 cursor-pointer"
-                                                        >
-                                                            <option value="todo">To Do</option>
-                                                            <option value="in_progress">In Progress</option>
-                                                            <option value="in_review">In Review</option>
-                                                            <option value="completed">Completed</option>
-                                                            <option value="cancelled">Cancelled</option>
-                                                        </select>
+                                                        {hasPermission(user, 'edit-client-portal-project-tasks') ? (
+                                                            <select
+                                                                value={task.status}
+                                                                onChange={(e) => handleTaskStatusQuickChange(task, e.target.value)}
+                                                                className="h-8 px-2.5 rounded-lg bg-slate-100 dark:bg-slate-800 text-[11px] font-bold text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700 focus:ring-1 focus:ring-blue-500 cursor-pointer"
+                                                            >
+                                                                <option value="todo">To Do</option>
+                                                                <option value="in_progress">In Progress</option>
+                                                                <option value="in_review">In Review</option>
+                                                                <option value="completed">Completed</option>
+                                                                <option value="cancelled">Cancelled</option>
+                                                            </select>
+                                                        ) : (
+                                                            <span className="capitalize text-xs font-semibold text-slate-700 dark:text-slate-300">
+                                                                {task.status.replace('_', ' ')}
+                                                            </span>
+                                                        )}
                                                     </td>
                                                     <td className="px-3 py-3.5 whitespace-nowrap font-medium text-slate-500">
                                                         {task.due_date ? formatDateOnly(task.due_date) : '-'}
                                                     </td>
                                                     <td className="px-3 py-3.5 text-right whitespace-nowrap">
                                                         <div className="flex items-center justify-end gap-1.5">
-                                                            <button
-                                                                type="button"
-                                                                onClick={() => openEditTaskModal(task)}
-                                                                className="p-1.5 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 transition-all cursor-pointer"
-                                                                title="Edit Task"
-                                                            >
-                                                                <Edit2 className="size-3.5" />
-                                                            </button>
-                                                            <button
-                                                                type="button"
-                                                                onClick={() => setDeletingTask(task)}
-                                                                className="p-1.5 rounded-lg bg-rose-50 text-rose-600 dark:bg-rose-950/60 dark:text-rose-400 hover:bg-rose-600 hover:text-white transition-all cursor-pointer"
-                                                                title="Delete Task"
-                                                            >
-                                                                <Trash2 className="size-3.5" />
-                                                            </button>
+                                                            {hasPermission(user, 'edit-client-portal-project-tasks') && (
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() => openEditTaskModal(task)}
+                                                                    className="p-1.5 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 transition-all cursor-pointer"
+                                                                    title="Edit Task"
+                                                                >
+                                                                    <Edit2 className="size-3.5" />
+                                                                </button>
+                                                            )}
+                                                            {hasPermission(user, 'delete-client-portal-project-tasks') && (
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() => setDeletingTask(task)}
+                                                                    className="p-1.5 rounded-lg bg-rose-50 text-rose-600 dark:bg-rose-950/60 dark:text-rose-400 hover:bg-rose-600 hover:text-white transition-all cursor-pointer"
+                                                                    title="Delete Task"
+                                                                >
+                                                                    <Trash2 className="size-3.5" />
+                                                                </button>
+                                                            )}
                                                         </div>
                                                     </td>
                                                 </tr>
@@ -1412,14 +1179,16 @@ export default function ClientPortalProjectsShow({
                                 </p>
                             </div>
 
-                            <button
-                                type="button"
-                                onClick={openCreateCredModal}
-                                className="h-10 px-4 rounded-xl bg-gradient-to-r from-[#003796] via-[#0052D4] to-[#1d4ed8] text-white text-xs font-bold shadow-md shadow-blue-600/20 inline-flex items-center gap-2 cursor-pointer self-start sm:self-auto"
-                            >
-                                <Plus className="size-4" />
-                                <span>Add Project Credential</span>
-                            </button>
+                            {hasPermission(user, 'create-client-portal-project-credentials') && (
+                                <button
+                                    type="button"
+                                    onClick={openCreateCredModal}
+                                    className="h-10 px-3 rounded-xl bg-gradient-to-r from-[#003796] via-[#0052D4] to-[#1d4ed8] text-white text-xs font-bold shadow-md shadow-blue-600/20 inline-flex items-center gap-2 cursor-pointer self-start sm:self-auto"
+                                >
+                                    <Plus className="size-4" />
+                                    <span>Add Project Credential</span>
+                                </button>
+                            )}
                         </div>
 
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
@@ -1467,22 +1236,26 @@ export default function ClientPortalProjectsShow({
                                                                 )}
                                                             </button>
                                                         )}
-                                                        <button
-                                                            type="button"
-                                                            onClick={() => openEditCredModal(cred)}
-                                                            className="p-1.5 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 transition-all cursor-pointer"
-                                                            title="Edit Credential"
-                                                        >
-                                                            <Edit2 className="size-3.5" />
-                                                        </button>
-                                                        <button
-                                                            type="button"
-                                                            onClick={() => setDeletingCred(cred)}
-                                                            className="p-1.5 rounded-lg bg-rose-50 text-rose-600 dark:bg-rose-950/60 dark:text-rose-400 hover:bg-rose-600 hover:text-white transition-all cursor-pointer"
-                                                            title="Delete Credential"
-                                                        >
-                                                            <Trash2 className="size-3.5" />
-                                                        </button>
+                                                        {hasPermission(user, 'edit-client-portal-project-credentials') && (
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => openEditCredModal(cred)}
+                                                                className="p-1.5 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 transition-all cursor-pointer"
+                                                                title="Edit Credential"
+                                                            >
+                                                                <Edit2 className="size-3.5" />
+                                                            </button>
+                                                        )}
+                                                        {hasPermission(user, 'delete-client-portal-project-credentials') && (
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => setDeletingCred(cred)}
+                                                                className="p-1.5 rounded-lg bg-rose-50 text-rose-600 dark:bg-rose-950/60 dark:text-rose-400 hover:bg-rose-600 hover:text-white transition-all cursor-pointer"
+                                                                title="Delete Credential"
+                                                            >
+                                                                <Trash2 className="size-3.5" />
+                                                            </button>
+                                                        )}
                                                     </div>
                                                 </div>
 
@@ -1500,6 +1273,17 @@ export default function ClientPortalProjectsShow({
                             )}
                         </div>
                     </div>
+                )}
+
+                {/* TAB 5: DOCUMENTS */}
+                {activeTab === 'documents' && (
+                    <DocumentsTab
+                        documents={project.documents || []}
+                        uploadUrl={`/client-portal/projects/${project.id}/documents/store`}
+                        deleteUrlPrefix={`/client-portal/projects/${project.id}/documents/destroy`}
+                        canUpload={hasPermission(user, 'create-client-portal-project-documents')}
+                        canDelete={hasPermission(user, 'delete-client-portal-project-documents')}
+                    />
                 )}
 
                 {/* MILESTONE PAYMENT MODAL (Create / Edit - STANDARD CRM DESIGN) */}
@@ -1528,7 +1312,7 @@ export default function ClientPortalProjectsShow({
                                 </button>
                             </div>
 
-                            <form onSubmit={handleMilestoneSubmit} className="space-y-4">
+                            <form noValidate onSubmit={handleMilestoneSubmit} className="space-y-4">
                                 {/* Remaining Unallocated Budget Banner */}
                                 <div className="p-3 rounded-2xl bg-blue-50 dark:bg-blue-950/60 border border-blue-200/80 dark:border-blue-800 text-xs flex items-center justify-between">
                                     <span className="font-bold text-blue-700 dark:text-blue-300">Remaining Allocatable Budget:</span>
@@ -1545,12 +1329,20 @@ export default function ClientPortalProjectsShow({
                                     <label className="text-xs font-bold text-slate-700 dark:text-slate-300">Milestone Title *</label>
                                     <input
                                         type="text"
-                                        required
                                         value={milestoneFormData.milestone_title}
-                                        onChange={(e) => setMilestoneFormData({ ...milestoneFormData, milestone_title: e.target.value })}
+                                        onChange={(e) => {
+                                            setMilestoneFormData({ ...milestoneFormData, milestone_title: e.target.value });
+                                            if (milestoneErrors.milestone_title) {
+                                                setMilestoneErrors((prev) => ({ ...prev, milestone_title: '' }));
+                                            }
+                                        }}
                                         placeholder="e.g. 50% Advance Payment / Final Settlement"
-                                        className="w-full h-11 px-4 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-xs font-medium focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                                        className={`w-full h-11 px-4 rounded-xl bg-slate-50 dark:bg-slate-950 border text-xs font-medium focus:ring-2 focus:ring-blue-500 focus:outline-none ${milestoneErrors.milestone_title ? 'border-rose-500 text-rose-600 focus:ring-rose-500' : 'border-slate-200 dark:border-slate-800'
+                                            }`}
                                     />
+                                    {milestoneErrors.milestone_title && (
+                                        <p className="text-[11px] font-bold text-rose-600 dark:text-rose-400 mt-1">{milestoneErrors.milestone_title}</p>
+                                    )}
                                 </div>
 
                                 <div className="grid grid-cols-2 gap-4">
@@ -1559,18 +1351,20 @@ export default function ClientPortalProjectsShow({
                                         <input
                                             type="number"
                                             step="0.01"
-                                            required
                                             value={milestoneFormData.amount}
                                             onChange={(e) => {
                                                 setMilestoneFormData({ ...milestoneFormData, amount: e.target.value });
                                                 setAmountError(null);
+                                                if (milestoneErrors.amount) {
+                                                    setMilestoneErrors((prev) => ({ ...prev, amount: '' }));
+                                                }
                                             }}
                                             placeholder="0.00"
-                                            className={`w-full h-11 px-4 rounded-xl bg-slate-50 dark:bg-slate-950 border text-xs font-medium focus:ring-2 focus:ring-blue-500 focus:outline-none ${amountError ? 'border-rose-500 text-rose-600' : 'border-slate-200 dark:border-slate-800'
+                                            className={`w-full h-11 px-4 rounded-xl bg-slate-50 dark:bg-slate-950 border text-xs font-medium focus:ring-2 focus:ring-blue-500 focus:outline-none ${amountError || milestoneErrors.amount ? 'border-rose-500 text-rose-600 focus:ring-rose-500' : 'border-slate-200 dark:border-slate-800'
                                                 }`}
                                         />
-                                        {amountError && (
-                                            <p className="text-[11px] font-bold text-rose-600 dark:text-rose-400 mt-1">{amountError}</p>
+                                        {(amountError || milestoneErrors.amount) && (
+                                            <p className="text-[11px] font-bold text-rose-600 dark:text-rose-400 mt-1">{amountError || milestoneErrors.amount}</p>
                                         )}
                                     </div>
 
@@ -1578,40 +1372,23 @@ export default function ClientPortalProjectsShow({
                                         <label className="text-xs font-bold text-slate-700 dark:text-slate-300">Payment Stage *</label>
                                         <select
                                             value={milestoneFormData.payment_stage}
-                                            onChange={(e) => setMilestoneFormData({ ...milestoneFormData, payment_stage: e.target.value as any })}
-                                            className="w-full h-11 px-3 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-xs font-semibold"
+                                            onChange={(e) => {
+                                                setMilestoneFormData({ ...milestoneFormData, payment_stage: e.target.value as any });
+                                                if (milestoneErrors.payment_stage) {
+                                                    setMilestoneErrors((prev) => ({ ...prev, payment_stage: '' }));
+                                                }
+                                            }}
+                                            className={`w-full h-11 px-3 rounded-xl bg-slate-50 dark:bg-slate-950 border text-xs font-semibold ${milestoneErrors.payment_stage ? 'border-rose-500 text-rose-600' : 'border-slate-200 dark:border-slate-800'
+                                                }`}
                                         >
                                             <option value="advance">Advance Payment</option>
                                             <option value="partial">Partial Payment</option>
                                             <option value="full">Full Settlement</option>
                                         </select>
+                                        {milestoneErrors.payment_stage && (
+                                            <p className="text-[11px] font-bold text-rose-600 dark:text-rose-400 mt-1">{milestoneErrors.payment_stage}</p>
+                                        )}
                                     </div>
-                                </div>
-
-                                <div className="grid grid-cols-2 gap-4">
-                                    <div className="space-y-1.5">
-                                        <label className="text-xs font-bold text-slate-700 dark:text-slate-300">Status *</label>
-                                        <select
-                                            value={milestoneFormData.status}
-                                            onChange={(e) => setMilestoneFormData({ ...milestoneFormData, status: e.target.value as any })}
-                                            className="w-full h-11 px-3 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-xs font-semibold"
-                                        >
-                                            <option value="pending">Pending</option>
-                                            <option value="paid">Paid / Cleared</option>
-                                        </select>
-                                    </div>
-
-                                    {milestoneFormData.status === 'paid' && (
-                                        <div className="space-y-1.5">
-                                            <label className="text-xs font-bold text-slate-700 dark:text-slate-300">Paid Date</label>
-                                            <input
-                                                type="date"
-                                                value={milestoneFormData.paid_at}
-                                                onChange={(e) => setMilestoneFormData({ ...milestoneFormData, paid_at: e.target.value })}
-                                                className="w-full h-11 px-4 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-xs font-medium"
-                                            />
-                                        </div>
-                                    )}
                                 </div>
 
                                 <div className="space-y-1.5">
@@ -1619,10 +1396,19 @@ export default function ClientPortalProjectsShow({
                                     <textarea
                                         rows={2}
                                         value={milestoneFormData.notes}
-                                        onChange={(e) => setMilestoneFormData({ ...milestoneFormData, notes: e.target.value })}
+                                        onChange={(e) => {
+                                            setMilestoneFormData({ ...milestoneFormData, notes: e.target.value });
+                                            if (milestoneErrors.notes) {
+                                                setMilestoneErrors((prev) => ({ ...prev, notes: '' }));
+                                            }
+                                        }}
                                         placeholder="Receipt reference or notes..."
-                                        className="w-full p-3 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-xs font-medium"
+                                        className={`w-full p-3 rounded-xl bg-slate-50 dark:bg-slate-950 border text-xs font-medium focus:ring-2 focus:ring-blue-500 focus:outline-none ${milestoneErrors.notes ? 'border-rose-500 text-rose-600' : 'border-slate-200 dark:border-slate-800'
+                                            }`}
                                     />
+                                    {milestoneErrors.notes && (
+                                        <p className="text-[11px] font-bold text-rose-600 dark:text-rose-400 mt-1">{milestoneErrors.notes}</p>
+                                    )}
                                 </div>
 
                                 <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-100 dark:border-slate-800">
@@ -1630,17 +1416,17 @@ export default function ClientPortalProjectsShow({
                                         type="button"
                                         onClick={() => setIsMilestoneModalOpen(false)}
                                         disabled={isMilestoneSubmitting}
-                                        className="h-11 px-5 rounded-xl border border-slate-200 dark:border-slate-800 text-xs font-bold text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                                        className="h-10 px-3 rounded-xl border border-slate-200 dark:border-slate-800 text-xs font-bold text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                                     >
                                         Cancel
                                     </button>
                                     <button
                                         type="submit"
                                         disabled={isMilestoneSubmitting}
-                                        className="h-11 px-6 rounded-xl bg-gradient-to-r from-[#003796] via-[#0052D4] to-[#1d4ed8] text-white text-xs font-bold shadow-md shadow-blue-600/20 inline-flex items-center gap-2 cursor-pointer hover:opacity-95 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                                        className="h-10 px-3 rounded-xl bg-gradient-to-r from-[#003796] via-[#0052D4] to-[#1d4ed8] text-white text-xs font-bold shadow-md shadow-blue-600/20 inline-flex items-center gap-2 cursor-pointer hover:opacity-95 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                                     >
                                         {isMilestoneSubmitting && <LoaderCircle className="size-4 animate-spin" />}
-                                        <span>Save Milestone</span>
+                                        <span>{editingMilestone ? 'Update Milestone' : 'Save Milestone'}</span>
                                     </button>
                                 </div>
                             </form>
@@ -1676,7 +1462,7 @@ export default function ClientPortalProjectsShow({
                                     type="button"
                                     onClick={() => setDeletingMilestone(null)}
                                     disabled={isMilestoneSubmitting}
-                                    className="h-11 px-5 rounded-xl border border-slate-200 dark:border-slate-800 text-xs font-bold text-slate-700 dark:text-slate-300 disabled:opacity-50 disabled:cursor-not-allowed"
+                                    className="h-10 px-3 rounded-xl border border-slate-200 dark:border-slate-800 text-xs font-bold text-slate-700 dark:text-slate-300 disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none"
                                 >
                                     Cancel
                                 </button>
@@ -1684,10 +1470,16 @@ export default function ClientPortalProjectsShow({
                                     type="button"
                                     onClick={handleDeleteMilestone}
                                     disabled={isMilestoneSubmitting}
-                                    className="h-11 px-5 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold inline-flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+                                    className="h-10 px-3 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold inline-flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none transition-all"
                                 >
-                                    {isMilestoneSubmitting && <LoaderCircle className="size-4 animate-spin" />}
-                                    <span>Delete Milestone</span>
+                                    {isMilestoneSubmitting ? (
+                                        <>
+                                            <LoaderCircle className="size-4 animate-spin" />
+                                            <span>Deleting...</span>
+                                        </>
+                                    ) : (
+                                        <span>Delete Milestone</span>
+                                    )}
                                 </button>
                             </div>
                         </div>
@@ -1840,14 +1632,14 @@ export default function ClientPortalProjectsShow({
                                         type="button"
                                         onClick={() => setIsTaskModalOpen(false)}
                                         disabled={isTaskSubmitting}
-                                        className="h-11 px-5 rounded-xl border border-slate-200 dark:border-slate-800 text-xs font-bold text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                                        className="h-10 px-3 rounded-xl border border-slate-200 dark:border-slate-800 text-xs font-bold text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                                     >
                                         Cancel
                                     </button>
                                     <button
                                         type="submit"
                                         disabled={isTaskSubmitting}
-                                        className="h-11 px-6 rounded-xl bg-gradient-to-r from-[#003796] via-[#0052D4] to-[#1d4ed8] text-white text-xs font-bold shadow-md shadow-blue-600/20 inline-flex items-center gap-2 cursor-pointer hover:opacity-95 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                                        className="h-10 px-3 rounded-xl bg-gradient-to-r from-[#003796] via-[#0052D4] to-[#1d4ed8] text-white text-xs font-bold shadow-md shadow-blue-600/20 inline-flex items-center gap-2 cursor-pointer hover:opacity-95 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                                     >
                                         {isTaskSubmitting && <LoaderCircle className="size-4 animate-spin" />}
                                         <span>{editingTask ? 'Update Task' : 'Save Task'}</span>
@@ -1886,7 +1678,7 @@ export default function ClientPortalProjectsShow({
                                     type="button"
                                     onClick={() => setDeletingTask(null)}
                                     disabled={isTaskSubmitting}
-                                    className="h-11 px-5 rounded-xl border border-slate-200 dark:border-slate-800 text-xs font-bold text-slate-700 dark:text-slate-300 disabled:opacity-50 disabled:cursor-not-allowed"
+                                    className="h-10 px-3 rounded-xl border border-slate-200 dark:border-slate-800 text-xs font-bold text-slate-700 dark:text-slate-300 disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none"
                                 >
                                     Cancel
                                 </button>
@@ -1894,10 +1686,16 @@ export default function ClientPortalProjectsShow({
                                     type="button"
                                     onClick={handleDeleteTask}
                                     disabled={isTaskSubmitting}
-                                    className="h-11 px-5 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold inline-flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+                                    className="h-10 px-3 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold inline-flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none transition-all"
                                 >
-                                    {isTaskSubmitting && <LoaderCircle className="size-4 animate-spin" />}
-                                    <span>Delete Task</span>
+                                    {isTaskSubmitting ? (
+                                        <>
+                                            <LoaderCircle className="size-4 animate-spin" />
+                                            <span>Deleting...</span>
+                                        </>
+                                    ) : (
+                                        <span>Delete Task</span>
+                                    )}
                                 </button>
                             </div>
                         </div>
@@ -1971,14 +1769,14 @@ export default function ClientPortalProjectsShow({
                                         type="button"
                                         onClick={() => setIsCredModalOpen(false)}
                                         disabled={isCredSubmitting}
-                                        className="h-11 px-5 rounded-xl border border-slate-200 dark:border-slate-800 text-xs font-bold text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                                        className="h-10 px-3 rounded-xl border border-slate-200 dark:border-slate-800 text-xs font-bold text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                                     >
                                         Cancel
                                     </button>
                                     <button
                                         type="submit"
                                         disabled={isCredSubmitting}
-                                        className="h-11 px-6 rounded-xl bg-gradient-to-r from-[#003796] via-[#0052D4] to-[#1d4ed8] text-white text-xs font-bold shadow-md shadow-blue-600/20 inline-flex items-center gap-2 cursor-pointer hover:opacity-95 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                                        className="h-10 px-3 rounded-xl bg-gradient-to-r from-[#003796] via-[#0052D4] to-[#1d4ed8] text-white text-xs font-bold shadow-md shadow-blue-600/20 inline-flex items-center gap-2 cursor-pointer hover:opacity-95 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                                     >
                                         {isCredSubmitting && <LoaderCircle className="size-4 animate-spin" />}
                                         <span>{editingCred ? 'Update Credential' : 'Save Credential'}</span>
@@ -2017,7 +1815,7 @@ export default function ClientPortalProjectsShow({
                                     type="button"
                                     onClick={() => setDeletingCred(null)}
                                     disabled={isCredSubmitting}
-                                    className="h-11 px-5 rounded-xl border border-slate-200 dark:border-slate-800 text-xs font-bold text-slate-700 dark:text-slate-300 disabled:opacity-50 disabled:cursor-not-allowed"
+                                    className="h-10 px-3 rounded-xl border border-slate-200 dark:border-slate-800 text-xs font-bold text-slate-700 dark:text-slate-300 disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none"
                                 >
                                     Cancel
                                 </button>
@@ -2025,10 +1823,64 @@ export default function ClientPortalProjectsShow({
                                     type="button"
                                     onClick={handleDeleteCred}
                                     disabled={isCredSubmitting}
-                                    className="h-11 px-5 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold inline-flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+                                    className="h-10 px-3 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold inline-flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none transition-all"
                                 >
-                                    {isCredSubmitting && <LoaderCircle className="size-4 animate-spin" />}
-                                    <span>Delete Credential</span>
+                                    {isCredSubmitting ? (
+                                        <>
+                                            <LoaderCircle className="size-4 animate-spin" />
+                                            <span>Deleting...</span>
+                                        </>
+                                    ) : (
+                                        <span>Delete Credential</span>
+                                    )}
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                )}
+                {/* GENERATE INVOICE CONFIRMATION MODAL */}
+                {confirmingInvoiceMilestone && (
+                    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-900/60 backdrop-blur-xs overflow-y-auto">
+                        <div className="w-full max-w-md max-h-[90vh] my-auto overflow-y-auto rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-4 sm:p-6 shadow-2xl space-y-4 text-center animate-in fade-in zoom-in-95 duration-200 relative">
+                            <button
+                                type="button"
+                                onClick={() => setConfirmingInvoiceMilestone(null)}
+                                className="absolute top-4 right-4 size-8 rounded-xl text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-all flex items-center justify-center cursor-pointer"
+                            >
+                                <X className="size-4" />
+                            </button>
+
+                            <div className="size-12 rounded-2xl bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400 mx-auto flex items-center justify-center">
+                                <FileText className="size-6" />
+                            </div>
+
+                            <div className="space-y-1">
+                                <h3 className="text-base font-black text-slate-900 dark:text-white">Generate Invoice Confirmation</h3>
+                                <p className="text-xs text-slate-500 dark:text-slate-400">
+                                    Are you sure you want to generate an official invoice for milestone <strong>"{confirmingInvoiceMilestone.milestone_title}"</strong> ({formatCurrency(confirmingInvoiceMilestone.amount)})?
+                                </p>
+                                <p className="text-[11px] text-amber-600 dark:text-amber-400 font-semibold mt-2">
+                                    Note: Once generated, this milestone record will be locked from editing or deletion.
+                                </p>
+                            </div>
+
+                            <div className="flex items-center justify-center gap-3 pt-2 border-t border-slate-100 dark:border-slate-800">
+                                <button
+                                    type="button"
+                                    onClick={() => setConfirmingInvoiceMilestone(null)}
+                                    disabled={generatingInvoiceId === confirmingInvoiceMilestone.id}
+                                    className="h-10 px-3 rounded-xl border border-slate-200 dark:border-slate-800 text-xs font-bold text-slate-700 dark:text-slate-300 disabled:opacity-50 cursor-pointer"
+                                >
+                                    Cancel
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={handleExecuteGenerateInvoice}
+                                    disabled={generatingInvoiceId === confirmingInvoiceMilestone.id}
+                                    className="h-10 px-3 rounded-xl bg-gradient-to-r from-[#003796] via-[#0052D4] to-[#1d4ed8] hover:opacity-95 text-white text-xs font-bold inline-flex items-center gap-2 disabled:opacity-50 cursor-pointer shadow-md shadow-blue-600/20"
+                                >
+                                    {generatingInvoiceId === confirmingInvoiceMilestone.id && <LoaderCircle className="size-4 animate-spin" />}
+                                    <span>Yes, Generate Invoice</span>
                                 </button>
                             </div>
                         </div>

@@ -49,4 +49,14 @@ class ClientService extends Model
     {
         return $this->hasMany(ServicePayment::class, 'client_service_id');
     }
+
+    public function credentials(): HasMany
+    {
+        return $this->hasMany(ClientCredential::class, 'client_service_id');
+    }
+
+    public function documents(): HasMany
+    {
+        return $this->hasMany(ClientDocument::class, 'client_service_id');
+    }
 }

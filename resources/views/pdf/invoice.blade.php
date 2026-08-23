@@ -286,10 +286,7 @@
                     <div class="info-text">
                         <strong>Issue Date:</strong> {{ \Carbon\Carbon::parse($invoice->issue_date)->format('M d, Y') }}<br>
                         <strong>Due Date:</strong> {{ \Carbon\Carbon::parse($invoice->due_date)->format('M d, Y') }}<br>
-                        <strong>Billing Currency:</strong> {{ $invoice->currency_code }}<br>
-                        @if($invoice->currency_code !== 'PKR')
-                            <strong>Exchange Rate:</strong> 1 {{ $invoice->currency_code }} = PKR {{ number_format($invoice->exchange_rate_to_pkr, 2) }}
-                        @endif
+                        <strong>Billing Currency:</strong> {{ $invoice->currency_code }}
                     </div>
                 </div>
             </td>
@@ -345,13 +342,6 @@
             </tr>
         </table>
         <div class="clear"></div>
-
-        @if($invoice->currency_code !== 'PKR')
-            <div class="pkr-banner text-right" style="width: 320px; float: right; margin-top: 8px;">
-                <strong>PKR Converted Total:</strong> PKR {{ number_format($invoice->total_amount_pkr, 2) }}
-            </div>
-            <div class="clear"></div>
-        @endif
     </div>
 
     <!-- Notes & Terms -->

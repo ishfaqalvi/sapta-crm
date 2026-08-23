@@ -1,6 +1,7 @@
 import { SidebarGroup, SidebarGroupLabel, SidebarMenu, SidebarMenuItem } from '@/components/ui/sidebar';
 import { type NavGroup, type NavItem } from '@/types';
 import { Link, usePage } from '@inertiajs/react';
+import { useEffect, useRef } from 'react';
 
 interface NavMainProps {
     groups?: NavGroup[];
@@ -9,6 +10,20 @@ interface NavMainProps {
 
 export function NavMain({ groups = [], items = [] }: NavMainProps) {
     const page = usePage();
+    const activeRef = useRef<HTMLAnchorElement | null>(null);
+
+    useEffect(() => {
+        if (activeRef.current) {
+            const timer = setTimeout(() => {
+                activeRef.current?.scrollIntoView({
+                    behavior: 'smooth',
+                    block: 'center',
+                    inline: 'nearest',
+                });
+            }, 150);
+            return () => clearTimeout(timer);
+        }
+    }, [page.url]);
 
     if (groups && groups.length > 0) {
         return (
@@ -27,6 +42,7 @@ export function NavMain({ groups = [], items = [] }: NavMainProps) {
                                 return (
                                     <SidebarMenuItem key={item.title}>
                                         <Link
+                                            ref={isActive ? activeRef : null}
                                             href={item.url}
                                             prefetch
                                             className={`flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs transition-all ${
@@ -65,6 +81,7 @@ export function NavMain({ groups = [], items = [] }: NavMainProps) {
                     return (
                         <SidebarMenuItem key={item.title}>
                             <Link
+                                ref={isActive ? activeRef : null}
                                 href={item.url}
                                 prefetch
                                 className={`flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs sm:text-sm transition-all ${

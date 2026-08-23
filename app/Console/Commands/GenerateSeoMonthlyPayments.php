@@ -2,8 +2,9 @@
 
 namespace App\Console\Commands;
 
-use App\Models\SeoPayment;
-use App\Models\SeoRetainer;
+use App\Models\ClientService;
+use App\Models\ServicePayment;
+use App\Services\CurrencyService;
 use Illuminate\Console\Command;
 
 class GenerateSeoMonthlyPayments extends Command
@@ -13,14 +14,14 @@ class GenerateSeoMonthlyPayments extends Command
      *
      * @var string
      */
-    protected $signature = 'seo:generate-monthly-payments {--month= : Target billing month in Y-m format}';
+    protected $signature = 'services:generate-monthly-payments {--month= : Target billing month in Y-m format}';
 
     /**
      * The console command description.
      *
      * @var string
      */
-    protected $description = 'Automatically generate monthly billing logs for all active SEO Retainers';
+    protected $description = 'Automatically generate monthly billing logs for all active Client Services';
 
     /**
      * Execute the console command.
@@ -29,22 +30,25 @@ class GenerateSeoMonthlyPayments extends Command
     {
         $billingMonth = $this->option('month') ?: date('Y-m');
 
-        $activeRetainers = SeoRetainer::where('status', 'active')->get();
+        $activeServices = ClientService::where('status', 'active')->get();
         $generatedCount = 0;
 
-        foreach ($activeRetainers as $retainer) {
-            // Check if billing log already exists for this retainer & month
-            $exists = SeoPayment::where('seo_retainer_id', $retainer->id)
+        foreach ($activeServices as $service) {
+            // Check if billing log already exists for this service & month
+            $exists = ServicePayment::where('client_service_id', $service->id)
                 ->where('billing_month', $billingMonth)
                 ->exists();
 
             if (!$exists) {
-                SeoPayment::create([
-                    'seo_retainer_id' => $retainer->id,
-                    'client_id' => $retainer->client_id,
+                $rate = CurrencyService::getRate($service->currency);
+                ServicePayment::create([
+                    'client_service_id' => $service->id,
+                    'client_id' => $service->client_id,
                     'billing_month' => $billingMonth,
-                    'amount_due' => $retainer->monthly_fee,
+                    'amount_due' => $service->monthly_fee,
                     'amount_paid' => 0.00,
+                    'exchange_rate' => $rate,
+                    'amount_paid_pkr' => 0.00,
                     'status' => 'due_pending',
                     'notes' => 'Auto-generated monthly billing log for ' . $billingMonth,
                 ]);
@@ -52,8 +56,9 @@ class GenerateSeoMonthlyPayments extends Command
             }
         }
 
-        $this->info("Successfully generated {$generatedCount} new SEO payment billing logs for {$billingMonth}.");
+        $this->info("Successfully generated {$generatedCount} new service payment billing logs for {$billingMonth}.");
 
         return Command::SUCCESS;
     }
 }
+

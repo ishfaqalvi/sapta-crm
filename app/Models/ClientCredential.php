@@ -13,6 +13,7 @@ class ClientCredential extends Model
     protected $fillable = [
         'client_id',
         'website_project_id',
+        'client_service_id',
         'title',
         'type',
         'username',
@@ -35,5 +36,13 @@ class ClientCredential extends Model
     public function project(): BelongsTo
     {
         return $this->belongsTo(WebsiteProject::class, 'website_project_id');
+    }
+
+    /**
+     * Get the service associated with the credential.
+     */
+    public function service(): BelongsTo
+    {
+        return $this->belongsTo(ClientService::class, 'client_service_id');
     }
 }

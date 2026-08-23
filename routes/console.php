@@ -11,3 +11,5 @@ Artisan::command('inspire', function () {
 // Auto-check and generate monthly SEO retainer payment logs every day
 Schedule::command('seo:generate-monthly-payments')->daily();
 
+// Auto-scan and dispatch daily notification alerts (domains, hostings, invoices, tasks, daily digest)
+Schedule::command('crm:send-daily-alerts')->dailyAt('08:00');

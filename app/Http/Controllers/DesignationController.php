@@ -90,6 +90,10 @@ class DesignationController extends Controller
      */
     public function destroy(Designation $designation): RedirectResponse
     {
+        if ($designation->employees()->count() > 0) {
+            return redirect()->back()->with('error', 'Cannot delete designation assigned to existing employees.');
+        }
+
         $designation->delete();
         return redirect()->back()->with('success', 'Designation deleted successfully!');
     }

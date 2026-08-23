@@ -7,6 +7,7 @@ import { type BreadcrumbItem, type SharedData } from '@/types';
 import { hasPermission } from '@/utils/permissions';
 import { Head, router, useForm, usePage } from '@inertiajs/react';
 import {
+    AlertTriangle,
     CheckCircle2,
     Edit2,
     FolderKanban,
@@ -158,7 +159,7 @@ export default function ServiceCategoriesIndex({ categories, stats, filters }: S
                     {hasPermission(user, 'create-service-categories') && (
                         <button
                             onClick={() => setIsCreateOpen(true)}
-                            className="h-11 px-5 text-xs sm:text-sm font-bold rounded-xl bg-gradient-to-r from-[#003796] via-[#0052D4] to-[#1d4ed8] hover:from-[#002a75] hover:to-[#0040b8] text-white shadow-md shadow-blue-600/20 active:scale-[0.99] transition-all inline-flex items-center gap-2 shrink-0 self-start sm:self-auto cursor-pointer"
+                            className="h-10 px-3 text-xs font-bold rounded-xl bg-gradient-to-r from-[#003796] via-[#0052D4] to-[#1d4ed8] hover:from-[#002a75] hover:to-[#0040b8] text-white shadow-md shadow-blue-600/20 active:scale-[0.99] transition-all inline-flex items-center gap-2 shrink-0 self-start sm:self-auto cursor-pointer"
                         >
                             <Plus className="size-4" />
                             <span>Add New Category</span>
@@ -328,7 +329,7 @@ export default function ServiceCategoriesIndex({ categories, stats, filters }: S
                                     className="p-1 rounded-lg text-slate-400 hover:bg-slate-100 hover:text-slate-600 dark:hover:bg-slate-800 dark:hover:text-slate-200"
                                 >
                                     <X className="size-5" />
-                                </button>
+                                 </button>
                             </div>
 
                             <form onSubmit={handleCreateSubmit} noValidate className="space-y-4">
@@ -342,7 +343,11 @@ export default function ServiceCategoriesIndex({ categories, stats, filters }: S
                                         onChange={(e) => createForm.setData('name', e.target.value)}
                                         placeholder="e.g. SEO Retainers or PPC Advertising"
                                         required
-                                        className="h-11 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-sm font-semibold text-slate-900 dark:text-white focus:bg-white focus:border-blue-600 transition-all"
+                                        className={`h-11 rounded-xl bg-slate-50 dark:bg-slate-950 text-sm font-semibold text-slate-900 dark:text-white transition-all ${
+                                            createForm.errors.name
+                                                ? 'border-rose-500 ring-2 ring-rose-500/20 focus:border-rose-500 focus:ring-rose-500/20'
+                                                : 'border-slate-200 dark:border-slate-800 focus:bg-white focus:border-blue-600 focus:ring-4 focus:ring-blue-600/10'
+                                        }`}
                                     />
                                     {createForm.errors.name && (
                                         <p className="text-xs font-semibold text-rose-500">{createForm.errors.name}</p>
@@ -369,14 +374,14 @@ export default function ServiceCategoriesIndex({ categories, stats, filters }: S
                                         type="button"
                                         variant="outline"
                                         onClick={() => setIsCreateOpen(false)}
-                                        className="h-11 px-5 rounded-xl text-xs font-bold"
+                                        className="h-10 px-5 rounded-xl text-xs font-bold"
                                     >
                                         Cancel
                                     </Button>
                                     <Button
                                         type="submit"
                                         disabled={createForm.processing}
-                                        className="h-11 px-5 rounded-xl bg-gradient-to-r from-[#003796] via-[#0052D4] to-[#1d4ed8] hover:from-[#002a75] hover:to-[#0040b8] text-white text-xs font-bold shadow-md shadow-blue-600/20 active:scale-[0.99] transition-all cursor-pointer inline-flex items-center gap-2"
+                                        className="h-10 px-5 rounded-xl bg-gradient-to-r from-[#003796] via-[#0052D4] to-[#1d4ed8] hover:from-[#002a75] hover:to-[#0040b8] text-white text-xs font-bold shadow-md shadow-blue-600/20 active:scale-[0.99] transition-all cursor-pointer inline-flex items-center gap-2"
                                     >
                                         {createForm.processing ? (
                                             <>
@@ -430,7 +435,11 @@ export default function ServiceCategoriesIndex({ categories, stats, filters }: S
                                         value={editForm.data.name}
                                         onChange={(e) => editForm.setData('name', e.target.value)}
                                         required
-                                        className="h-11 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-sm font-semibold text-slate-900 dark:text-white focus:bg-white focus:border-blue-600 transition-all"
+                                        className={`h-11 rounded-xl bg-slate-50 dark:bg-slate-950 text-sm font-semibold text-slate-900 dark:text-white transition-all ${
+                                            editForm.errors.name
+                                                ? 'border-rose-500 ring-2 ring-rose-500/20 focus:border-rose-500 focus:ring-rose-500/20'
+                                                : 'border-slate-200 dark:border-slate-800 focus:bg-white focus:border-blue-600 focus:ring-4 focus:ring-blue-600/10'
+                                        }`}
                                     />
                                     {editForm.errors.name && (
                                         <p className="text-xs font-semibold text-rose-500">{editForm.errors.name}</p>
@@ -457,14 +466,14 @@ export default function ServiceCategoriesIndex({ categories, stats, filters }: S
                                         type="button"
                                         variant="outline"
                                         onClick={() => setEditingCategory(null)}
-                                        className="h-11 px-5 rounded-xl text-xs font-bold"
+                                        className="h-10 px-5 rounded-xl text-xs font-bold"
                                     >
                                         Cancel
                                     </Button>
                                     <Button
                                         type="submit"
                                         disabled={editForm.processing}
-                                        className="h-11 px-5 rounded-xl bg-gradient-to-r from-[#003796] via-[#0052D4] to-[#1d4ed8] hover:from-[#002a75] hover:to-[#0040b8] text-white text-xs font-bold shadow-md shadow-blue-600/20 active:scale-[0.99] transition-all cursor-pointer inline-flex items-center gap-2"
+                                        className="h-10 px-5 rounded-xl bg-gradient-to-r from-[#003796] via-[#0052D4] to-[#1d4ed8] hover:from-[#002a75] hover:to-[#0040b8] text-white text-xs font-bold shadow-md shadow-blue-600/20 active:scale-[0.99] transition-all cursor-pointer inline-flex items-center gap-2"
                                     >
                                         {editForm.processing ? (
                                             <>
@@ -483,44 +492,59 @@ export default function ServiceCategoriesIndex({ categories, stats, filters }: S
 
                 {/* DELETE CONFIRMATION MODAL */}
                 {deletingCategory && (
-                    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs overflow-y-auto">
-                        <div className="w-full max-w-md rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-6 shadow-2xl space-y-4 text-center animate-in fade-in zoom-in-95 duration-200">
+                    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-900/60 backdrop-blur-xs overflow-y-auto">
+                        <div className="w-full max-w-md max-h-[90vh] my-auto overflow-y-auto rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-4 sm:p-6 shadow-2xl space-y-4 text-center animate-in fade-in zoom-in-95 duration-200 relative">
+                            <button
+                                type="button"
+                                onClick={() => setDeletingCategory(null)}
+                                className="absolute top-4 right-4 size-8 rounded-xl text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-all flex items-center justify-center cursor-pointer"
+                            >
+                                <X className="size-4" />
+                            </button>
+
                             <div className="size-12 rounded-2xl bg-rose-50 dark:bg-rose-950/60 text-rose-600 dark:text-rose-400 mx-auto flex items-center justify-center">
-                                <Trash2 className="size-6" />
+                                <AlertTriangle className="size-6" />
                             </div>
 
                             <div className="space-y-1">
                                 <h3 className="text-base font-black text-slate-900 dark:text-white">Delete Service Category?</h3>
                                 <p className="text-xs text-slate-500 dark:text-slate-400">
-                                    Are you sure you want to delete category <strong>"{deletingCategory.name}"</strong>?
+                                    Are you sure you want to delete category <strong className="text-slate-900 dark:text-white">"{deletingCategory.name}"</strong>? This action cannot be undone.
                                 </p>
                             </div>
 
+                            {deletingCategory.services_count && deletingCategory.services_count > 0 ? (
+                                <div className="p-3 rounded-xl bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800 text-xs font-medium text-amber-800 dark:text-amber-300 text-left">
+                                    <strong>Cannot Delete:</strong> This category is assigned to {deletingCategory.services_count} client service(s). Reassign or delete those services first.
+                                </div>
+                            ) : null}
+
                             <div className="flex items-center justify-center gap-3 pt-2 border-t border-slate-100 dark:border-slate-800">
-                                <Button
+                                <button
                                     type="button"
-                                    variant="outline"
                                     onClick={() => setDeletingCategory(null)}
                                     disabled={isDeleting}
-                                    className="h-11 px-5 rounded-xl text-xs font-bold"
+                                    className="h-10 px-4 rounded-xl border border-slate-200 dark:border-slate-800 text-xs font-bold text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                                 >
                                     Cancel
-                                </Button>
-                                <Button
-                                    type="button"
-                                    onClick={handleDeleteSubmit}
-                                    disabled={isDeleting}
-                                    className="h-11 px-5 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold shadow-md shadow-rose-600/20 active:scale-[0.99] transition-all cursor-pointer inline-flex items-center gap-2"
-                                >
-                                    {isDeleting ? (
-                                        <>
-                                            <LoaderCircle className="size-4 animate-spin" />
-                                            <span>Deleting...</span>
-                                        </>
-                                    ) : (
-                                        <span>Delete Category</span>
-                                    )}
-                                </Button>
+                                </button>
+                                {!(deletingCategory.services_count && deletingCategory.services_count > 0) && (
+                                    <button
+                                        type="button"
+                                        onClick={handleDeleteSubmit}
+                                        disabled={isDeleting}
+                                        className="h-10 px-4 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold inline-flex items-center gap-2 shadow-md shadow-rose-600/20 active:scale-[0.99] cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+                                    >
+                                        {isDeleting ? (
+                                            <>
+                                                <LoaderCircle className="size-4 animate-spin" />
+                                                <span>Deleting...</span>
+                                            </>
+                                        ) : (
+                                            <span>Delete Category</span>
+                                        )}
+                                    </button>
+                                )}
                             </div>
                         </div>
                     </div>

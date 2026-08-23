@@ -13,8 +13,10 @@ import {
     Eye,
     FileText,
     Globe,
+    LoaderCircle,
     Pencil,
     Plus,
+    Printer,
     Receipt,
     Search,
     Trash2,
@@ -97,8 +99,10 @@ export default function ClientPortalInvoicesIndex({
     // Modals
     const [viewingInvoice, setViewingInvoice] = useState<ClientInvoiceItem | null>(null);
     const [deletingInvoice, setDeletingInvoice] = useState<ClientInvoiceItem | null>(null);
+    const [markingPaidInvoice, setMarkingPaidInvoice] = useState<ClientInvoiceItem | null>(null);
+    const [isDeleting, setIsDeleting] = useState(false);
+    const [isMarkingPaid, setIsMarkingPaid] = useState(false);
 
-    const { delete: destroy, processing } = useForm();
     const isFirstRender = useRef(true);
 
     useEffect(() => {
@@ -127,8 +131,27 @@ export default function ClientPortalInvoicesIndex({
 
     const handleDelete = () => {
         if (!deletingInvoice) return;
-        destroy(`/client-portal/invoices/destroy/${deletingInvoice.id}`, {
-            onSuccess: () => setDeletingInvoice(null),
+        setIsDeleting(true);
+        router.delete(`/client-portal/invoices/destroy/${deletingInvoice.id}`, {
+            onSuccess: () => {
+                setIsDeleting(false);
+                setDeletingInvoice(null);
+            },
+            onError: () => setIsDeleting(false),
+            onFinish: () => setIsDeleting(false),
+        });
+    };
+
+    const handleMarkPaid = () => {
+        if (!markingPaidInvoice) return;
+        setIsMarkingPaid(true);
+        router.patch(`/client-portal/invoices/${markingPaidInvoice.id}/status`, { status: 'paid' }, {
+            onSuccess: () => {
+                setIsMarkingPaid(false);
+                setMarkingPaidInvoice(null);
+            },
+            onError: () => setIsMarkingPaid(false),
+            onFinish: () => setIsMarkingPaid(false),
         });
     };
 
@@ -185,7 +208,7 @@ export default function ClientPortalInvoicesIndex({
                     {hasPermission(user, 'create-client-portal-invoices') && (
                         <Link
                             href="/client-portal/invoices/create"
-                            className="bg-gradient-to-r from-[#003796] via-[#0052D4] to-[#1d4ed8] hover:opacity-95 text-white text-xs font-bold px-4 py-2.5 rounded-xl shadow-md shadow-blue-500/20 flex items-center gap-2 cursor-pointer transition-all self-start sm:self-auto shrink-0"
+                            className="bg-gradient-to-r from-[#003796] via-[#0052D4] to-[#1d4ed8] hover:opacity-95 text-white text-xs font-bold h-10 px-3 rounded-xl shadow-md shadow-blue-500/20 flex items-center gap-2 cursor-pointer transition-all self-start sm:self-auto shrink-0"
                         >
                             <Plus className="size-4" />
                             <span>Create Invoice</span>
@@ -273,7 +296,6 @@ export default function ClientPortalInvoicesIndex({
                             <option value="paid">Paid</option>
                             <option value="sent">Sent / Pending</option>
                             <option value="overdue">Overdue</option>
-                            <option value="draft">Draft</option>
                             <option value="cancelled">Cancelled</option>
                         </select>
 
@@ -346,38 +368,47 @@ export default function ClientPortalInvoicesIndex({
 
                                             <td className="px-6 py-4 text-right">
                                                 <div className="flex items-center justify-end gap-1.5">
+                                                    {item.status !== 'paid' && hasPermission(user, 'edit-client-portal-invoices') && (
+                                                        <button
+                                                            onClick={() => setMarkingPaidInvoice(item)}
+                                                            className="size-8 rounded-xl bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-600 hover:text-white dark:hover:bg-emerald-600 dark:hover:text-white transition-all flex items-center justify-center cursor-pointer shadow-2xs"
+                                                            title="Mark as Paid"
+                                                        >
+                                                            <CheckCircle2 className="size-3.5" />
+                                                        </button>
+                                                    )}
+
                                                     <button
                                                         onClick={() => setViewingInvoice(item)}
-                                                        className="p-1.5 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 transition-all font-bold text-[11px] cursor-pointer"
-                                                        title="View Details"
+                                                        className="size-8 rounded-xl bg-purple-50 dark:bg-purple-950/60 text-purple-600 dark:purple-400 hover:bg-purple-600 hover:text-white dark:hover:bg-purple-600 dark:hover:text-white transition-all flex items-center justify-center cursor-pointer shadow-2xs"
+                                                        title="View Invoice Details"
                                                     >
                                                         <Eye className="size-3.5" />
                                                     </button>
-                                                    {hasPermission(user, 'edit-client-portal-invoices') && (
+                                                    {item.status !== 'paid' && hasPermission(user, 'edit-client-portal-invoices') && (
                                                         <Link
                                                             href={`/client-portal/invoices/${item.id}/edit`}
-                                                            className="p-1.5 rounded-xl bg-blue-50 dark:bg-blue-950 text-blue-600 dark:text-blue-400 hover:bg-blue-100 transition-all font-bold text-[11px] cursor-pointer"
-                                                            title="Edit Invoice Page"
+                                                            className="size-8 rounded-xl bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400 hover:bg-blue-600 hover:text-white dark:hover:bg-blue-600 dark:hover:text-white transition-all flex items-center justify-center cursor-pointer shadow-2xs"
+                                                            title="Edit Invoice"
                                                         >
                                                             <Pencil className="size-3.5" />
                                                         </Link>
                                                     )}
-                                                    {hasPermission(user, 'download-client-portal-invoices') && (
+                                                    {hasPermission(user, 'print-client-portal-invoices') && (
                                                         <a
                                                             href={`/client-portal/invoices/${item.id}/pdf`}
                                                             target="_blank"
                                                             rel="noopener noreferrer"
-                                                            className="px-2.5 py-1.5 rounded-xl bg-gradient-to-r from-[#003796] via-[#0052D4] to-[#1d4ed8] hover:opacity-95 text-white transition-all flex items-center gap-1 font-bold text-[11px] cursor-pointer shadow-md shadow-blue-500/20"
-                                                            title="Download PDF"
+                                                            className="size-8 rounded-lg bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400 hover:bg-gradient-to-r hover:from-[#003796] hover:via-[#0052D4] hover:to-[#1d4ed8] hover:text-white transition-all flex items-center justify-center cursor-pointer border border-blue-200/50 hover:border-transparent"
+                                                            title="Download / Print PDF"
                                                         >
-                                                            <Download className="size-3.5" />
-                                                            <span>PDF</span>
+                                                            <Printer className="size-3.5" />
                                                         </a>
                                                     )}
                                                     {item.status !== 'paid' && hasPermission(user, 'delete-client-portal-invoices') && (
                                                         <button
                                                             onClick={() => setDeletingInvoice(item)}
-                                                            className="p-1.5 rounded-xl bg-rose-50 dark:bg-rose-950 text-rose-600 dark:text-rose-400 hover:bg-rose-100 transition-all font-bold text-[11px] cursor-pointer"
+                                                            className="size-8 rounded-xl bg-rose-50 dark:bg-rose-950/40 text-rose-600 dark:text-rose-400 hover:bg-rose-600 hover:text-white dark:hover:bg-rose-600 dark:hover:text-white transition-all flex items-center justify-center cursor-pointer shadow-2xs"
                                                             title="Delete Invoice"
                                                         >
                                                             <Trash2 className="size-3.5" />
@@ -402,6 +433,52 @@ export default function ClientPortalInvoicesIndex({
                 {/* Pagination */}
                 {invoices.data.length > 0 && <Pagination meta={invoices} />}
             </div>
+
+            {/* Mark as Paid Confirmation Modal */}
+            {markingPaidInvoice && (
+                <div className="fixed inset-0 z-50 bg-slate-950/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
+                    <div className="bg-white dark:bg-slate-900 rounded-3xl p-4 sm:p-6 max-w-md w-full max-h-[90vh] my-auto overflow-y-auto border border-slate-200 dark:border-slate-800 shadow-2xl space-y-4">
+                        <div className="flex items-center gap-3 text-emerald-600 dark:text-emerald-400">
+                            <div className="p-2.5 rounded-2xl bg-emerald-50 dark:bg-emerald-950">
+                                <CheckCircle2 className="size-6" />
+                            </div>
+                            <div>
+                                <h3 className="font-extrabold text-slate-900 dark:text-white text-base">Mark Invoice as Paid</h3>
+                                <p className="text-xs text-slate-500 dark:text-slate-400">Confirm payment receipt</p>
+                            </div>
+                        </div>
+
+                        <p className="text-xs text-slate-600 dark:text-slate-300 font-medium">
+                            Are you sure you want to mark invoice statement <strong className="text-slate-900 dark:text-white">{markingPaidInvoice.invoice_number}</strong> as Paid? This will automatically sync linked items to Paid/Active.
+                        </p>
+
+                        <div className="flex items-center justify-end gap-3 pt-2">
+                            <button
+                                type="button"
+                                onClick={() => setMarkingPaidInvoice(null)}
+                                className="h-10 px-3 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 text-slate-700 dark:text-slate-300 text-xs font-bold transition-all cursor-pointer"
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                type="button"
+                                onClick={handleMarkPaid}
+                                disabled={isMarkingPaid}
+                                className="h-10 px-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold transition-all shadow-md shadow-emerald-600/20 active:scale-[0.99] cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed inline-flex items-center gap-2"
+                            >
+                                {isMarkingPaid ? (
+                                    <>
+                                        <LoaderCircle className="size-4 animate-spin" />
+                                        <span>Confirming...</span>
+                                    </>
+                                ) : (
+                                    <span>Confirm Paid</span>
+                                )}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
 
             {/* View Invoice Details Modal */}
             {viewingInvoice && (
@@ -521,7 +598,7 @@ export default function ClientPortalInvoicesIndex({
                             <button
                                 type="button"
                                 onClick={() => setViewingInvoice(null)}
-                                className="px-4 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 text-slate-700 dark:text-slate-300 text-xs font-bold transition-all cursor-pointer"
+                                className="h-10 px-3 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 text-slate-700 dark:text-slate-300 text-xs font-bold transition-all cursor-pointer"
                             >
                                 Close
                             </button>
@@ -529,10 +606,10 @@ export default function ClientPortalInvoicesIndex({
                                 href={`/client-portal/invoices/${viewingInvoice.id}/pdf`}
                                 target="_blank"
                                 rel="noopener noreferrer"
-                                className="px-5 py-2 rounded-xl bg-gradient-to-r from-[#003796] via-[#0052D4] to-[#1d4ed8] hover:opacity-95 text-white text-xs font-bold transition-all shadow-md shadow-blue-500/20 flex items-center gap-2 cursor-pointer"
+                                className="h-10 px-3 rounded-xl bg-gradient-to-r from-[#003796] via-[#0052D4] to-[#1d4ed8] hover:opacity-95 text-white text-xs font-bold transition-all shadow-md shadow-blue-500/20 flex items-center gap-2 cursor-pointer"
                             >
-                                <Download className="size-4" />
-                                <span>Download PDF</span>
+                                <FileText className="size-4" />
+                                <span>Open / Print PDF</span>
                             </a>
                         </div>
                     </div>
@@ -561,17 +638,25 @@ export default function ClientPortalInvoicesIndex({
                             <button
                                 type="button"
                                 onClick={() => setDeletingInvoice(null)}
-                                className="px-4 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 text-slate-700 dark:text-slate-300 text-xs font-bold transition-all cursor-pointer"
+                                disabled={isDeleting}
+                                className="px-4 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 text-slate-700 dark:text-slate-300 text-xs font-bold transition-all disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none"
                             >
                                 Cancel
                             </button>
                             <button
                                 type="button"
                                 onClick={handleDelete}
-                                disabled={processing}
-                                className="px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold transition-all shadow-md shadow-rose-600/20 cursor-pointer"
+                                disabled={isDeleting}
+                                className="px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold transition-all shadow-md shadow-rose-600/20 active:scale-[0.99] disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none inline-flex items-center gap-2"
                             >
-                                {processing ? 'Deleting...' : 'Yes, Delete Invoice'}
+                                {isDeleting ? (
+                                    <>
+                                        <LoaderCircle className="size-4 animate-spin" />
+                                        <span>Deleting...</span>
+                                    </>
+                                ) : (
+                                    <span>Yes, Delete Invoice</span>
+                                )}
                             </button>
                         </div>
                     </div>

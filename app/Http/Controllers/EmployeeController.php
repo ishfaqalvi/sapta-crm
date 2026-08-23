@@ -9,9 +9,11 @@ use App\Models\SubDepartment;
 use App\Models\User;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 use Inertia\Response;
+use Spatie\Permission\Models\Role;
 
 class EmployeeController extends Controller
 {
@@ -63,12 +65,14 @@ class EmployeeController extends Controller
     {
         $departments = Department::with('subDepartments')->where('is_active', true)->get();
         $designations = Designation::where('is_active', true)->get();
-        $users = User::select('id', 'name', 'email')->get();
+        $users = User::select('id', 'name', 'email', 'type')->get();
+        $roles = Role::select('id', 'name')->get();
 
         return Inertia::render('employees/create', [
             'departments' => $departments,
             'designations' => $designations,
             'users' => $users,
+            'roles' => $roles,
         ]);
     }
 
@@ -96,6 +100,12 @@ class EmployeeController extends Controller
             'notes' => ['nullable', 'string', 'max:1000'],
             'status' => ['required', Rule::in(['active', 'inactive', 'resigned'])],
             'avatar' => ['nullable', 'image', 'mimes:jpeg,png,jpg,gif,webp', 'max:4096'],
+            
+            // Auto User Creation Options
+            'create_user_account' => ['boolean'],
+            'password' => ['nullable', 'required_if:create_user_account,true', 'string', 'min:8'],
+            'roles' => ['nullable', 'array'],
+            'roles.*' => ['string', 'exists:roles,name'],
         ]);
 
         // Auto-generate sequential Employee Code (e.g. EMP-001)
@@ -127,6 +137,45 @@ class EmployeeController extends Controller
         }
 
         $employee->save();
+
+        // Create User Account if requested
+        if ($request->boolean('create_user_account') && !empty($validated['password'])) {
+            // Check if email already exists in users
+            $existingUser = User::where('email', $employee->email)->first();
+            if ($existingUser) {
+                $existingUser->update([
+                    'type' => 'employee',
+                    'employee_id' => $employee->id,
+                    'is_active' => ($employee->status === 'active'),
+                ]);
+                $employee->update(['user_id' => $existingUser->id]);
+                if (!empty($validated['roles'])) {
+                    $existingUser->syncRoles($validated['roles']);
+                }
+            } else {
+                $user = User::create([
+                    'name' => $employee->name,
+                    'email' => $employee->email,
+                    'password' => Hash::make($validated['password']),
+                    'type' => 'employee',
+                    'is_active' => ($employee->status === 'active'),
+                    'employee_id' => $employee->id,
+                    'email_verified_at' => now(),
+                ]);
+
+                $employee->update(['user_id' => $user->id]);
+
+                if (!empty($validated['roles'])) {
+                    $user->syncRoles($validated['roles']);
+                }
+            }
+        } elseif ($employee->user_id) {
+            User::where('id', $employee->user_id)->update([
+                'type' => 'employee',
+                'employee_id' => $employee->id,
+                'is_active' => ($employee->status === 'active'),
+            ]);
+        }
 
         return redirect()->route('employees.index')->with('success', 'Employee profile created successfully!');
     }
@@ -161,13 +210,17 @@ class EmployeeController extends Controller
     {
         $departments = Department::with('subDepartments')->where('is_active', true)->get();
         $designations = Designation::where('is_active', true)->get();
-        $users = User::select('id', 'name', 'email')->get();
+        $users = User::select('id', 'name', 'email', 'type')->get();
+        $roles = Role::select('id', 'name')->get();
+
+        $employee->load(['department', 'subDepartment', 'designation', 'user.roles']);
 
         return Inertia::render('employees/edit', [
-            'employee' => $employee->load(['department', 'subDepartment', 'designation', 'user']),
+            'employee' => $employee,
             'departments' => $departments,
             'designations' => $designations,
             'users' => $users,
+            'roles' => $roles,
         ]);
     }
 
@@ -196,6 +249,12 @@ class EmployeeController extends Controller
             'status' => ['required', Rule::in(['active', 'inactive', 'resigned'])],
             'avatar' => ['nullable', 'image', 'mimes:jpeg,png,jpg,gif,webp', 'max:4096'],
             'remove_avatar' => ['boolean'],
+
+            // User account update options
+            'create_user_account' => ['boolean'],
+            'password' => ['nullable', 'string', 'min:8'],
+            'roles' => ['nullable', 'array'],
+            'roles.*' => ['string', 'exists:roles,name'],
         ]);
 
         $employee->name = trim($validated['name']);
@@ -224,6 +283,42 @@ class EmployeeController extends Controller
 
         $employee->save();
 
+        // Handle Linked User Login Account
+        if ($employee->user_id) {
+            $user = User::find($employee->user_id);
+            if ($user) {
+                $user->name = $employee->name;
+                $user->email = $employee->email;
+                $user->type = 'employee';
+                $user->is_active = ($employee->status === 'active');
+                $user->employee_id = $employee->id;
+                if (!empty($validated['password'])) {
+                    $user->password = Hash::make($validated['password']);
+                }
+                $user->save();
+
+                if (!empty($validated['roles'])) {
+                    $user->syncRoles($validated['roles']);
+                }
+            }
+        } elseif ($request->boolean('create_user_account') && !empty($validated['password'])) {
+            $user = User::create([
+                'name' => $employee->name,
+                'email' => $employee->email,
+                'password' => Hash::make($validated['password']),
+                'type' => 'employee',
+                'is_active' => ($employee->status === 'active'),
+                'employee_id' => $employee->id,
+                'email_verified_at' => now(),
+            ]);
+
+            $employee->update(['user_id' => $user->id]);
+
+            if (!empty($validated['roles'])) {
+                $user->syncRoles($validated['roles']);
+            }
+        }
+
         return redirect()->route('employees.index')->with('success', 'Employee profile updated successfully!');
     }
 
@@ -232,6 +327,9 @@ class EmployeeController extends Controller
      */
     public function destroy(Employee $employee): RedirectResponse
     {
+        if ($employee->user_id) {
+            User::where('id', $employee->user_id)->delete();
+        }
         $employee->delete();
         return redirect()->back()->with('success', 'Employee profile deleted successfully!');
     }

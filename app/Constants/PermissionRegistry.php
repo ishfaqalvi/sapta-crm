@@ -5,36 +5,53 @@ namespace App\Constants;
 class PermissionRegistry
 {
     /**
-     * Get all system permissions grouped by module.
-     * Single source of truth for Seeders, Controllers, and Role Management UI.
-     * Aligned with the Admin Sidebar navigation hierarchy.
+     * Get all Admin Panel permissions grouped by module.
      */
-    public static function getPermissionsByModule(): array
+    public static function getAdminPermissions(): array
     {
         return [
-            // 1. Main Navigation
+            // 1. Core & Operations
+            'Executive Dashboard' => [
+                'view-dashboard',
+            ],
             'Client Hub' => [
                 'view-clients',
                 'create-clients',
                 'edit-clients',
                 'delete-clients',
             ],
-
-            // 2. Client Operations
-            'Projects Directory' => [
-                'view-website-projects',
-            ],
-            'Services Hub' => [
-                'view-services',
-            ],
-            'Invoices & Billing' => [
-                'view-invoices',
-            ],
             'Credentials Vault' => [
                 'view-credentials',
             ],
+            'General Tasks' => [
+                'view-tasks',
+                'create-tasks',
+                'edit-tasks',
+                'delete-tasks',
+            ],
 
-            // 3. HR & Payroll
+            // 2. Finance & Billing
+            'Invoices & Billing' => [
+                'view-invoices',
+            ],
+            'Financial Reports & Ledger' => [
+                'view-reports',
+                'download-reports',
+            ],
+            'Income Tracker' => [
+                'view-incomes',
+                'create-incomes',
+                'edit-incomes',
+                'delete-incomes',
+            ],
+            'Expense Tracker' => [
+                'view-expenses',
+                'create-expenses',
+                'edit-expenses',
+                'delete-expenses',
+            ],
+
+            // 3. HR & Workforce
             'Employees Directory' => [
                 'view-employees',
                 'create-employees',
@@ -43,21 +60,11 @@ class PermissionRegistry
             ],
             'Monthly Payroll' => [
                 'view-payroll',
-                'manage-payroll',
-            ],
-
-            // 4. Master Data
-            'Project Categories' => [
-                'view-project-categories',
-                'create-project-categories',
-                'edit-project-categories',
-                'delete-project-categories',
-            ],
-            'Service Categories' => [
-                'view-service-categories',
-                'create-service-categories',
-                'edit-service-categories',
-                'delete-service-categories',
+                'generate-payroll',
+                'edit-payroll',
+                'manage-payroll-status',
+                'print-payslips',
+                'delete-payroll',
             ],
             'Departments' => [
                 'view-departments',
@@ -70,6 +77,38 @@ class PermissionRegistry
                 'create-designations',
                 'edit-designations',
                 'delete-designations',
+            ],
+
+            // 4. Master Categories
+            'Project Categories' => [
+                'view-project-categories',
+                'create-project-categories',
+                'edit-project-categories',
+                'delete-project-categories',
+            ],
+            'Service Categories' => [
+                'view-service-categories',
+                'create-service-categories',
+                'edit-service-categories',
+                'delete-service-categories',
+            ],
+            'Task Categories' => [
+                'view-task-categories',
+                'create-task-categories',
+                'edit-task-categories',
+                'delete-task-categories',
+            ],
+            'Income Categories' => [
+                'view-income-categories',
+                'create-income-categories',
+                'edit-income-categories',
+                'delete-income-categories',
+            ],
+            'Expense Categories' => [
+                'view-expense-categories',
+                'create-expense-categories',
+                'edit-expense-categories',
+                'delete-expense-categories',
             ],
             'Currencies' => [
                 'view-currencies',
@@ -95,56 +134,173 @@ class PermissionRegistry
                 'view-settings',
                 'edit-settings',
             ],
+        ];
+    }
 
-            // 6. Client Portal Workspace
-            'Client Portal Overview' => [
+    /**
+     * Get all Client Portal permissions grouped by module and tabs/actions.
+     */
+    public static function getClientPortalPermissions(): array
+    {
+        return [
+            // 1. Overview
+            'Portal Overview' => [
                 'view-client-portal-overview',
             ],
-            'Client Portal Projects' => [
+
+            // 2. Projects & Sub-tabs
+            'Projects Directory' => [
                 'view-client-portal-projects',
                 'create-client-portal-projects',
                 'edit-client-portal-projects',
                 'delete-client-portal-projects',
             ],
-            'Client Portal Tasks' => [
-                'view-client-portal-tasks',
-                'create-client-portal-tasks',
-                'edit-client-portal-tasks',
-                'delete-client-portal-tasks',
+            'Project Milestones & Billing' => [
+                'view-client-portal-project-milestones',
+                'create-client-portal-project-milestones',
+                'edit-client-portal-project-milestones',
+                'delete-client-portal-project-milestones',
             ],
-            'Client Portal Milestones' => [
-                'view-client-portal-milestones',
-                'create-client-portal-milestones',
-                'edit-client-portal-milestones',
-                'delete-client-portal-milestones',
+            'Project Tasks & Timeline' => [
+                'view-client-portal-project-tasks',
+                'create-client-portal-project-tasks',
+                'edit-client-portal-project-tasks',
+                'delete-client-portal-project-tasks',
             ],
-            'Client Portal Services' => [
+            'Project Credentials' => [
+                'view-client-portal-project-credentials',
+                'create-client-portal-project-credentials',
+                'edit-client-portal-project-credentials',
+                'delete-client-portal-project-credentials',
+            ],
+            'Project Documents' => [
+                'view-client-portal-project-documents',
+                'create-client-portal-project-documents',
+                'delete-client-portal-project-documents',
+            ],
+
+            // 5. Services & Sub-tabs
+            'Services Directory' => [
                 'view-client-portal-services',
                 'create-client-portal-services',
                 'edit-client-portal-services',
                 'delete-client-portal-services',
             ],
-            'Client Portal Credentials' => [
+            'Service Credentials' => [
+                'view-client-portal-service-credentials',
+                'create-client-portal-service-credentials',
+                'edit-client-portal-service-credentials',
+                'delete-client-portal-service-credentials',
+            ],
+            'Service Payments & Retainers' => [
+                'view-client-portal-service-payments',
+                'create-client-portal-service-payments',
+                'edit-client-portal-service-payments',
+                'delete-client-portal-service-payments',
+            ],
+            'Service Documents' => [
+                'view-client-portal-service-documents',
+                'create-client-portal-service-documents',
+                'delete-client-portal-service-documents',
+            ],
+
+            // 3. Domains & Sub-tabs
+            'Domains Directory' => [
+                'view-client-portal-domains',
+                'create-client-portal-domains',
+                'edit-client-portal-domains',
+                'delete-client-portal-domains',
+            ],
+            'Domain Payments & Renewals' => [
+                'view-client-portal-domain-payments',
+                'create-client-portal-domain-payments',
+                'edit-client-portal-domain-payments',
+                'delete-client-portal-domain-payments',
+            ],
+
+            // 4. Web Hosting & Sub-tabs
+            'Web Hosting Directory' => [
+                'view-client-portal-hostings',
+                'create-client-portal-hostings',
+                'edit-client-portal-hostings',
+                'delete-client-portal-hostings',
+            ],
+            'Hosting Payments & Renewals' => [
+                'view-client-portal-hosting-payments',
+                'create-client-portal-hosting-payments',
+                'edit-client-portal-hosting-payments',
+                'delete-client-portal-hosting-payments',
+            ],
+
+            // 6. Invoices & Billing
+            'Invoices & Statements' => [
+                'view-client-portal-invoices',
+                'create-client-portal-invoices',
+                'edit-client-portal-invoices',
+                'delete-client-portal-invoices',
+                'print-client-portal-invoices',
+            ],
+
+            // 7. General Logins & Credentials Vault
+            'General Credentials Vault' => [
                 'view-client-portal-credentials',
                 'create-client-portal-credentials',
                 'edit-client-portal-credentials',
                 'delete-client-portal-credentials',
             ],
-            'Client Portal Invoices' => [
-                'view-client-portal-invoices',
-                'create-client-portal-invoices',
-                'edit-client-portal-invoices',
-                'delete-client-portal-invoices',
-                'download-client-portal-invoices',
+
+            // 8. Reports & Account Settings
+            'Reports & Analytics' => [
+                'view-client-portal-reports',
             ],
-            'Client Portal Profile' => [
+            'Account Profile & Security' => [
                 'view-client-portal-profile',
                 'edit-client-portal-profile',
                 'manage-client-portal-account',
             ],
-            'Client Portal Reports' => [
-                'view-client-portal-reports',
+        ];
+    }
+
+    /**
+     * Get two high-level groups (Admin Panel vs Client Portal) with their submodules.
+     */
+    public static function getPermissionsGrouped(): array
+    {
+        return [
+            'admin' => [
+                'key' => 'admin',
+                'title' => 'Admin Panel Permissions',
+                'description' => 'Permissions governing the backoffice CRM administration area.',
+                'modules' => self::getAdminPermissions(),
+            ],
+            'portal' => [
+                'key' => 'portal',
+                'title' => 'Client Portal Permissions',
+                'description' => 'Granular permissions for customer portal workspaces, tabs, and actions.',
+                'modules' => self::getClientPortalPermissions(),
             ],
         ];
+    }
+
+    /**
+     * Single source of truth list of all module permissions combined.
+     */
+    public static function getPermissionsByModule(): array
+    {
+        return array_merge(self::getAdminPermissions(), self::getClientPortalPermissions());
+    }
+
+    /**
+     * Get flat list of all permission slug strings.
+     */
+    public static function getAllPermissions(): array
+    {
+        $all = [];
+        foreach (self::getPermissionsByModule() as $perms) {
+            foreach ($perms as $p) {
+                $all[] = $p;
+            }
+        }
+        return array_values(array_unique($all));
     }
 }

@@ -1,9 +1,11 @@
 import ClientPortalLayout from '@/layouts/client-portal-layout';
 import { type BreadcrumbItem } from '@/types';
+import { hasPermission } from '@/utils/permissions';
 import { Head, Link, usePage } from '@inertiajs/react';
 import {
     Activity,
     AlertCircle,
+    ArrowRight,
     ArrowUpRight,
     BadgeCheck,
     BadgeDollarSign,
@@ -21,15 +23,21 @@ import {
     FileText,
     FolderKanban,
     Globe,
+    HardDrive,
     Hash,
+    Key,
     Layers,
     LineChart,
+    Lock,
     Mail,
     MapPin,
     MessageSquare,
     Phone,
     PieChart as PieIcon,
+    Printer,
     Receipt,
+    Server,
+    ShieldAlert,
     ShieldCheck,
     Sparkles,
     TrendingUp,
@@ -37,6 +45,7 @@ import {
     Users,
     Zap,
 } from 'lucide-react';
+import { useState } from 'react';
 import {
     Bar,
     BarChart,
@@ -98,13 +107,66 @@ interface WebsiteProjectItem {
     tasks?: ProjectTaskData[];
 }
 
-interface SeoRetainerItem {
+interface ClientServiceItem {
     id: number;
-    monthly_amount: number | string;
+    service_name: string;
+    monthly_fee: number | string;
     currency: string;
-    status: 'active' | 'paused' | 'cancelled';
-    billing_cycle_day: number;
+    status: 'active' | 'paused' | 'stopped';
+    billing_day: number;
     start_date?: string;
+    contract_months?: number;
+    category?: {
+        id: number;
+        name: string;
+    };
+    payments?: any[];
+}
+
+interface ClientDomainItem {
+    id: number;
+    domain_name: string;
+    registrar: string;
+    expiry_date: string;
+    status: 'active' | 'pending_renewal' | 'expired' | 'transferred';
+    client_price_pkr?: number;
+    auto_renew?: boolean;
+    payments?: any[];
+}
+
+interface ClientHostingItem {
+    id: number;
+    hosting_title: string;
+    provider: string;
+    server_ip?: string;
+    server_type?: string;
+    billing_cycle: string;
+    expiry_date: string;
+    status: 'active' | 'suspended' | 'cancelled' | 'expired';
+    disk_space?: string;
+    bandwidth?: string;
+    client_price_pkr?: number;
+    payments?: any[];
+}
+
+interface ClientCredentialItem {
+    id: number;
+    title: string;
+    type?: string;
+    username?: string;
+    created_at?: string;
+}
+
+interface InvoiceItemData {
+    id: number;
+    invoice_number: string;
+    issue_date: string;
+    due_date: string;
+    status: 'paid' | 'unpaid' | 'overdue' | 'cancelled';
+    total_amount: number | string;
+    total_amount_pkr?: number;
+    currency_code?: string;
+    items?: any[];
 }
 
 interface ClientDetailItem {
@@ -123,23 +185,80 @@ interface ClientDetailItem {
     notes?: string;
     created_at: string;
     website_projects?: WebsiteProjectItem[];
-    seo_retainers?: SeoRetainerItem[];
+    client_services?: ClientServiceItem[];
+    services?: ClientServiceItem[];
     project_payments?: ProjectPaymentData[];
+    domains?: ClientDomainItem[];
+    hostings?: ClientHostingItem[];
+    credentials?: ClientCredentialItem[];
 }
 
 interface ClientPortalOverviewProps {
     client: ClientDetailItem;
+    invoices?: InvoiceItemData[];
+    canViewOverview?: boolean;
 }
 
-export default function ClientPortalOverview({ client }: ClientPortalOverviewProps) {
+export default function ClientPortalOverview({
+    client,
+    invoices = [],
+    canViewOverview,
+}: ClientPortalOverviewProps) {
     const page = usePage();
     const authUser = (page.props.auth as any)?.user;
     const isAdmin = authUser?.type === 'admin';
+
+    const [activeTabSection, setActiveTabSection] = useState<'projects' | 'services' | 'infrastructure' | 'invoices'>('projects');
 
     const breadcrumbs: BreadcrumbItem[] = [
         { title: 'Client Portal', href: '/client-portal/overview' },
         { title: `${client.name} Overview`, href: '/client-portal/overview' },
     ];
+
+    const isPermitted = canViewOverview !== undefined
+        ? Boolean(canViewOverview)
+        : hasPermission(authUser, 'view-client-portal-overview');
+
+    // -------------------------------------------------------------
+    // RESTRICTED VIEW: If User does not have view-client-portal-overview
+    // -------------------------------------------------------------
+    if (!isPermitted) {
+        return (
+            <ClientPortalLayout client={client} breadcrumbs={breadcrumbs} activeTab="overview">
+                <Head title={`${client.name} | Overview`} />
+
+                <div className="flex items-center justify-center min-h-[60vh] p-4">
+                    <div className="max-w-md w-full text-center p-8 sm:p-10 rounded-3xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 shadow-sm space-y-6">
+                        {/* Icon */}
+                        <div className="size-16 mx-auto rounded-2xl bg-amber-50 dark:bg-amber-950/50 border border-amber-200/60 dark:border-amber-800/60 flex items-center justify-center text-amber-600 dark:text-amber-400 shadow-xs">
+                            <Lock className="size-8" />
+                        </div>
+
+                        {/* Title & Message */}
+                        <div className="space-y-2">
+                            <h2 className="text-xl font-bold text-slate-900 dark:text-white tracking-tight">
+                                Access Restricted
+                            </h2>
+                            <p className="text-sm text-slate-500 dark:text-slate-400 leading-relaxed">
+                                You do not have permission to view this dashboard overview. If you need access, please contact your administrator.
+                            </p>
+                        </div>
+
+                        {/* Contact Action */}
+                        <div className="pt-2">
+                            <a
+                                href={client.email ? `mailto:${client.email}?subject=Request for Dashboard Access` : 'mailto:admin@sapta.com'}
+                                className="inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-[#003796] via-[#0052D4] to-[#1d4ed8] hover:opacity-95 text-white text-xs font-bold transition-all shadow-md shadow-blue-500/20"
+                            >
+                                <Mail className="size-4" />
+                                <span>Contact Administrator</span>
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </ClientPortalLayout>
+        );
+    }
 
     const formatCurrency = (val: number | string) => {
         const num = typeof val === 'string' ? parseFloat(val) : val;
@@ -150,22 +269,45 @@ export default function ClientPortalOverview({ client }: ClientPortalOverviewPro
         });
     };
 
+    const formatDate = (dateStr: string | null | undefined) => {
+        if (!dateStr) return '-';
+        const date = new Date(dateStr);
+        if (isNaN(date.getTime())) return dateStr;
+        return date.toLocaleDateString('en-GB', {
+            day: '2-digit',
+            month: 'short',
+            year: 'numeric',
+        });
+    };
+
     // Calculate Financial & Metrics Summary
-    const activeProjects = client.website_projects?.filter((p) => p.status === 'in_progress') || [];
-    const activeSeoRetainers = client.seo_retainers?.filter((r) => r.status === 'active') || [];
+    const projectsList = client.website_projects || [];
+    const activeProjects = projectsList.filter((p) => p.status === 'in_progress');
+    const completedProjects = projectsList.filter((p) => p.status === 'completed');
 
-    const totalProjectBudget = client.website_projects?.reduce((acc, p) => acc + (parseFloat(p.total_budget as string) || 0), 0) || 0;
+    const clientServicesList = client.client_services || client.services || [];
+    const activeServicesList = clientServicesList.filter((r) => r.status === 'active');
+    const totalServicesMonthly = activeServicesList.reduce((acc, s) => acc + (parseFloat(s.monthly_fee as string) || 0), 0);
 
-    let totalPaid = 0;
+    const domainsList = client.domains || [];
+    const activeDomains = domainsList.filter((d) => d.status === 'active');
+    const hostingsList = client.hostings || [];
+    const activeHostings = hostingsList.filter((h) => h.status === 'active');
+    const credentialsList = client.credentials || [];
+    const invoicesList = invoices || [];
+
+    const totalProjectBudget = projectsList.reduce((acc, p) => acc + (parseFloat(p.total_budget as string) || 0), 0);
+
+    let totalProjectPaid = 0;
     let allPayments: ProjectPaymentData[] = [];
     let allTasks: ProjectTaskData[] = [];
 
-    client.website_projects?.forEach((p) => {
+    projectsList.forEach((p) => {
         if (p.payments) {
             allPayments = [...allPayments, ...p.payments];
             p.payments.forEach((pay) => {
                 if (pay.status === 'paid') {
-                    totalPaid += parseFloat(pay.amount as string) || 0;
+                    totalProjectPaid += parseFloat(pay.amount as string) || 0;
                 }
             });
         }
@@ -174,11 +316,35 @@ export default function ClientPortalOverview({ client }: ClientPortalOverviewPro
         }
     });
 
-    const pendingBalance = Math.max(0, totalProjectBudget - totalPaid);
-    const paymentProgress = totalProjectBudget > 0 ? Math.min(100, Math.round((totalPaid / totalProjectBudget) * 100)) : 0;
+    const pendingProjectBalance = Math.max(0, totalProjectBudget - totalProjectPaid);
+    const paymentProgress = totalProjectBudget > 0 ? Math.min(100, Math.round((totalProjectPaid / totalProjectBudget) * 100)) : 0;
     const completedTasksCount = allTasks.filter((t) => t.status === 'completed').length;
+    const taskCompletionRate = allTasks.length > 0 ? Math.round((completedTasksCount / allTasks.length) * 100) : 100;
 
-    // Chart Data 1: Task Deliverables Distribution (Donut Chart)
+    // Invoices Aggregation
+    const totalInvoiced = invoicesList.reduce((sum, inv) => sum + (parseFloat(inv.total_amount as string) || 0), 0);
+    const totalInvoicesPaid = invoicesList
+        .filter((inv) => inv.status === 'paid')
+        .reduce((sum, inv) => sum + (parseFloat(inv.total_amount as string) || 0), 0);
+    const totalInvoicesPending = invoicesList
+        .filter((inv) => inv.status === 'unpaid' || inv.status === 'overdue')
+        .reduce((sum, inv) => sum + (parseFloat(inv.total_amount as string) || 0), 0);
+
+    // Chart Data 1: Project Budget vs Paid Breakdown
+    const projectInvestmentData = projectsList.map((proj) => {
+        const projPaid = (proj.payments || [])
+            .filter((p) => p.status === 'paid')
+            .reduce((sum, p) => sum + (parseFloat(p.amount as string) || 0), 0);
+        const budget = parseFloat(proj.total_budget as string) || 0;
+        return {
+            name: proj.project_name.length > 16 ? proj.project_name.substring(0, 14) + '...' : proj.project_name,
+            Budget: budget,
+            Cleared: projPaid,
+            Pending: Math.max(0, budget - projPaid),
+        };
+    });
+
+    // Chart Data 2: Task Deliverables Distribution (Donut Chart)
     const taskStatusCounts = {
         completed: allTasks.filter((t) => t.status === 'completed').length,
         in_progress: allTasks.filter((t) => t.status === 'in_progress').length,
@@ -193,218 +359,165 @@ export default function ClientPortalOverview({ client }: ClientPortalOverviewPro
         { name: 'To Do / Pending', value: taskStatusCounts.todo, color: '#f59e0b' },
     ].filter((d) => d.value > 0);
 
-    // Chart Data 2: Project Budget vs Paid Breakdown
-    const projectInvestmentData = (client.website_projects || []).map((proj) => {
-        const projPaid = (proj.payments || [])
-            .filter((p) => p.status === 'paid')
-            .reduce((sum, p) => sum + (parseFloat(p.amount as string) || 0), 0);
-        const budget = parseFloat(proj.total_budget as string) || 0;
-        return {
-            name: proj.project_name.length > 18 ? proj.project_name.substring(0, 16) + '...' : proj.project_name,
-            Budget: budget,
-            Cleared: projPaid,
-            Pending: Math.max(0, budget - projPaid),
-        };
+    // Chart Data 3: Asset Portfolio Distribution
+    const portfolioPieData = [
+        { name: 'Website Projects', value: projectsList.length || 1, color: '#3b82f6' },
+        { name: 'Active Retainers', value: activeServicesList.length || 0, color: '#10b981' },
+        { name: 'Domains & DNS', value: domainsList.length || 0, color: '#06b6d4' },
+        { name: 'Web Hostings', value: hostingsList.length || 0, color: '#8b5cf6' },
+        { name: 'Credentials', value: credentialsList.length || 0, color: '#f43f5e' },
+    ].filter((d) => d.value > 0);
+
+    // Chart Data 4: Services Breakdown by Category
+    const servicesCategoryMap: { [key: string]: number } = {};
+    clientServicesList.forEach((s) => {
+        const cat = s.category?.name || 'General';
+        const fee = parseFloat(s.monthly_fee as string) || 0;
+        servicesCategoryMap[cat] = (servicesCategoryMap[cat] || 0) + fee;
     });
+
+    const servicesCategoryData = Object.keys(servicesCategoryMap).map((cat) => ({
+        category: cat.length > 14 ? cat.substring(0, 12) + '...' : cat,
+        MonthlyInvestment: servicesCategoryMap[cat],
+    }));
 
     return (
         <ClientPortalLayout client={client} breadcrumbs={breadcrumbs} activeTab="overview">
             <Head title={`${client.name} | Overview & Portal Dashboard`} />
+            <div className="p-4 sm:p-6 w-full mx-auto space-y-6 min-h-screen">
 
-            <div className="p-4 sm:p-6 lg:p-8 w-full mx-auto space-y-6 sm:space-y-8 min-h-screen">
-                {/* 1. Executive Multi-Gradient Hero Banner */}
-                <div className="relative overflow-hidden rounded-3xl bg-gradient-to-r from-[#0b132b] via-[#1c2541] to-[#0b132b] text-white p-6 md:p-8 shadow-2xl border border-indigo-900/40">
-                    {/* Ambient Glow Orbs */}
-                    <div className="absolute right-0 top-0 translate-x-12 -translate-y-12 size-80 bg-blue-500/20 rounded-full blur-3xl pointer-events-none" />
-                    <div className="absolute left-1/3 bottom-0 size-60 bg-purple-500/20 rounded-full blur-3xl pointer-events-none" />
-                    <div className="absolute right-1/4 bottom-0 size-44 bg-emerald-500/15 rounded-full blur-2xl pointer-events-none" />
-
-                    <div className="relative z-10 flex flex-col lg:flex-row lg:items-center justify-between gap-6">
-                        <div className="flex items-start md:items-center gap-4 md:gap-6">
-                            <div className="relative size-16 md:size-20 rounded-2xl bg-gradient-to-tr from-[#003796] via-[#0052D4] to-[#1d4ed8] text-white font-black text-2xl md:text-3xl flex items-center justify-center shadow-xl shadow-blue-500/30 shrink-0 border-2 border-white/25">
-                                {client.name.charAt(0).toUpperCase()}
-                                <span className="absolute -bottom-1 -right-1 flex size-4">
-                                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                                    <span className="relative inline-flex rounded-full size-4 bg-emerald-500 ring-2 ring-slate-950"></span>
-                                </span>
-                            </div>
-
-                            <div className="space-y-2">
-                                <div className="flex flex-wrap items-center gap-2.5">
-                                    <h1 className="text-2xl md:text-3xl font-black tracking-tight drop-shadow-sm">{client.name}</h1>
-                                    <span className="px-3 py-1 rounded-full bg-white/10 text-blue-200 text-xs font-mono font-bold border border-white/15 backdrop-blur-md shadow-2xs">
-                                        {client.client_code}
-                                    </span>
-                                    <span className={`px-3 py-1 rounded-full text-xs font-extrabold uppercase tracking-wider flex items-center gap-1.5 backdrop-blur-md ${client.status === 'active'
-                                        ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 shadow-xs'
-                                        : 'bg-amber-500/20 text-amber-300 border border-amber-500/40 shadow-xs'
-                                        }`}>
-                                        <Sparkles className="size-3 text-emerald-400 animate-pulse" />
-                                        <span>{client.status} Account</span>
-                                    </span>
-                                </div>
-
-                                <p className="text-slate-300 text-xs md:text-sm font-medium flex flex-wrap items-center gap-2">
-                                    <Building2 className="size-4 text-blue-400 shrink-0" />
-                                    <span className="font-semibold text-white">{client.company_name || client.name}</span>
-                                    {client.city && (
-                                        <>
-                                            <span className="text-slate-500">•</span>
-                                            <span className="flex items-center gap-1 text-slate-300">
-                                                <MapPin className="size-3.5 text-rose-400" />
-                                                {[client.city, client.country].filter(Boolean).join(', ')}
-                                            </span>
-                                        </>
-                                    )}
-                                    <span className="text-slate-500">•</span>
-                                    <span className="text-indigo-300 font-semibold flex items-center gap-1">
-                                        <CreditCard className="size-3.5 text-purple-400" />
-                                        Currency: {client.currency}
-                                    </span>
-                                </p>
-                            </div>
-                        </div>
-
-                        {/* Banner Quick Actions */}
-                        <div className="flex flex-wrap items-center gap-3 self-start lg:self-auto pt-4 lg:pt-0 border-t border-white/10 lg:border-0 w-full lg:w-auto">
-                            <Link
-                                href="/client-portal/invoices"
-                                className="px-4.5 py-2.5 rounded-xl bg-gradient-to-r from-blue-600 via-indigo-600 to-blue-500 hover:from-blue-500 hover:to-indigo-500 text-white text-xs font-bold transition-all flex items-center gap-2 shadow-lg shadow-blue-600/30 hover:-translate-y-0.5 active:translate-y-0"
-                            >
-                                <Receipt className="size-4" />
-                                <span>Invoices & Billing</span>
-                            </Link>
-
-                            <Link
-                                href="/client-portal/projects"
-                                className="px-4 py-2.5 rounded-xl bg-white/10 hover:bg-white/20 text-white text-xs font-bold transition-all flex items-center gap-2 border border-white/15 backdrop-blur-md hover:-translate-y-0.5 active:translate-y-0"
-                            >
-                                <Globe className="size-4 text-cyan-300" />
-                                <span>View Projects</span>
-                            </Link>
-
-                            {isAdmin ? (
-                                <Link
-                                    href={`/clients/edit/${client.id}`}
-                                    className="px-4 py-2.5 rounded-xl bg-slate-800/80 hover:bg-slate-700 text-white text-xs font-bold transition-all flex items-center gap-2 border border-slate-700 hover:-translate-y-0.5 active:translate-y-0"
-                                >
-                                    <Edit3 className="size-4 text-indigo-300" />
-                                    <span>Edit Client</span>
-                                </Link>
-                            ) : (
-                                <Link
-                                    href="/client-portal/profile"
-                                    className="px-4 py-2.5 rounded-xl bg-white/10 hover:bg-white/20 text-white text-xs font-bold transition-all flex items-center gap-2 border border-white/15 backdrop-blur-md hover:-translate-y-0.5 active:translate-y-0"
-                                >
-                                    <User className="size-4 text-purple-300" />
-                                    <span>Profile Settings</span>
-                                </Link>
-                            )}
-                        </div>
-                    </div>
-                </div>
-
-                {/* 2. Key KPI Metric Cards Grid (4 Vibrant & Glassmorphic Cards) */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-5">
-                    {/* Card 1: Total Contract Budget */}
-                    <div className="bg-white dark:bg-slate-900 rounded-2xl p-5 border border-slate-200/80 dark:border-slate-800 shadow-xs hover:shadow-lg hover:shadow-blue-500/5 transition-all duration-300 space-y-3 relative overflow-hidden group">
+                {/* 1. Main High-Impact KPI Metric Cards Grid (4 Sleek & Compact Cards) */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                    {/* Card 1: Total Project Budget */}
+                    <div className="bg-white dark:bg-slate-900 rounded-xl p-4 sm:p-4.5 border border-slate-200/80 dark:border-slate-800 shadow-2xs hover:shadow-md transition-all duration-200 space-y-2 relative overflow-hidden group">
                         <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-blue-500 via-indigo-500 to-cyan-400" />
                         <div className="flex items-center justify-between">
-                            <span className="text-[11px] font-extrabold uppercase tracking-wider text-slate-400">Total Contract</span>
-                            <div className="p-2.5 rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 text-white shadow-md shadow-blue-500/25 group-hover:scale-105 transition-transform">
-                                <DollarSign className="size-5" />
+                            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400">Total Project Budget</span>
+                            <div className="size-8 rounded-lg bg-gradient-to-br from-blue-500 to-indigo-600 text-white flex items-center justify-center shadow-xs group-hover:scale-105 transition-transform">
+                                <DollarSign className="size-4" />
                             </div>
                         </div>
                         <div>
-                            <div className="text-xl sm:text-2xl font-black text-slate-900 dark:text-white font-mono tracking-tight">
+                            <div className="text-lg sm:text-xl font-black text-slate-900 dark:text-white font-mono tracking-tight">
                                 {formatCurrency(totalProjectBudget)}
                             </div>
-                            <div className="text-xs text-slate-500 dark:text-slate-400 font-medium mt-1 flex items-center gap-1.5">
-                                <span className="p-1 rounded bg-blue-50 dark:bg-blue-950 text-blue-600 dark:text-blue-400">
-                                    <FolderKanban className="size-3" />
-                                </span>
-                                <span>{client.website_projects?.length || 0} Projects Total</span>
+                            <div className="text-[11px] text-slate-500 dark:text-slate-400 font-medium mt-1 flex items-center gap-1.5">
+                                <FolderKanban className="size-3 text-blue-500 shrink-0" />
+                                <span>{projectsList.length} Projects ({activeProjects.length} Active)</span>
                             </div>
                         </div>
                     </div>
 
                     {/* Card 2: Cleared Receipts */}
-                    <div className="bg-white dark:bg-slate-900 rounded-2xl p-5 border border-slate-200/80 dark:border-slate-800 shadow-xs hover:shadow-lg hover:shadow-emerald-500/5 transition-all duration-300 space-y-3 relative overflow-hidden group">
+                    <div className="bg-white dark:bg-slate-900 rounded-xl p-4 sm:p-4.5 border border-slate-200/80 dark:border-slate-800 shadow-2xs hover:shadow-md transition-all duration-200 space-y-2 relative overflow-hidden group">
                         <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-emerald-400 via-teal-500 to-emerald-600" />
                         <div className="flex items-center justify-between">
-                            <span className="text-[11px] font-extrabold uppercase tracking-wider text-slate-400">Cleared Receipts</span>
-                            <div className="p-2.5 rounded-xl bg-gradient-to-br from-emerald-500 to-teal-600 text-white shadow-md shadow-emerald-500/25 group-hover:scale-105 transition-transform">
-                                <BadgeDollarSign className="size-5" />
+                            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400">Cleared Funds</span>
+                            <div className="size-8 rounded-lg bg-gradient-to-br from-emerald-500 to-teal-600 text-white flex items-center justify-center shadow-xs group-hover:scale-105 transition-transform">
+                                <BadgeDollarSign className="size-4" />
                             </div>
                         </div>
                         <div>
-                            <div className="text-xl sm:text-2xl font-black text-emerald-600 dark:text-emerald-400 font-mono tracking-tight">
-                                {formatCurrency(totalPaid)}
+                            <div className="text-lg sm:text-xl font-black text-emerald-600 dark:text-emerald-400 font-mono tracking-tight">
+                                {formatCurrency(totalProjectPaid)}
                             </div>
-                            <div className="text-xs text-slate-500 dark:text-slate-400 font-medium mt-1 flex items-center gap-1.5">
-                                <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-emerald-50 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800/80">
+                            <div className="text-[11px] text-slate-500 dark:text-slate-400 font-medium mt-1 flex items-center gap-1.5">
+                                <span className="px-1.5 py-0.2 rounded text-[10px] font-black bg-emerald-50 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800">
                                     {paymentProgress}%
                                 </span>
-                                <span>Budget Cleared</span>
+                                <span>Budget Received</span>
                             </div>
                         </div>
                     </div>
 
                     {/* Card 3: Pending Balance */}
-                    <div className="bg-white dark:bg-slate-900 rounded-2xl p-5 border border-slate-200/80 dark:border-slate-800 shadow-xs hover:shadow-lg hover:shadow-amber-500/5 transition-all duration-300 space-y-3 relative overflow-hidden group">
+                    <div className="bg-white dark:bg-slate-900 rounded-xl p-4 sm:p-4.5 border border-slate-200/80 dark:border-slate-800 shadow-2xs hover:shadow-md transition-all duration-200 space-y-2 relative overflow-hidden group">
                         <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-amber-400 via-rose-500 to-orange-500" />
                         <div className="flex items-center justify-between">
-                            <span className="text-[11px] font-extrabold uppercase tracking-wider text-slate-400">Pending Balance</span>
-                            <div className="p-2.5 rounded-xl bg-gradient-to-br from-amber-500 to-rose-500 text-white shadow-md shadow-amber-500/25 group-hover:scale-105 transition-transform">
-                                <Receipt className="size-5" />
+                            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400">Pending Balance</span>
+                            <div className="size-8 rounded-lg bg-gradient-to-br from-amber-500 to-rose-500 text-white flex items-center justify-center shadow-xs group-hover:scale-105 transition-transform">
+                                <Receipt className="size-4" />
                             </div>
                         </div>
                         <div>
-                            <div className="text-xl sm:text-2xl font-black text-amber-600 dark:text-amber-400 font-mono tracking-tight">
-                                {formatCurrency(pendingBalance)}
+                            <div className="text-lg sm:text-xl font-black text-amber-600 dark:text-amber-400 font-mono tracking-tight">
+                                {formatCurrency(pendingProjectBalance)}
                             </div>
-                            <div className="text-xs text-slate-500 dark:text-slate-400 font-medium mt-1 flex items-center gap-1.5">
-                                <span className="p-1 rounded bg-amber-50 dark:bg-amber-950 text-amber-600 dark:text-amber-400">
-                                    <Clock className="size-3" />
-                                </span>
-                                <span>Milestones Due</span>
+                            <div className="text-[11px] text-slate-500 dark:text-slate-400 font-medium mt-1 flex items-center gap-1.5">
+                                <Clock className="size-3 text-amber-500 shrink-0" />
+                                <span>Upcoming Milestones</span>
                             </div>
                         </div>
                     </div>
 
-                    {/* Card 4: Active Services & Retainers */}
-                    <div className="bg-white dark:bg-slate-900 rounded-2xl p-5 border border-slate-200/80 dark:border-slate-800 shadow-xs hover:shadow-lg hover:shadow-purple-500/5 transition-all duration-300 space-y-3 relative overflow-hidden group">
-                        <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-purple-400 via-violet-500 to-indigo-500" />
+                    {/* Card 4: Monthly Retainers */}
+                    <div className="bg-white dark:bg-slate-900 rounded-xl p-4 sm:p-4.5 border border-slate-200/80 dark:border-slate-800 shadow-2xs hover:shadow-md transition-all duration-200 space-y-2 relative overflow-hidden group">
+                        <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-cyan-400 via-teal-500 to-blue-500" />
                         <div className="flex items-center justify-between">
-                            <span className="text-[11px] font-extrabold uppercase tracking-wider text-slate-400">Active Services</span>
-                            <div className="p-2.5 rounded-xl bg-gradient-to-br from-purple-500 to-violet-600 text-white shadow-md shadow-purple-500/25 group-hover:scale-105 transition-transform">
-                                <LineChart className="size-5" />
+                            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400">Monthly Run-Rate</span>
+                            <div className="size-8 rounded-lg bg-gradient-to-br from-cyan-500 to-blue-600 text-white flex items-center justify-center shadow-xs group-hover:scale-105 transition-transform">
+                                <LineChart className="size-4" />
                             </div>
                         </div>
                         <div>
-                            <div className="text-xl sm:text-2xl font-black text-slate-900 dark:text-white tracking-tight">
-                                {activeProjects.length + activeSeoRetainers.length} Active
+                            <div className="text-lg sm:text-xl font-black text-cyan-600 dark:text-cyan-400 font-mono tracking-tight">
+                                {formatCurrency(totalServicesMonthly)} <span className="text-[11px] text-slate-400 font-normal">/ mo</span>
                             </div>
-                            <div className="text-xs text-slate-500 dark:text-slate-400 font-medium mt-1 flex items-center gap-1.5">
-                                <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-purple-50 text-purple-700 dark:bg-purple-950 dark:text-purple-300 border border-purple-200 dark:border-purple-800/80">
-                                    {activeProjects.length} Web • {activeSeoRetainers.length} SEO
-                                </span>
+                            <div className="text-[11px] text-slate-500 dark:text-slate-400 font-medium mt-1 flex items-center gap-1.5">
+                                <Zap className="size-3 text-cyan-500 shrink-0" />
+                                <span>{activeServicesList.length} Active Services</span>
                             </div>
                         </div>
                     </div>
                 </div>
 
-                {/* 3. Colorful Interactive Recharts Visualizations Grid */}
-                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 sm:gap-8">
+                {/* Secondary Quick Summary Pills Bar */}
+                <div className="flex flex-wrap items-center justify-between gap-3 p-4 rounded-2xl bg-slate-50/80 dark:bg-slate-900/60 border border-slate-200/80 dark:border-slate-800 text-xs">
+                    <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+                        <span className="font-bold text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
+                            <Activity className="size-4 text-blue-500" /> Asset Overview:
+                        </span>
+                        <span className="px-3 py-1 rounded-xl bg-white dark:bg-slate-800 border border-slate-200/80 dark:border-slate-700/80 font-bold text-slate-700 dark:text-slate-200 shadow-2xs inline-flex items-center gap-1.5">
+                            <Globe className="size-3.5 text-cyan-500" />
+                            <span>{domainsList.length} Domains</span>
+                        </span>
+                        <span className="px-3 py-1 rounded-xl bg-white dark:bg-slate-800 border border-slate-200/80 dark:border-slate-700/80 font-bold text-slate-700 dark:text-slate-200 shadow-2xs inline-flex items-center gap-1.5">
+                            <Server className="size-3.5 text-purple-500" />
+                            <span>{hostingsList.length} Cloud Servers</span>
+                        </span>
+                        <span className="px-3 py-1 rounded-xl bg-white dark:bg-slate-800 border border-slate-200/80 dark:border-slate-700/80 font-bold text-slate-700 dark:text-slate-200 shadow-2xs inline-flex items-center gap-1.5">
+                            <CheckSquare className="size-3.5 text-pink-500" />
+                            <span>{completedTasksCount}/{allTasks.length} Tasks Done</span>
+                        </span>
+                        <span className="px-3 py-1 rounded-xl bg-white dark:bg-slate-800 border border-slate-200/80 dark:border-slate-700/80 font-bold text-slate-700 dark:text-slate-200 shadow-2xs inline-flex items-center gap-1.5">
+                            <Key className="size-3.5 text-rose-500" />
+                            <span>{credentialsList.length} Vault Credentials</span>
+                        </span>
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                        <Link
+                            href="/client-portal/invoices"
+                            className="px-3 py-1.5 rounded-xl bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400 font-bold hover:underline inline-flex items-center gap-1"
+                        >
+                            <Receipt className="size-3.5" />
+                            <span>{invoicesList.length} Invoices & Statements</span>
+                            <ArrowRight className="size-3" />
+                        </Link>
+                    </div>
+                </div>
+
+                {/* 3. Colorful Interactive Recharts Visualizations Grid (4 Rich Charts) */}
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                     {/* Visual 1: Project Investment & Clearance Breakdown (Bar Chart - Left 2 Columns) */}
-                    <div className="lg:col-span-2 bg-white dark:bg-slate-900 rounded-3xl border border-slate-200/80 dark:border-slate-800 p-5 sm:p-6 shadow-xs space-y-6">
+                    <div className="lg:col-span-2 bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/80 dark:border-slate-800 p-5 sm:p-6 shadow-xs space-y-6">
                         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 dark:border-slate-800 pb-4">
                             <div className="flex items-center gap-3">
                                 <div className="p-2.5 rounded-2xl bg-gradient-to-tr from-indigo-600 to-purple-600 text-white shadow-md shadow-indigo-600/20">
                                     <BarChart2 className="size-5" />
                                 </div>
                                 <div>
-                                    <h2 className="font-extrabold text-slate-900 dark:text-white text-base">Project Financial Breakdown</h2>
+                                    <h2 className="font-extrabold text-slate-900 dark:text-white text-base">Project Financial Allocations</h2>
                                     <p className="text-xs text-slate-400 font-medium">Budget vs Cleared Payment Comparison</p>
                                 </div>
                             </div>
@@ -460,14 +573,14 @@ export default function ClientPortalOverview({ client }: ClientPortalOverviewPro
                     </div>
 
                     {/* Visual 2: Deliverable Tasks Breakdown (Donut Pie Chart - Right 1 Column) */}
-                    <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200/80 dark:border-slate-800 p-5 sm:p-6 shadow-xs space-y-6">
+                    <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/80 dark:border-slate-800 p-5 sm:p-6 shadow-xs space-y-6">
                         <div className="flex items-center gap-3 border-b border-slate-100 dark:border-slate-800 pb-4">
                             <div className="p-2.5 rounded-2xl bg-gradient-to-tr from-blue-600 to-cyan-500 text-white shadow-md shadow-blue-600/20">
                                 <PieIcon className="size-5" />
                             </div>
                             <div>
                                 <h2 className="font-extrabold text-slate-900 dark:text-white text-base">Sprint Deliverables</h2>
-                                <p className="text-xs text-slate-400 font-medium">Task Progress Breakdown</p>
+                                <p className="text-xs text-slate-400 font-medium">Task Progress Status</p>
                             </div>
                         </div>
 
@@ -524,76 +637,246 @@ export default function ClientPortalOverview({ client }: ClientPortalOverviewPro
                         ) : (
                             <div className="h-64 flex flex-col items-center justify-center text-slate-400 text-sm italic">
                                 <CheckSquare className="size-10 mb-2 opacity-30 text-blue-500" />
-                                No deliverables recorded yet.
+                                No sprint tasks recorded yet.
                             </div>
                         )}
                     </div>
                 </div>
 
-                {/* 4. Main Dashboard Layout (2 Columns: Left 2/3, Right 1/3) */}
-                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 sm:gap-8">
-                    {/* Left Column: Website Projects & Task Deliverables */}
-                    <div className="lg:col-span-2 space-y-6 sm:space-y-8">
-                        {/* Website Projects Showcase Card */}
-                        <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200/80 dark:border-slate-800 overflow-hidden shadow-xs">
+                {/* Additional 2 Visuals Grid (Portfolio Distribution + Services Categories) */}
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                    {/* Visual 3: Asset Portfolio Distribution (Donut Chart) */}
+                    <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/80 dark:border-slate-800 p-5 sm:p-6 shadow-xs space-y-6">
+                        <div className="flex items-center gap-3 border-b border-slate-100 dark:border-slate-800 pb-4">
+                            <div className="p-2.5 rounded-2xl bg-gradient-to-tr from-purple-600 to-pink-500 text-white shadow-md shadow-purple-600/20">
+                                <Layers className="size-5" />
+                            </div>
+                            <div>
+                                <h2 className="font-extrabold text-slate-900 dark:text-white text-base">Asset Distribution</h2>
+                                <p className="text-xs text-slate-400 font-medium">Resources in Client Account</p>
+                            </div>
+                        </div>
+
+                        <div className="space-y-4">
+                            <div className="h-48 w-full relative flex items-center justify-center">
+                                <ResponsiveContainer width="100%" height="100%">
+                                    <PieChart>
+                                        <Pie
+                                            data={portfolioPieData}
+                                            cx="50%"
+                                            cy="50%"
+                                            innerRadius={50}
+                                            outerRadius={72}
+                                            paddingAngle={4}
+                                            dataKey="value"
+                                        >
+                                            {portfolioPieData.map((entry, index) => (
+                                                <Cell key={`port-${index}`} fill={entry.color} />
+                                            ))}
+                                        </Pie>
+                                        <Tooltip
+                                            contentStyle={{
+                                                backgroundColor: '#0f172a',
+                                                borderColor: '#1e293b',
+                                                borderRadius: '10px',
+                                                color: '#fff',
+                                                fontSize: '11px',
+                                            }}
+                                        />
+                                    </PieChart>
+                                </ResponsiveContainer>
+                                <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+                                    <span className="text-xl font-black text-slate-900 dark:text-white">
+                                        {projectsList.length + activeServicesList.length + domainsList.length + hostingsList.length}
+                                    </span>
+                                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Total Assets</span>
+                                </div>
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-2 pt-2 border-t border-slate-100 dark:border-slate-800/70">
+                                {portfolioPieData.map((item, idx) => (
+                                    <div key={idx} className="flex items-center justify-between p-2 rounded-xl bg-slate-50 dark:bg-slate-800/40 border border-slate-100 dark:border-slate-800/60">
+                                        <div className="flex items-center gap-1.5 min-w-0">
+                                            <span className="size-2.5 rounded-full shrink-0 shadow-xs" style={{ backgroundColor: item.color }} />
+                                            <span className="text-xs font-bold text-slate-700 dark:text-slate-300 truncate">{item.name}</span>
+                                        </div>
+                                        <span className="text-xs font-mono font-black text-slate-900 dark:text-white">{item.value}</span>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Visual 4: Services Investment by Category (Bar Chart) */}
+                    <div className="lg:col-span-2 bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/80 dark:border-slate-800 p-5 sm:p-6 shadow-xs space-y-6">
+                        <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-4">
+                            <div className="flex items-center gap-3">
+                                <div className="p-2.5 rounded-2xl bg-gradient-to-tr from-cyan-600 to-teal-500 text-white shadow-md shadow-cyan-600/20">
+                                    <TrendingUp className="size-5" />
+                                </div>
+                                <div>
+                                    <h2 className="font-extrabold text-slate-900 dark:text-white text-base">Monthly Services by Category</h2>
+                                    <p className="text-xs text-slate-400 font-medium">Subscription Spend by Service Domain</p>
+                                </div>
+                            </div>
+                            <span className="text-xs font-bold text-cyan-600 dark:text-cyan-400 font-mono bg-cyan-50 dark:bg-cyan-950/60 px-3 py-1.5 rounded-xl border border-cyan-200 dark:border-cyan-800">
+                                {formatCurrency(totalServicesMonthly)} / mo
+                            </span>
+                        </div>
+
+                        {servicesCategoryData.length > 0 ? (
+                            <div className="h-64 w-full">
+                                <ResponsiveContainer width="100%" height="100%">
+                                    <BarChart data={servicesCategoryData} margin={{ top: 10, right: 10, left: -10, bottom: 0 }}>
+                                        <defs>
+                                            <linearGradient id="serviceGrad" x1="0" y1="0" x2="0" y2="1">
+                                                <stop offset="0%" stopColor="#06b6d4" stopOpacity={1} />
+                                                <stop offset="100%" stopColor="#0891b2" stopOpacity={0.8} />
+                                            </linearGradient>
+                                        </defs>
+                                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#3341551a" />
+                                        <XAxis dataKey="category" stroke="#94a3b8" fontSize={11} tickLine={false} />
+                                        <YAxis stroke="#94a3b8" fontSize={11} tickLine={false} tickFormatter={(val) => `${val >= 1000 ? `${(val / 1000).toFixed(0)}k` : val}`} />
+                                        <Tooltip
+                                            contentStyle={{
+                                                backgroundColor: '#0f172a',
+                                                borderColor: '#1e293b',
+                                                borderRadius: '12px',
+                                                color: '#fff',
+                                                fontSize: '12px',
+                                            }}
+                                            formatter={(val: any) => [formatCurrency(val), 'Monthly Fee']}
+                                        />
+                                        <Bar dataKey="MonthlyInvestment" fill="url(#serviceGrad)" radius={[8, 8, 0, 0]} maxBarSize={44} />
+                                    </BarChart>
+                                </ResponsiveContainer>
+                            </div>
+                        ) : (
+                            <div className="h-64 flex flex-col items-center justify-center text-slate-400 text-sm italic">
+                                <LineChart className="size-10 mb-2 opacity-30 text-cyan-500" />
+                                No active monthly services configured yet.
+                            </div>
+                        )}
+                    </div>
+                </div>
+
+                {/* 4. Interactive Tabbed Resource Explorer */}
+                <div className="space-y-4">
+                    {/* Section Switcher Tabs */}
+                    <div className="flex flex-wrap items-center gap-2 p-1.5 rounded-2xl bg-slate-100 dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 self-start">
+                        <button
+                            type="button"
+                            onClick={() => setActiveTabSection('projects')}
+                            className={`px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-2 ${activeTabSection === 'projects'
+                                ? 'bg-gradient-to-r from-[#003796] via-[#0052D4] to-[#1d4ed8] text-white shadow-md shadow-blue-600/20'
+                                : 'text-slate-600 dark:text-slate-400 hover:bg-white dark:hover:bg-slate-800'
+                                }`}
+                        >
+                            <Globe className="size-4" />
+                            <span>1. Website Projects ({projectsList.length})</span>
+                        </button>
+
+                        <button
+                            type="button"
+                            onClick={() => setActiveTabSection('services')}
+                            className={`px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-2 ${activeTabSection === 'services'
+                                ? 'bg-gradient-to-r from-[#003796] via-[#0052D4] to-[#1d4ed8] text-white shadow-md shadow-blue-600/20'
+                                : 'text-slate-600 dark:text-slate-400 hover:bg-white dark:hover:bg-slate-800'
+                                }`}
+                        >
+                            <LineChart className="size-4" />
+                            <span>2. Active Services ({clientServicesList.length})</span>
+                        </button>
+
+                        <button
+                            type="button"
+                            onClick={() => setActiveTabSection('infrastructure')}
+                            className={`px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-2 ${activeTabSection === 'infrastructure'
+                                ? 'bg-gradient-to-r from-[#003796] via-[#0052D4] to-[#1d4ed8] text-white shadow-md shadow-blue-600/20'
+                                : 'text-slate-600 dark:text-slate-400 hover:bg-white dark:hover:bg-slate-800'
+                                }`}
+                        >
+                            <Server className="size-4" />
+                            <span>3. Domains & Hosting ({domainsList.length + hostingsList.length})</span>
+                        </button>
+
+                        <button
+                            type="button"
+                            onClick={() => setActiveTabSection('invoices')}
+                            className={`px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-2 ${activeTabSection === 'invoices'
+                                ? 'bg-gradient-to-r from-[#003796] via-[#0052D4] to-[#1d4ed8] text-white shadow-md shadow-blue-600/20'
+                                : 'text-slate-600 dark:text-slate-400 hover:bg-white dark:hover:bg-slate-800'
+                                }`}
+                        >
+                            <Receipt className="size-4" />
+                            <span>4. Invoices & Billing ({invoicesList.length})</span>
+                        </button>
+                    </div>
+
+                    {/* TAB 1: Projects Showcase */}
+                    {activeTabSection === 'projects' && (
+                        <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/80 dark:border-slate-800 overflow-hidden shadow-xs">
                             <div className="p-5 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between bg-slate-50/50 dark:bg-slate-900/50">
-                                <div className="flex items-center gap-3">
-                                    <div className="p-2.5 rounded-2xl bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-md shadow-blue-600/20">
-                                        <Globe className="size-5" />
-                                    </div>
-                                    <div>
-                                        <h2 className="font-extrabold text-slate-900 dark:text-white text-base">Website Projects Showcase</h2>
-                                        <p className="text-xs text-slate-400 font-medium">Active development status & milestone timelines</p>
-                                    </div>
+                                <div>
+                                    <h3 className="font-extrabold text-slate-900 dark:text-white text-base">Projects Development Roadmap</h3>
+                                    <p className="text-xs text-slate-400 font-medium">Sprint progress, milestone deliverables, and budget tracking</p>
                                 </div>
                                 <Link
                                     href="/client-portal/projects"
                                     className="text-xs font-bold text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-1"
                                 >
-                                    <span>All Projects</span>
-                                    <ArrowUpRight className="size-3.5" />
+                                    <span>Open Projects Directory</span>
+                                    <ArrowUpRight className="size-4" />
                                 </Link>
                             </div>
 
                             <div className="divide-y divide-slate-100 dark:divide-slate-800/80">
-                                {client.website_projects && client.website_projects.length > 0 ? (
-                                    client.website_projects.map((project) => (
-                                        <div key={project.id} className="p-6 space-y-4 hover:bg-blue-50/40 dark:hover:bg-slate-800/40 transition-colors">
+                                {projectsList.length > 0 ? (
+                                    projectsList.map((project) => (
+                                        <div key={project.id} className="p-6 space-y-4 hover:bg-blue-50/30 dark:hover:bg-slate-800/30 transition-colors">
                                             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                                                 <div>
-                                                    <div className="flex items-center gap-2">
-                                                        <h3 className="font-bold text-slate-900 dark:text-white text-base">
-                                                            {project.project_name}
-                                                        </h3>
-                                                    </div>
+                                                    <h4 className="font-bold text-slate-900 dark:text-white text-base">
+                                                        {project.project_name}
+                                                    </h4>
                                                     <div className="flex flex-wrap items-center gap-4 mt-1.5 text-xs text-slate-400 font-medium">
                                                         <span>Budget: <strong className="text-slate-800 dark:text-slate-200 font-bold">{formatCurrency(project.total_budget)}</strong></span>
                                                         {project.start_date && (
                                                             <span className="flex items-center gap-1">
                                                                 <Calendar className="size-3.5 text-blue-500" />
-                                                                Started: {project.start_date}
+                                                                Started: {formatDate(project.start_date)}
                                                             </span>
                                                         )}
                                                         {project.deadline && (
                                                             <span className="flex items-center gap-1 text-slate-500 font-bold">
                                                                 <Clock className="size-3.5 text-amber-500" />
-                                                                Deadline: {project.deadline}
+                                                                Deadline: {formatDate(project.deadline)}
                                                             </span>
                                                         )}
                                                     </div>
                                                 </div>
 
-                                                <span className={`px-3.5 py-1 rounded-full text-xs font-black uppercase tracking-wider self-start sm:self-auto shrink-0 ${project.status === 'in_progress'
-                                                    ? 'bg-blue-50 text-blue-700 dark:bg-blue-950/60 dark:text-blue-300 border border-blue-200 dark:border-blue-800'
-                                                    : project.status === 'completed'
-                                                        ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800'
-                                                        : 'bg-amber-50 text-amber-700 dark:bg-amber-950/60 dark:text-amber-300 border border-amber-200 dark:border-amber-800'
-                                                    }`}>
-                                                    {project.status.replace('_', ' ')}
-                                                </span>
+                                                <div className="flex items-center gap-3">
+                                                    <span className={`px-3 py-1 rounded-full text-xs font-black uppercase tracking-wider ${project.status === 'in_progress'
+                                                        ? 'bg-blue-50 text-blue-700 dark:bg-blue-950/60 dark:text-blue-300 border border-blue-200 dark:border-blue-800'
+                                                        : project.status === 'completed'
+                                                            ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800'
+                                                            : 'bg-amber-50 text-amber-700 dark:bg-amber-950/60 dark:text-amber-300 border border-amber-200 dark:border-amber-800'
+                                                        }`}>
+                                                        {project.status.replace('_', ' ')}
+                                                    </span>
+
+                                                    <Link
+                                                        href={`/client-portal/projects/${project.id}`}
+                                                        className="px-3 py-1.5 rounded-xl bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400 hover:bg-gradient-to-r hover:from-[#003796] hover:via-[#0052D4] hover:to-[#1d4ed8] hover:text-white dark:hover:text-white hover:shadow-md hover:shadow-blue-600/20 active:scale-[0.99] transition-all inline-flex items-center gap-1 text-xs font-bold"
+                                                    >
+                                                        <span>Details</span>
+                                                        <ArrowRight className="size-3.5" />
+                                                    </Link>
+                                                </div>
                                             </div>
 
-                                            {/* Multi-Color Progress Bar */}
+                                            {/* Progress Bar */}
                                             <div className="space-y-1.5">
                                                 <div className="flex justify-between text-xs font-bold text-slate-600 dark:text-slate-300">
                                                     <span className="flex items-center gap-1 text-slate-400">
@@ -601,9 +884,9 @@ export default function ClientPortalOverview({ client }: ClientPortalOverviewPro
                                                     </span>
                                                     <span className="text-blue-600 dark:text-blue-400 font-mono">{project.progress_percentage}%</span>
                                                 </div>
-                                                <div className="w-full bg-slate-100 dark:bg-slate-800 h-3 rounded-full overflow-hidden p-0.5">
+                                                <div className="w-full bg-slate-100 dark:bg-slate-800 h-2.5 rounded-full overflow-hidden p-0.5">
                                                     <div
-                                                        className="bg-gradient-to-r from-blue-600 via-indigo-500 to-emerald-500 h-full rounded-full transition-all duration-500 shadow-sm"
+                                                        className="bg-gradient-to-r from-blue-600 via-indigo-500 to-emerald-500 h-full rounded-full transition-all duration-500"
                                                         style={{ width: `${project.progress_percentage}%` }}
                                                     />
                                                 </div>
@@ -612,273 +895,250 @@ export default function ClientPortalOverview({ client }: ClientPortalOverviewPro
                                     ))
                                 ) : (
                                     <div className="p-8 text-center text-slate-400 italic text-sm">
-                                        No website development projects recorded for this account.
+                                        No website development projects recorded yet.
                                     </div>
                                 )}
                             </div>
                         </div>
+                    )}
 
-                        {/* Deliverables & Tasks Feed */}
-                        <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200/80 dark:border-slate-800 overflow-hidden shadow-xs">
+                    {/* TAB 2: Active Services */}
+                    {activeTabSection === 'services' && (
+                        <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/80 dark:border-slate-800 overflow-hidden shadow-xs">
                             <div className="p-5 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between bg-slate-50/50 dark:bg-slate-900/50">
-                                <div className="flex items-center gap-3">
-                                    <div className="p-2.5 rounded-2xl bg-gradient-to-r from-emerald-600 to-teal-600 text-white shadow-md shadow-emerald-600/20">
-                                        <CheckSquare className="size-5" />
-                                    </div>
-                                    <div>
-                                        <h2 className="font-extrabold text-slate-900 dark:text-white text-base">Project Deliverables Feed</h2>
-                                        <p className="text-xs text-slate-400 font-medium">Sprint tasks & milestone progress</p>
-                                    </div>
+                                <div>
+                                    <h3 className="font-extrabold text-slate-900 dark:text-white text-base">Recurring Services & Retainers</h3>
+                                    <p className="text-xs text-slate-400 font-medium">Monthly subscriptions, SEO retainers, and SLA contracts</p>
                                 </div>
-                                <span className="px-2.5 py-1 rounded-full text-xs font-mono font-bold bg-emerald-50 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800">
-                                    {completedTasksCount} / {allTasks.length} Done
-                                </span>
+                                <Link
+                                    href="/client-portal/services"
+                                    className="text-xs font-bold text-purple-600 dark:text-purple-400 hover:underline flex items-center gap-1"
+                                >
+                                    <span>All Services</span>
+                                    <ArrowUpRight className="size-4" />
+                                </Link>
                             </div>
 
-                            <div className="divide-y divide-slate-100 dark:divide-slate-800/60">
-                                {allTasks.length > 0 ? (
-                                    allTasks.slice(0, 6).map((task) => (
-                                        <div key={task.id} className="p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 hover:bg-slate-50/50 dark:hover:bg-slate-800/30 transition-colors">
-                                            <div className="flex items-center gap-3 min-w-0">
-                                                <div className={`p-2 rounded-xl shrink-0 ${task.status === 'completed'
-                                                    ? 'bg-emerald-50 text-emerald-600 dark:bg-emerald-950/60 dark:text-emerald-400'
-                                                    : 'bg-blue-50 text-blue-600 dark:bg-blue-950/60 dark:text-blue-400'
-                                                    }`}>
-                                                    <CheckCircle2 className="size-4" />
+                            <div className="p-6 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                                {clientServicesList.length > 0 ? (
+                                    clientServicesList.map((service) => (
+                                        <div
+                                            key={service.id}
+                                            className="p-5 rounded-2xl bg-slate-50/70 dark:bg-slate-800/40 border border-slate-200/70 dark:border-slate-800 space-y-3 flex flex-col justify-between hover:border-purple-500/40 transition-colors"
+                                        >
+                                            <div className="space-y-2">
+                                                <div className="flex items-start justify-between">
+                                                    <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-indigo-50 text-indigo-700 dark:bg-indigo-950 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800">
+                                                        {service.category?.name || 'General'}
+                                                    </span>
+                                                    <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase ${service.status === 'active'
+                                                        ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300'
+                                                        : 'bg-amber-50 text-amber-700 dark:bg-amber-950/60 dark:text-amber-300'
+                                                        }`}>
+                                                        {service.status}
+                                                    </span>
                                                 </div>
-                                                <div className="min-w-0">
-                                                    <h4 className="text-xs font-bold text-slate-900 dark:text-white truncate">
-                                                        {task.task_title}
-                                                    </h4>
-                                                    {task.assigned_employee && (
-                                                        <span className="text-[11px] text-slate-400 font-medium block mt-0.5">
-                                                            Assigned: {task.assigned_employee.name}
-                                                        </span>
-                                                    )}
-                                                </div>
+                                                <h4 className="font-bold text-slate-900 dark:text-white text-base">
+                                                    {service.service_name}
+                                                </h4>
                                             </div>
 
-                                            <div className="flex items-center gap-2 shrink-0 self-end sm:self-auto">
-                                                <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase ${task.priority === 'urgent' || task.priority === 'high'
-                                                    ? 'bg-rose-50 text-rose-700 dark:bg-rose-950/60 dark:text-rose-300 border border-rose-200 dark:border-rose-800'
-                                                    : 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300'
-                                                    }`}>
-                                                    {task.priority}
-                                                </span>
-                                                <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-extrabold uppercase ${task.status === 'completed'
-                                                    ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300'
-                                                    : 'bg-blue-50 text-blue-700 dark:bg-blue-950/60 dark:text-blue-300'
-                                                    }`}>
-                                                    {task.status.replace('_', ' ')}
-                                                </span>
+                                            <div className="pt-2 border-t border-slate-200/60 dark:border-slate-700/60 flex items-center justify-between">
+                                                <div>
+                                                    <span className="text-lg font-black text-purple-600 dark:text-purple-400 font-mono">
+                                                        {formatCurrency(service.monthly_fee)}
+                                                    </span>
+                                                    <span className="text-xs text-slate-400"> / month</span>
+                                                </div>
+                                                <Link
+                                                    href={`/client-portal/services/${service.id}`}
+                                                    className="text-xs font-bold text-blue-600 dark:text-blue-400 hover:underline inline-flex items-center gap-1"
+                                                >
+                                                    <span>Details</span>
+                                                    <ArrowRight className="size-3.5" />
+                                                </Link>
                                             </div>
                                         </div>
                                     ))
                                 ) : (
-                                    <div className="p-8 text-center text-slate-400 italic text-sm">
-                                        No active tasks linked to current projects.
+                                    <div className="col-span-full p-8 text-center text-slate-400 italic text-sm">
+                                        No active services or subscriptions recorded.
                                     </div>
                                 )}
                             </div>
                         </div>
+                    )}
 
-                        {/* Recent Transactions & Payment Receipts Feed */}
-                        <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200/80 dark:border-slate-800 overflow-hidden shadow-xs">
+                    {/* TAB 3: Domains & Hosting */}
+                    {activeTabSection === 'infrastructure' && (
+                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                            {/* Domains Showcase */}
+                            <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/80 dark:border-slate-800 p-5 sm:p-6 shadow-xs space-y-4">
+                                <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-3">
+                                    <div className="flex items-center gap-2.5">
+                                        <div className="p-2 rounded-xl bg-cyan-50 dark:bg-cyan-950 text-cyan-600 dark:text-cyan-400">
+                                            <Globe className="size-4" />
+                                        </div>
+                                        <h3 className="font-extrabold text-slate-900 dark:text-white text-sm">Domain Registrations</h3>
+                                    </div>
+                                    <Link href="/client-portal/domains" className="text-xs font-bold text-cyan-600 dark:text-cyan-400 hover:underline">
+                                        View All ({domainsList.length})
+                                    </Link>
+                                </div>
+
+                                <div className="space-y-2.5">
+                                    {domainsList.length > 0 ? (
+                                        domainsList.slice(0, 4).map((domain) => (
+                                            <div key={domain.id} className="p-3.5 rounded-xl bg-slate-50/70 dark:bg-slate-800/40 border border-slate-100 dark:border-slate-800 flex items-center justify-between">
+                                                <div>
+                                                    <h4 className="font-bold text-slate-900 dark:text-white text-xs sm:text-sm">
+                                                        {domain.domain_name}
+                                                    </h4>
+                                                    <span className="text-[11px] text-slate-400 block mt-0.5">
+                                                        Registrar: {domain.registrar} &bull; Expires: {formatDate(domain.expiry_date)}
+                                                    </span>
+                                                </div>
+                                                <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase ${domain.status === 'active'
+                                                    ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300'
+                                                    : 'bg-rose-50 text-rose-700 dark:bg-rose-950/60 dark:text-rose-300'
+                                                    }`}>
+                                                    {domain.status}
+                                                </span>
+                                            </div>
+                                        ))
+                                    ) : (
+                                        <div className="p-6 text-center text-slate-400 italic text-xs">
+                                            No domain registrations found.
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+
+                            {/* Hosting Showcase */}
+                            <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/80 dark:border-slate-800 p-5 sm:p-6 shadow-xs space-y-4">
+                                <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-3">
+                                    <div className="flex items-center gap-2.5">
+                                        <div className="p-2 rounded-xl bg-purple-50 dark:bg-purple-950 text-purple-600 dark:text-purple-400">
+                                            <Server className="size-4" />
+                                        </div>
+                                        <h3 className="font-extrabold text-slate-900 dark:text-white text-sm">Cloud Web Hosting</h3>
+                                    </div>
+                                    <Link href="/client-portal/hostings" className="text-xs font-bold text-purple-600 dark:text-purple-400 hover:underline">
+                                        View All ({hostingsList.length})
+                                    </Link>
+                                </div>
+
+                                <div className="space-y-2.5">
+                                    {hostingsList.length > 0 ? (
+                                        hostingsList.slice(0, 4).map((hosting) => (
+                                            <div key={hosting.id} className="p-3.5 rounded-xl bg-slate-50/70 dark:bg-slate-800/40 border border-slate-100 dark:border-slate-800 flex items-center justify-between">
+                                                <div>
+                                                    <h4 className="font-bold text-slate-900 dark:text-white text-xs sm:text-sm">
+                                                        {hosting.hosting_title}
+                                                    </h4>
+                                                    <span className="text-[11px] text-slate-400 block mt-0.5">
+                                                        {hosting.provider} &bull; IP: {hosting.server_ip || 'Managed'} &bull; Cycle: {hosting.billing_cycle}
+                                                    </span>
+                                                </div>
+                                                <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase ${hosting.status === 'active'
+                                                    ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300'
+                                                    : 'bg-amber-50 text-amber-700 dark:bg-amber-950/60 dark:text-amber-300'
+                                                    }`}>
+                                                    {hosting.status}
+                                                </span>
+                                            </div>
+                                        ))
+                                    ) : (
+                                        <div className="p-6 text-center text-slate-400 italic text-xs">
+                                            No web hosting packages configured.
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* TAB 4: Invoices & Statements */}
+                    {activeTabSection === 'invoices' && (
+                        <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/80 dark:border-slate-800 overflow-hidden shadow-xs">
                             <div className="p-5 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between bg-slate-50/50 dark:bg-slate-900/50">
-                                <div className="flex items-center gap-3">
-                                    <div className="p-2.5 rounded-2xl bg-gradient-to-r from-amber-500 to-orange-500 text-white shadow-md shadow-amber-500/20">
-                                        <Receipt className="size-5" />
-                                    </div>
-                                    <div>
-                                        <h2 className="font-extrabold text-slate-900 dark:text-white text-base">Recent Payment Receipts</h2>
-                                        <p className="text-xs text-slate-400 font-medium">Milestone transaction log</p>
-                                    </div>
+                                <div>
+                                    <h3 className="font-extrabold text-slate-900 dark:text-white text-base">Invoices & Payment Records</h3>
+                                    <p className="text-xs text-slate-400 font-medium">Official billing statements, payment receipts, and tax records</p>
                                 </div>
                                 <Link
                                     href="/client-portal/invoices"
                                     className="text-xs font-bold text-amber-600 dark:text-amber-400 hover:underline flex items-center gap-1"
                                 >
                                     <span>All Statements</span>
-                                    <ArrowUpRight className="size-3.5" />
+                                    <ArrowUpRight className="size-4" />
                                 </Link>
                             </div>
 
-                            <div className="divide-y divide-slate-100 dark:divide-slate-800/60">
-                                {allPayments.length > 0 ? (
-                                    allPayments.slice(0, 5).map((payment) => (
-                                        <div key={payment.id} className="p-4 flex items-center justify-between gap-4 hover:bg-slate-50/50 dark:hover:bg-slate-800/30 transition-colors">
-                                            <div className="flex items-center gap-3 min-w-0">
-                                                <div className={`p-2.5 rounded-xl shrink-0 ${payment.status === 'paid'
-                                                    ? 'bg-emerald-50 text-emerald-600 dark:bg-emerald-950/60 dark:text-emerald-400'
-                                                    : 'bg-amber-50 text-amber-600 dark:bg-amber-950/60 dark:text-amber-400'
-                                                    }`}>
-                                                    <BadgeDollarSign className="size-4" />
-                                                </div>
-                                                <div className="min-w-0">
-                                                    <h4 className="text-xs font-bold text-slate-900 dark:text-white truncate">
-                                                        {payment.milestone_title}
-                                                    </h4>
-                                                    <span className="text-[11px] text-slate-400 block font-medium mt-0.5">
-                                                        Stage: <strong className="capitalize text-slate-700 dark:text-slate-300">{payment.payment_stage}</strong>
-                                                    </span>
-                                                </div>
-                                            </div>
-
-                                            <div className="text-right shrink-0">
-                                                <div className="text-xs font-black font-mono text-slate-900 dark:text-white">
-                                                    {formatCurrency(payment.amount)}
-                                                </div>
-                                                <span className={`inline-block px-2 py-0.5 rounded-full text-[10px] font-black uppercase mt-0.5 ${payment.status === 'paid'
-                                                    ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300'
-                                                    : 'bg-amber-50 text-amber-700 dark:bg-amber-950/60 dark:text-amber-300'
-                                                    }`}>
-                                                    {payment.status}
-                                                </span>
-                                            </div>
-                                        </div>
-                                    ))
-                                ) : (
-                                    <div className="p-8 text-center text-slate-400 italic text-sm">
-                                        No recent payment records found.
-                                    </div>
-                                )}
+                            <div className="overflow-x-auto">
+                                <table className="w-full text-left border-collapse">
+                                    <thead>
+                                        <tr className="border-b border-slate-200/80 dark:border-slate-800 text-[11px] font-extrabold uppercase tracking-wider text-slate-400 bg-slate-50/40 dark:bg-slate-800/40">
+                                            <th className="py-3.5 px-4">Invoice #</th>
+                                            <th className="py-3.5 px-4">Issue Date</th>
+                                            <th className="py-3.5 px-4">Due Date</th>
+                                            <th className="py-3.5 px-4">Total Amount</th>
+                                            <th className="py-3.5 px-4">Status</th>
+                                            <th className="py-3.5 px-4 text-right">Action</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60 text-xs">
+                                        {invoicesList.length > 0 ? (
+                                            invoicesList.map((inv) => (
+                                                <tr key={inv.id} className="hover:bg-slate-50/60 dark:hover:bg-slate-800/40 transition-colors">
+                                                    <td className="py-3.5 px-4 font-mono font-bold text-blue-600 dark:text-blue-400">
+                                                        {inv.invoice_number}
+                                                    </td>
+                                                    <td className="py-3.5 px-4 text-slate-500 dark:text-slate-400">
+                                                        {formatDate(inv.issue_date)}
+                                                    </td>
+                                                    <td className="py-3.5 px-4 text-slate-500 dark:text-slate-400">
+                                                        {formatDate(inv.due_date)}
+                                                    </td>
+                                                    <td className="py-3.5 px-4 font-mono font-bold text-slate-900 dark:text-white">
+                                                        {formatCurrency(inv.total_amount)}
+                                                    </td>
+                                                    <td className="py-3.5 px-4">
+                                                        <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase ${inv.status === 'paid'
+                                                            ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300'
+                                                            : inv.status === 'overdue'
+                                                                ? 'bg-rose-50 text-rose-700 dark:bg-rose-950/60 dark:text-rose-300'
+                                                                : 'bg-amber-50 text-amber-700 dark:bg-amber-950/60 dark:text-amber-300'
+                                                            }`}>
+                                                            {inv.status}
+                                                        </span>
+                                                    </td>
+                                                    <td className="py-3.5 px-4 text-right">
+                                                        <a
+                                                            href={`/client-portal/invoices/${inv.id}/pdf`}
+                                                            target="_blank"
+                                                            rel="noopener noreferrer"
+                                                            className="h-8 px-2.5 rounded-lg bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400 hover:bg-gradient-to-r hover:from-[#003796] hover:via-[#0052D4] hover:to-[#1d4ed8] hover:text-white text-xs font-bold inline-flex items-center gap-1.5 transition-all cursor-pointer border border-blue-200/50 hover:border-transparent"
+                                                            title="Open & Print Invoice PDF"
+                                                        >
+                                                            <Printer className="size-3.5" />
+                                                            <span>Print</span>
+                                                        </a>
+                                                    </td>
+                                                </tr>
+                                            ))
+                                        ) : (
+                                            <tr>
+                                                <td colSpan={6} className="py-8 text-center text-slate-400 italic">
+                                                    No official tax invoices generated yet.
+                                                </td>
+                                            </tr>
+                                        )}
+                                    </tbody>
+                                </table>
                             </div>
                         </div>
-                    </div>
-
-                    {/* Right Column: Clean Customer Profile, SEO Retainers & Support */}
-                    <div className="space-y-6 sm:space-y-8">
-                        {/* Elegant & Clean Customer Details Card */}
-                        <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200/80 dark:border-slate-800 p-5 space-y-4 shadow-xs">
-                            <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-3">
-                                <div className="flex items-center gap-2">
-                                    <div className="p-2 rounded-lg bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400">
-                                        <Building2 className="size-4" />
-                                    </div>
-                                    <h3 className="font-bold text-slate-900 dark:text-white text-sm">Customer Details</h3>
-                                </div>
-                                <span className="px-2.5 py-0.5 text-[10px] font-mono font-bold bg-indigo-50 dark:bg-indigo-950 text-indigo-600 dark:text-indigo-300 rounded-full border border-indigo-100 dark:border-indigo-900/50">
-                                    {client.client_code}
-                                </span>
-                            </div>
-
-                            <div className="space-y-2 text-xs">
-                                <div className="flex items-center justify-between p-2 rounded-xl bg-slate-50/70 dark:bg-slate-800/40 border border-slate-100/80 dark:border-slate-800/60">
-                                    <span className="text-slate-500 dark:text-slate-400 font-medium flex items-center gap-1.5">
-                                        <User className="size-3.5 text-indigo-500" /> Primary Contact
-                                    </span>
-                                    <span className="font-bold text-slate-900 dark:text-slate-100">{client.contact_person || client.name}</span>
-                                </div>
-
-                                {client.email && (
-                                    <div className="flex items-center justify-between p-2 rounded-xl bg-slate-50/70 dark:bg-slate-800/40 border border-slate-100/80 dark:border-slate-800/60">
-                                        <span className="text-slate-500 dark:text-slate-400 font-medium flex items-center gap-1.5">
-                                            <Mail className="size-3.5 text-blue-500" /> Email Address
-                                        </span>
-                                        <span className="font-bold text-slate-900 dark:text-slate-100 truncate max-w-[160px]">{client.email}</span>
-                                    </div>
-                                )}
-
-                                {(client.phone || client.mobile) && (
-                                    <div className="flex items-center justify-between p-2 rounded-xl bg-slate-50/70 dark:bg-slate-800/40 border border-slate-100/80 dark:border-slate-800/60">
-                                        <span className="text-slate-500 dark:text-slate-400 font-medium flex items-center gap-1.5">
-                                            <Phone className="size-3.5 text-emerald-500" /> Phone
-                                        </span>
-                                        <span className="font-bold text-slate-900 dark:text-slate-100">{client.phone || client.mobile}</span>
-                                    </div>
-                                )}
-
-                                {(client.city || client.country) && (
-                                    <div className="flex items-center justify-between p-2 rounded-xl bg-slate-50/70 dark:bg-slate-800/40 border border-slate-100/80 dark:border-slate-800/60">
-                                        <span className="text-slate-500 dark:text-slate-400 font-medium flex items-center gap-1.5">
-                                            <MapPin className="size-3.5 text-rose-500" /> Location
-                                        </span>
-                                        <span className="font-bold text-slate-900 dark:text-slate-100">{[client.city, client.country].filter(Boolean).join(', ')}</span>
-                                    </div>
-                                )}
-
-                                <div className="flex items-center justify-between p-2 rounded-xl bg-slate-50/70 dark:bg-slate-800/40 border border-slate-100/80 dark:border-slate-800/60">
-                                    <span className="text-slate-500 dark:text-slate-400 font-medium flex items-center gap-1.5">
-                                        <CreditCard className="size-3.5 text-purple-500" /> Currency
-                                    </span>
-                                    <span className="font-bold text-slate-900 dark:text-slate-100 font-mono uppercase">{client.currency}</span>
-                                </div>
-                            </div>
-                        </div>
-
-                        {/* Active SEO Retainers Card */}
-                        <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200/80 dark:border-slate-800 p-6 space-y-4 shadow-xs">
-                            <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-4">
-                                <div className="flex items-center gap-3">
-                                    <div className="p-2.5 rounded-2xl bg-gradient-to-r from-purple-600 to-indigo-600 text-white shadow-md shadow-purple-600/20">
-                                        <LineChart className="size-5" />
-                                    </div>
-                                    <div>
-                                        <h2 className="font-extrabold text-slate-900 dark:text-white text-base">SEO Retainers</h2>
-                                        <p className="text-xs text-slate-400 font-medium">Active Subscriptions</p>
-                                    </div>
-                                </div>
-                                <Link
-                                    href="/client-portal/services"
-                                    className="text-xs font-bold text-purple-600 dark:text-purple-400 hover:underline"
-                                >
-                                    Manage
-                                </Link>
-                            </div>
-
-                            {client.seo_retainers && client.seo_retainers.length > 0 ? (
-                                client.seo_retainers.map((retainer) => (
-                                    <div key={retainer.id} className="p-4 rounded-2xl bg-gradient-to-br from-purple-500/5 via-slate-50 to-purple-500/5 dark:from-purple-950/20 dark:via-slate-900 dark:to-purple-950/20 space-y-2 border border-purple-100 dark:border-purple-900/40">
-                                        <div className="flex items-center justify-between">
-                                            <span className="text-xs font-bold text-slate-900 dark:text-white">Monthly SEO Service</span>
-                                            <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase ${retainer.status === 'active'
-                                                ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300'
-                                                : 'bg-amber-50 text-amber-700 dark:bg-amber-950/60 dark:text-amber-300'
-                                                }`}>
-                                                {retainer.status}
-                                            </span>
-                                        </div>
-                                        <div className="text-xl font-black text-purple-600 dark:text-purple-400 font-mono">
-                                            {formatCurrency(retainer.monthly_amount)} <span className="text-xs text-slate-400 font-normal">/ mo</span>
-                                        </div>
-                                        <div className="text-[11px] text-slate-400 font-medium">
-                                            Billing cycle day: {retainer.billing_cycle_day} of every month
-                                        </div>
-                                    </div>
-                                ))
-                            ) : (
-                                <div className="text-center py-6 text-slate-400 italic text-xs">
-                                    No active SEO retainers on record.
-                                </div>
-                            )}
-                        </div>
-
-                        {/* Dedicated Support Card */}
-                        <div className="rounded-3xl bg-gradient-to-br from-slate-900 via-indigo-950 to-slate-950 p-6 text-white space-y-4 shadow-xl border border-indigo-900/40 relative overflow-hidden">
-                            <div className="absolute right-0 bottom-0 translate-x-6 translate-y-6 size-32 bg-blue-500/10 rounded-full blur-xl pointer-events-none" />
-                            <div className="flex items-center gap-3">
-                                <div className="p-2.5 rounded-2xl bg-blue-600/30 border border-blue-400/30 text-blue-300">
-                                    <ShieldCheck className="size-5" />
-                                </div>
-                                <div>
-                                    <h3 className="font-black text-sm text-white">Dedicated Support</h3>
-                                    <p className="text-xs text-slate-300">Sapta Agency Success Team</p>
-                                </div>
-                            </div>
-                            <p className="text-xs text-slate-300 leading-relaxed">
-                                Need help or want to request custom website features or SEO upgrades? Contact your dedicated project team anytime.
-                            </p>
-                            <div className="pt-2 flex items-center gap-2">
-                                <a
-                                    href={`mailto:${client.email || 'support@sapta.com'}`}
-                                    className="flex-1 py-2 px-3 rounded-xl bg-white/10 hover:bg-white/20 text-white text-xs font-bold text-center transition-all border border-white/15 backdrop-blur-md flex items-center justify-center gap-1.5"
-                                >
-                                    <Mail className="size-3.5 text-blue-300" />
-                                    <span>Email Support</span>
-                                </a>
-                            </div>
-                        </div>
-                    </div>
+                    )}
                 </div>
             </div>
         </ClientPortalLayout>

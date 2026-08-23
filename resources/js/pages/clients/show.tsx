@@ -72,12 +72,13 @@ interface WebsiteProjectItem {
     tasks?: ProjectTaskData[];
 }
 
-interface SeoRetainerItem {
+interface ClientServiceItem {
     id: number;
-    monthly_amount: number | string;
+    service_name: string;
+    monthly_fee: number | string;
     currency: string;
-    status: 'active' | 'paused' | 'cancelled';
-    billing_cycle_day: number;
+    status: 'active' | 'paused' | 'stopped';
+    billing_day: number;
     start_date?: string;
 }
 
@@ -97,7 +98,8 @@ interface ClientDetailItem {
     notes?: string;
     created_at: string;
     website_projects?: WebsiteProjectItem[];
-    seo_retainers?: SeoRetainerItem[];
+    client_services?: ClientServiceItem[];
+    services?: ClientServiceItem[];
     project_payments?: ProjectPaymentData[];
 }
 
@@ -140,7 +142,7 @@ export default function ClientShow({ client }: ClientShowProps) {
     };
 
     const websiteProjects = client.website_projects || [];
-    const seoRetainers = client.seo_retainers || [];
+    const clientServices = client.client_services || client.services || [];
 
     // Flatten all tasks under client's projects
     const allTasks: (ProjectTaskData & { projectName: string })[] = [];
@@ -289,16 +291,16 @@ export default function ClientShow({ client }: ClientShowProps) {
                         </div>
                     </div>
 
-                    {/* SEO Retainers */}
+                    {/* Client Services */}
                     <div className="p-5 rounded-3xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 shadow-2xs space-y-2">
                         <div className="flex items-center justify-between">
-                            <span className="text-xs font-bold uppercase tracking-wider text-slate-400">SEO Retainers</span>
+                            <span className="text-xs font-bold uppercase tracking-wider text-slate-400">Active Services</span>
                             <div className="p-2 rounded-xl bg-emerald-50 dark:bg-emerald-950 text-emerald-600 dark:text-emerald-400">
                                 <BadgeDollarSign className="size-4" />
                             </div>
                         </div>
                         <p className="text-xl font-extrabold text-slate-900 dark:text-white">
-                            {seoRetainers.length} <span className="text-xs font-semibold text-slate-400">Active</span>
+                            {clientServices.length} <span className="text-xs font-semibold text-slate-400">Active</span>
                         </p>
                         <p className="text-xs text-slate-400 font-semibold pt-2 border-t border-slate-100 dark:border-slate-800">
                             Client Currency: {client.currency}
@@ -384,7 +386,7 @@ export default function ClientShow({ client }: ClientShowProps) {
                             }`}
                         >
                             <Globe className="size-4" />
-                            <span>SEO Retainers ({seoRetainers.length})</span>
+                            <span>Client Services ({clientServices.length})</span>
                         </button>
                     </div>
                 </div>
@@ -759,7 +761,7 @@ export default function ClientShow({ client }: ClientShowProps) {
                     </div>
                 )}
 
-                {/* Tab 5: SEO Retainers */}
+                {/* Tab 5: Client Services */}
                 {activeTab === 'seo' && (
                     <div className="p-6 rounded-3xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 shadow-2xs space-y-4">
                         <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-3">
@@ -767,43 +769,47 @@ export default function ClientShow({ client }: ClientShowProps) {
                                 <Globe className="size-5 text-emerald-600 dark:text-emerald-400" />
                                 <div>
                                     <h3 className="text-base font-extrabold text-slate-900 dark:text-white">
-                                        SEO Retainers & Contracts
+                                        General Services & Retainers
                                     </h3>
-                                    <p className="text-xs text-slate-400">Monthly recurring SEO packages for {client.name}.</p>
+                                    <p className="text-xs text-slate-400">Active services and recurring packages for {client.name}.</p>
                                 </div>
                             </div>
                             <Link
-                                href="/seo-retainers/create"
+                                href="/client-portal/services"
                                 className="h-8 px-3 rounded-xl bg-emerald-50 dark:bg-emerald-950 text-emerald-600 dark:text-emerald-400 text-xs font-bold hover:bg-emerald-600 hover:text-white transition-all inline-flex items-center gap-1.5"
                             >
                                 <Plus className="size-3.5" />
-                                <span>Add Retainer</span>
+                                <span>Manage Services</span>
                             </Link>
                         </div>
 
-                        {seoRetainers.length === 0 ? (
+                        {clientServices.length === 0 ? (
                             <div className="p-8 text-center text-slate-400 italic bg-slate-50/50 dark:bg-slate-950/50 rounded-2xl border border-dashed border-slate-200 dark:border-slate-800">
-                                No SEO retainers registered for this client yet.
+                                No services registered for this client yet.
                             </div>
                         ) : (
                             <div className="overflow-x-auto">
                                 <table className="w-full text-left border-collapse">
                                     <thead>
                                         <tr className="border-b border-slate-100 dark:border-slate-800 text-[11px] font-extrabold uppercase tracking-wider text-slate-400">
-                                            <th className="py-3 px-4">Monthly Retainer Amount</th>
+                                            <th className="py-3 px-4">Service Name</th>
+                                            <th className="py-3 px-4">Monthly Fee</th>
                                             <th className="py-3 px-4">Billing Day</th>
                                             <th className="py-3 px-4">Start Date</th>
                                             <th className="py-3 px-4">Status</th>
                                         </tr>
                                     </thead>
                                     <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60 text-xs font-medium text-slate-700 dark:text-slate-300">
-                                        {seoRetainers.map((r) => (
+                                        {clientServices.map((r) => (
                                             <tr key={r.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/30">
+                                                <td className="py-3.5 px-4 font-bold text-slate-900 dark:text-white">
+                                                    {r.service_name}
+                                                </td>
                                                 <td className="py-3.5 px-4 font-extrabold text-emerald-600 dark:text-emerald-400 text-sm">
-                                                    {formatCurrency(r.monthly_amount)} / month
+                                                    {formatCurrency(r.monthly_fee)} / month
                                                 </td>
                                                 <td className="py-3.5 px-4 whitespace-nowrap font-bold text-slate-700 dark:text-slate-300">
-                                                    Day {r.billing_cycle_day} of every month
+                                                    Day {r.billing_day} of every month
                                                 </td>
                                                 <td className="py-3.5 px-4 whitespace-nowrap text-slate-500 font-semibold">
                                                     {formatDateOnly(r.start_date)}

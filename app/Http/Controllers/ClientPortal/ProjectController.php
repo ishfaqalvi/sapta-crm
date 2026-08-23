@@ -3,7 +3,7 @@
 namespace App\Http\Controllers\ClientPortal;
 
 use App\Http\Controllers\Controller;
-use App\Models\{Client, WebsiteProject, Currency, SystemSetting, Employee, ProjectTask, ProjectPayment, ClientCredential, ProjectCategory};
+use App\Models\{Client, WebsiteProject, Currency, SystemSetting, Employee, ProjectTask, ProjectPayment, ClientCredential, ProjectCategory, Invoice, InvoiceItem};
 use App\Services\CurrencyService;
 use App\Traits\AuthorizesClientPortalAccess;
 use Illuminate\Http\RedirectResponse;
@@ -101,12 +101,15 @@ class ProjectController extends Controller
             'client',
             'category',
             'payments' => function ($q) {
-                $q->orderBy('created_at', 'desc');
+                $q->with('invoice')->orderBy('created_at', 'desc');
             },
             'tasks' => function ($q) {
                 $q->with('assignedEmployee:id,name,employee_code,avatar')->orderBy('due_date', 'asc');
             },
             'credentials' => function ($q) {
+                $q->orderBy('created_at', 'desc');
+            },
+            'documents' => function ($q) {
                 $q->orderBy('created_at', 'desc');
             },
         ]);
@@ -160,11 +163,13 @@ class ProjectController extends Controller
 
         $clientId = $this->getClientId();
 
+        $client = $this->getClientModel();
+
         $validated = $request->validate([
             'project_name' => ['required', 'string', 'max:255'],
             'category_id' => ['required', 'exists:project_categories,id'],
             'total_budget' => ['required', 'numeric', 'min:0'],
-            'currency' => ['required', 'string', 'max:10'],
+            'currency' => ['nullable', 'string', 'max:10'],
             'exchange_rate' => ['nullable', 'numeric', 'min:0.0001'],
             'start_date' => ['nullable', 'date'],
             'deadline' => ['nullable', 'date'],
@@ -173,11 +178,13 @@ class ProjectController extends Controller
             'notes' => ['nullable', 'string', 'max:2000'],
         ]);
 
+        $currency = $validated['currency'] ?? ($client->currency ?? 'USD');
         $rate = (!empty($validated['exchange_rate']) && $validated['exchange_rate'] > 0)
             ? (float) $validated['exchange_rate']
-            : CurrencyService::getRate($validated['currency']);
+            : CurrencyService::getRate($currency);
 
         $validated['client_id'] = $clientId;
+        $validated['currency'] = $currency;
         $validated['category_id'] = $request->filled('category_id') ? (int) $request->category_id : null;
         $validated['exchange_rate'] = $rate;
         $validated['total_budget_pkr'] = round((float) $validated['total_budget'] * $rate, 2);
@@ -226,11 +233,13 @@ class ProjectController extends Controller
             abort(403, 'Unauthorized access to project');
         }
 
+        $client = $this->getClientModel();
+
         $validated = $request->validate([
             'project_name' => ['required', 'string', 'max:255'],
             'category_id' => ['required', 'exists:project_categories,id'],
             'total_budget' => ['required', 'numeric', 'min:0'],
-            'currency' => ['required', 'string', 'max:10'],
+            'currency' => ['nullable', 'string', 'max:10'],
             'exchange_rate' => ['nullable', 'numeric', 'min:0.0001'],
             'start_date' => ['nullable', 'date'],
             'deadline' => ['nullable', 'date'],
@@ -239,10 +248,12 @@ class ProjectController extends Controller
             'notes' => ['nullable', 'string', 'max:2000'],
         ]);
 
+        $currency = $validated['currency'] ?? ($project->currency ?? ($client->currency ?? 'USD'));
         $rate = (!empty($validated['exchange_rate']) && $validated['exchange_rate'] > 0)
             ? (float) $validated['exchange_rate']
-            : CurrencyService::getRate($validated['currency']);
+            : CurrencyService::getRate($currency);
 
+        $validated['currency'] = $currency;
         $validated['category_id'] = $request->filled('category_id') ? (int) $request->category_id : null;
         $validated['exchange_rate'] = $rate;
         $validated['total_budget_pkr'] = round((float) $validated['total_budget'] * $rate, 2);
@@ -277,7 +288,7 @@ class ProjectController extends Controller
     */
     public function storeTask(Request $request): RedirectResponse
     {
-        $this->authorizePermission('create-client-portal-tasks');
+        $this->authorizePermission('create-client-portal-project-tasks');
 
         $clientId = $this->getClientId();
 
@@ -312,7 +323,7 @@ class ProjectController extends Controller
 
     public function updateTask(Request $request, ProjectTask $task): RedirectResponse
     {
-        $this->authorizePermission('edit-client-portal-tasks');
+        $this->authorizePermission('edit-client-portal-project-tasks');
 
         $clientId = $this->getClientId();
 
@@ -353,7 +364,7 @@ class ProjectController extends Controller
 
     public function updateStatus(Request $request, ProjectTask $task): RedirectResponse
     {
-        $this->authorizePermission('edit-client-portal-tasks');
+        $this->authorizePermission('edit-client-portal-project-tasks');
 
         $clientId = $this->getClientId();
 
@@ -379,7 +390,7 @@ class ProjectController extends Controller
 
     public function destroyTask(ProjectTask $task): RedirectResponse
     {
-        $this->authorizePermission('delete-client-portal-tasks');
+        $this->authorizePermission('delete-client-portal-project-tasks');
 
         $clientId = $this->getClientId();
 
@@ -403,7 +414,7 @@ class ProjectController extends Controller
     */
     public function storeMilestone(Request $request): RedirectResponse
     {
-        $this->authorizePermission('create-client-portal-milestones');
+        $this->authorizePermission('create-client-portal-project-milestones');
 
         $clientId = $this->getClientId();
 
@@ -417,9 +428,6 @@ class ProjectController extends Controller
             'milestone_title' => 'required|string|max:255',
             'amount' => 'required|numeric|min:0',
             'payment_stage' => ['required', Rule::in(['advance', 'partial', 'full'])],
-            'status' => ['required', Rule::in(['pending', 'paid'])],
-            'paid_at' => 'nullable|date',
-            'payment_method' => 'nullable|string|max:100',
             'notes' => 'nullable|string|max:1000',
         ]);
 
@@ -437,14 +445,12 @@ class ProjectController extends Controller
         }
 
         $validated['client_id'] = $clientId;
+        $validated['status'] = 'pending';
+        $validated['paid_at'] = null;
 
         $rate = CurrencyService::getRate($project->currency);
         $validated['exchange_rate'] = $rate;
         $validated['amount_pkr'] = round((float) $validated['amount'] * $rate, 2);
-
-        if ($validated['status'] === 'paid' && empty($validated['paid_at'])) {
-            $validated['paid_at'] = now()->toDateString();
-        }
 
         ProjectPayment::create($validated);
 
@@ -453,7 +459,7 @@ class ProjectController extends Controller
 
     public function updateMilestone(Request $request, ProjectPayment $milestone): RedirectResponse
     {
-        $this->authorizePermission('edit-client-portal-milestones');
+        $this->authorizePermission('edit-client-portal-project-milestones');
 
         $clientId = $this->getClientId();
 
@@ -461,8 +467,8 @@ class ProjectController extends Controller
             abort(403, 'Unauthorized access to milestone');
         }
 
-        if ($milestone->status === 'paid') {
-            return redirect()->back()->with('error', 'Paid / settled milestone payments cannot be edited.');
+        if ($milestone->invoice()->exists() || $milestone->status === 'paid') {
+            return redirect()->back()->with('error', 'Milestone payments with a generated invoice or paid status cannot be edited.');
         }
 
         $validated = $request->validate([
@@ -475,9 +481,6 @@ class ProjectController extends Controller
             'milestone_title' => 'required|string|max:255',
             'amount' => 'required|numeric|min:0',
             'payment_stage' => ['required', Rule::in(['advance', 'partial', 'full'])],
-            'status' => ['required', Rule::in(['pending', 'paid'])],
-            'paid_at' => 'nullable|date',
-            'payment_method' => 'nullable|string|max:100',
             'notes' => 'nullable|string|max:1000',
         ]);
 
@@ -500,12 +503,6 @@ class ProjectController extends Controller
         $validated['exchange_rate'] = $rate;
         $validated['amount_pkr'] = round((float) $validated['amount'] * $rate, 2);
 
-        if ($validated['status'] === 'paid' && empty($validated['paid_at'])) {
-            $validated['paid_at'] = now()->toDateString();
-        } elseif ($validated['status'] === 'pending') {
-            $validated['paid_at'] = null;
-        }
-
         $milestone->update($validated);
 
         return redirect()->back()->with('success', 'Project milestone updated successfully.');
@@ -513,7 +510,7 @@ class ProjectController extends Controller
 
     public function destroyMilestone(ProjectPayment $milestone): RedirectResponse
     {
-        $this->authorizePermission('delete-client-portal-milestones');
+        $this->authorizePermission('delete-client-portal-project-milestones');
 
         $clientId = $this->getClientId();
 
@@ -521,13 +518,63 @@ class ProjectController extends Controller
             abort(403, 'Unauthorized access to milestone');
         }
 
-        if ($milestone->status === 'paid') {
-            return redirect()->back()->with('error', 'Paid / settled milestone payments cannot be deleted.');
+        if ($milestone->invoice()->exists() || $milestone->status === 'paid') {
+            return redirect()->back()->with('error', 'Milestone payments with a generated invoice or paid status cannot be deleted.');
         }
 
         $milestone->delete();
 
         return redirect()->back()->with('success', 'Project milestone deleted successfully.');
+    }
+
+    public function generateMilestoneInvoice(ProjectPayment $milestone): RedirectResponse
+    {
+        $this->authorizePermission('create-client-portal-invoices');
+
+        $clientId = $this->getClientId();
+
+        if ($milestone->client_id !== $clientId) {
+            abort(403, 'Unauthorized access to milestone');
+        }
+
+        if ($milestone->invoice()->exists()) {
+            return redirect()->back()->with('error', 'An invoice has already been generated for this milestone payment.');
+        }
+
+        $project = $milestone->websiteProject;
+        $currency = $project ? ($project->currency ?? 'USD') : 'USD';
+        $rate = CurrencyService::getRate($currency);
+
+        $invoiceNumber = Invoice::generateNextInvoiceNumber();
+
+        $invoice = Invoice::create([
+            'invoice_number' => $invoiceNumber,
+            'client_id' => $milestone->client_id,
+            'currency_code' => $currency,
+            'exchange_rate_to_pkr' => $rate,
+            'subtotal' => $milestone->amount,
+            'tax_rate' => 0.00,
+            'tax_amount' => 0.00,
+            'discount' => 0.00,
+            'total_amount' => $milestone->amount,
+            'total_amount_pkr' => round((float) $milestone->amount * $rate, 2),
+            'issue_date' => now()->toDateString(),
+            'due_date' => $milestone->paid_at ? $milestone->paid_at->toDateString() : now()->addDays(14)->toDateString(),
+            'notes' => 'Invoice generated for project milestone: ' . $milestone->milestone_title,
+            'created_by' => Auth::id(),
+        ]);
+
+        InvoiceItem::create([
+            'invoice_id' => $invoice->id,
+            'description' => 'Project Milestone: ' . $milestone->milestone_title . ($milestone->notes ? ' (' . $milestone->notes . ')' : ''),
+            'quantity' => 1.00,
+            'unit_price' => $milestone->amount,
+            'amount' => $milestone->amount,
+            'invoiceable_type' => ProjectPayment::class,
+            'invoiceable_id' => $milestone->id,
+        ]);
+
+        return redirect()->back()->with('success', "Invoice {$invoiceNumber} generated successfully.");
     }
 
     /*
@@ -537,7 +584,7 @@ class ProjectController extends Controller
     */
     public function storeCredential(Request $request): RedirectResponse
     {
-        $this->authorizePermission('create-client-portal-credentials');
+        $this->authorizePermission('create-client-portal-project-credentials');
 
         $clientId = $this->getClientId();
 
@@ -560,7 +607,7 @@ class ProjectController extends Controller
 
     public function updateCredential(Request $request, ClientCredential $credential): RedirectResponse
     {
-        $this->authorizePermission('edit-client-portal-credentials');
+        $this->authorizePermission('edit-client-portal-project-credentials');
 
         $clientId = $this->getClientId();
 
@@ -585,7 +632,7 @@ class ProjectController extends Controller
 
     public function destroyCredential(ClientCredential $credential): RedirectResponse
     {
-        $this->authorizePermission('delete-client-portal-credentials');
+        $this->authorizePermission('delete-client-portal-project-credentials');
 
         $clientId = $this->getClientId();
 
@@ -596,5 +643,78 @@ class ProjectController extends Controller
         $credential->delete();
 
         return redirect()->back()->with('success', 'Credential deleted successfully.');
+    }
+
+    public function storeDocument(Request $request, WebsiteProject $project): RedirectResponse
+    {
+        $this->authorizePermission('create-client-portal-project-documents');
+        $clientId = $this->getClientId();
+
+        if ($project->client_id !== $clientId) {
+            abort(403, 'Unauthorized access to project');
+        }
+
+        $allowedExtensions = ['pdf', 'doc', 'docx', 'xls', 'xlsx', 'csv', 'png', 'jpg', 'jpeg', 'webp'];
+
+        $request->validate([
+            'title' => ['required', 'string', 'max:255'],
+            'file' => [
+                'required',
+                'file',
+                'max:25600',
+                function ($attribute, $value, $fail) use ($allowedExtensions) {
+                    if (!$value || !method_exists($value, 'getClientOriginalExtension'))
+                        return;
+                    $ext = strtolower($value->getClientOriginalExtension());
+                    if (!in_array($ext, $allowedExtensions)) {
+                        $fail('The file field must be a file of type: ' . implode(', ', $allowedExtensions) . '.');
+                    }
+                },
+            ],
+        ]);
+
+        $file = $request->file('file');
+        $originalName = $file->getClientOriginalName();
+        $extension = strtolower($file->getClientOriginalExtension());
+        $fileSize = $file->getSize();
+
+        $destinationPath = public_path('uploads/documents');
+        if (!file_exists($destinationPath)) {
+            mkdir($destinationPath, 0755, true);
+        }
+
+        $filename = time() . '_' . uniqid() . '.' . $extension;
+        $file->move($destinationPath, $filename);
+        $filePath = '/uploads/documents/' . $filename;
+
+        \App\Models\ClientDocument::create([
+            'client_id' => $clientId,
+            'website_project_id' => $project->id,
+            'title' => $request->input('title'),
+            'file_path' => $filePath,
+            'file_name' => $originalName,
+            'file_type' => $extension,
+            'file_size' => $fileSize,
+        ]);
+
+        return redirect()->back()->with('success', 'Document uploaded successfully.');
+    }
+
+    public function destroyDocument(WebsiteProject $project, \App\Models\ClientDocument $document): RedirectResponse
+    {
+        $this->authorizePermission('delete-client-portal-project-documents');
+        $clientId = $this->getClientId();
+
+        if ($project->client_id !== $clientId || $document->website_project_id !== $project->id) {
+            abort(403, 'Unauthorized access');
+        }
+
+        $physicalPath = public_path($document->file_path);
+        if (file_exists($physicalPath)) {
+            @unlink($physicalPath);
+        }
+        $document->delete();
+
+        return redirect()->back()->with('success', 'Document deleted successfully.');
     }
 }

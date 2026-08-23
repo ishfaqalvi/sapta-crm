@@ -25,7 +25,7 @@ class AdminUserSeeder extends Seeder
         );
         $superAdmin->syncRoles(['Super Admin']);
 
-        // 2. Standard Admin User
+        // 2. Secondary Staff / Agency User
         $adminUser = User::updateOrCreate(
             ['email' => 'admin.user@sapta.com'],
             [
@@ -35,9 +35,9 @@ class AdminUserSeeder extends Seeder
                 'email_verified_at' => now(),
             ]
         );
-        $adminUser->syncRoles(['Admin']);
+        $adminUser->syncRoles(['Super Admin']);
 
-        // 3. Manager User
+        // 3. Operations Staff User
         $managerUser = User::updateOrCreate(
             ['email' => 'manager@sapta.com'],
             [
@@ -47,6 +47,6 @@ class AdminUserSeeder extends Seeder
                 'email_verified_at' => now(),
             ]
         );
-        $managerUser->syncRoles(['Manager']);
+        $managerUser->syncRoles(['Employee']);
     }
 }

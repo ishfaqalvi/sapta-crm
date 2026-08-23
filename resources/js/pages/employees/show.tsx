@@ -154,13 +154,6 @@ export default function EmployeeShow({ employee }: EmployeeShowProps) {
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-2 border-b border-slate-200/80 dark:border-slate-800">
                     <div className="space-y-1">
                         <div className="flex items-center gap-2">
-                            <Link
-                                href="/employees"
-                                className="p-2 rounded-xl text-slate-400 hover:text-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 dark:hover:text-slate-200 transition-colors"
-                                title="Back to Employee Directory"
-                            >
-                                <ArrowLeft className="size-5" />
-                            </Link>
                             <h1 className="text-xl sm:text-2xl font-extrabold text-slate-900 dark:text-white tracking-tight flex items-center gap-2">
                                 {employee.name}
                             </h1>
@@ -168,16 +161,15 @@ export default function EmployeeShow({ employee }: EmployeeShowProps) {
                                 {employee.employee_code}
                             </span>
                             <span
-                                className={`px-3 py-1 rounded-full text-xs font-extrabold capitalize ${
-                                    employee.status === 'active'
-                                        ? 'bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800'
-                                        : 'bg-rose-50 dark:bg-rose-950/60 text-rose-700 dark:text-rose-300 border border-rose-200 dark:border-rose-800'
-                                }`}
+                                className={`px-3 py-1 rounded-full text-xs font-extrabold capitalize ${employee.status === 'active'
+                                    ? 'bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800'
+                                    : 'bg-rose-50 dark:bg-rose-950/60 text-rose-700 dark:text-rose-300 border border-rose-200 dark:border-rose-800'
+                                    }`}
                             >
                                 {employee.status}
                             </span>
                         </div>
-                        <p className="text-xs text-slate-500 dark:text-slate-400 pl-9 flex items-center gap-2">
+                        <p className="text-xs text-slate-500 dark:text-slate-400 flex items-center gap-2">
                             <Building2 className="size-3.5 text-blue-600 dark:text-blue-400" />
                             <span className="font-bold text-slate-700 dark:text-slate-300">{employee.department?.name || 'Unassigned'}</span>
                             {employee.sub_department && <span>/ {employee.sub_department.name}</span>}
@@ -208,7 +200,7 @@ export default function EmployeeShow({ employee }: EmployeeShowProps) {
                 {/* KPI Summary Cards */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                     {/* Organization & Role */}
-                    <div className="p-5 rounded-3xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 shadow-2xs space-y-2">
+                    <div className="p-5 rounded-xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 shadow-2xs space-y-2">
                         <div className="flex items-center justify-between">
                             <span className="text-xs font-bold uppercase tracking-wider text-slate-400">Designation</span>
                             <div className="p-2 rounded-xl bg-purple-50 dark:bg-purple-950 text-purple-600 dark:text-purple-400">
@@ -224,7 +216,7 @@ export default function EmployeeShow({ employee }: EmployeeShowProps) {
                     </div>
 
                     {/* Base Salary */}
-                    <div className="p-5 rounded-3xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 shadow-2xs space-y-2">
+                    <div className="p-5 rounded-xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 shadow-2xs space-y-2">
                         <div className="flex items-center justify-between">
                             <span className="text-xs font-bold uppercase tracking-wider text-slate-400">Base Salary</span>
                             <div className="p-2 rounded-xl bg-emerald-50 dark:bg-emerald-950 text-emerald-600 dark:text-emerald-400">
@@ -240,7 +232,7 @@ export default function EmployeeShow({ employee }: EmployeeShowProps) {
                     </div>
 
                     {/* Assigned Tasks KPI */}
-                    <div className="p-5 rounded-3xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 shadow-2xs space-y-2">
+                    <div className="p-5 rounded-xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 shadow-2xs space-y-2">
                         <div className="flex items-center justify-between">
                             <span className="text-xs font-bold uppercase tracking-wider text-slate-400">Assigned Tasks</span>
                             <div className="p-2 rounded-xl bg-blue-50 dark:bg-blue-950 text-blue-600 dark:text-blue-400">
@@ -257,7 +249,7 @@ export default function EmployeeShow({ employee }: EmployeeShowProps) {
                     </div>
 
                     {/* Payroll Log Count */}
-                    <div className="p-5 rounded-3xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 shadow-2xs space-y-2">
+                    <div className="p-5 rounded-xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 shadow-2xs space-y-2">
                         <div className="flex items-center justify-between">
                             <span className="text-xs font-bold uppercase tracking-wider text-slate-400">Payroll Records</span>
                             <div className="p-2 rounded-xl bg-indigo-50 dark:bg-indigo-950 text-indigo-600 dark:text-indigo-400">
@@ -274,7 +266,7 @@ export default function EmployeeShow({ employee }: EmployeeShowProps) {
                 </div>
 
                 {/* Hero Header & Tabs Card */}
-                <div className="p-6 rounded-3xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 shadow-2xs space-y-6">
+                <div className="p-6 rounded-xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 shadow-2xs space-y-6">
                     <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
                         <div className="flex items-center gap-5">
                             <div className="relative size-16 rounded-2xl bg-gradient-to-tr from-[#003796] via-[#0052D4] to-[#1d4ed8] text-white font-extrabold text-2xl flex items-center justify-center shadow-md overflow-hidden shrink-0 border-2 border-white dark:border-slate-800">
@@ -300,11 +292,10 @@ export default function EmployeeShow({ employee }: EmployeeShowProps) {
                     <div className="flex items-center gap-2 border-b border-slate-100 dark:border-slate-800 pt-2 overflow-x-auto">
                         <button
                             onClick={() => setActiveTab('overview')}
-                            className={`h-11 px-5 text-xs font-bold border-b-2 transition-all inline-flex items-center gap-2 shrink-0 ${
-                                activeTab === 'overview'
-                                    ? 'border-blue-600 text-blue-600 dark:text-blue-400'
-                                    : 'border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'
-                            }`}
+                            className={`h-11 px-5 text-xs font-bold border-b-2 transition-all inline-flex items-center gap-2 shrink-0 ${activeTab === 'overview'
+                                ? 'border-blue-600 text-blue-600 dark:text-blue-400'
+                                : 'border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'
+                                }`}
                         >
                             <User className="size-4" />
                             <span>Overview & Contact</span>
@@ -312,27 +303,27 @@ export default function EmployeeShow({ employee }: EmployeeShowProps) {
 
                         <button
                             onClick={() => setActiveTab('tasks')}
-                            className={`h-11 px-5 text-xs font-bold border-b-2 transition-all inline-flex items-center gap-2 shrink-0 ${
-                                activeTab === 'tasks'
-                                    ? 'border-blue-600 text-blue-600 dark:text-blue-400'
-                                    : 'border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'
-                            }`}
+                            className={`h-11 px-5 text-xs font-bold border-b-2 transition-all inline-flex items-center gap-2 shrink-0 ${activeTab === 'tasks'
+                                ? 'border-blue-600 text-blue-600 dark:text-blue-400'
+                                : 'border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'
+                                }`}
                         >
                             <CheckSquare className="size-4" />
                             <span>Assigned Project Tasks ({tasks.length})</span>
                         </button>
 
-                        <button
-                            onClick={() => setActiveTab('payrolls')}
-                            className={`h-11 px-5 text-xs font-bold border-b-2 transition-all inline-flex items-center gap-2 shrink-0 ${
-                                activeTab === 'payrolls'
+                        {hasPermission(user, 'view-payroll') && (
+                            <button
+                                onClick={() => setActiveTab('payrolls')}
+                                className={`h-11 px-5 text-xs font-bold border-b-2 transition-all inline-flex items-center gap-2 shrink-0 ${activeTab === 'payrolls'
                                     ? 'border-blue-600 text-blue-600 dark:text-blue-400'
                                     : 'border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'
-                            }`}
-                        >
-                            <Receipt className="size-4" />
-                            <span>Monthly Payroll History ({payrolls.length})</span>
-                        </button>
+                                    }`}
+                            >
+                                <Receipt className="size-4" />
+                                <span>Monthly Payroll History ({payrolls.length})</span>
+                            </button>
+                        )}
                     </div>
                 </div>
 
@@ -340,7 +331,7 @@ export default function EmployeeShow({ employee }: EmployeeShowProps) {
                 {activeTab === 'overview' && (
                     <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                         {/* Personal & Contact Card */}
-                        <div className="p-6 rounded-3xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 shadow-2xs space-y-4">
+                        <div className="p-6 rounded-xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 shadow-2xs space-y-4">
                             <div className="flex items-center gap-2 text-sm font-extrabold text-slate-900 dark:text-white border-b border-slate-100 dark:border-slate-800 pb-3">
                                 <User className="size-4 text-blue-600" />
                                 <span>Contact Details</span>
@@ -373,7 +364,7 @@ export default function EmployeeShow({ employee }: EmployeeShowProps) {
                         </div>
 
                         {/* Organizational Card */}
-                        <div className="p-6 rounded-3xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 shadow-2xs space-y-4">
+                        <div className="p-6 rounded-xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 shadow-2xs space-y-4">
                             <div className="flex items-center gap-2 text-sm font-extrabold text-slate-900 dark:text-white border-b border-slate-100 dark:border-slate-800 pb-3">
                                 <Building2 className="size-4 text-purple-600" />
                                 <span>Organizational Structure</span>
@@ -406,7 +397,7 @@ export default function EmployeeShow({ employee }: EmployeeShowProps) {
                         </div>
 
                         {/* Financial & Banking Card */}
-                        <div className="p-6 rounded-3xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 shadow-2xs space-y-4">
+                        <div className="p-6 rounded-xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 shadow-2xs space-y-4">
                             <div className="flex items-center gap-2 text-sm font-extrabold text-slate-900 dark:text-white border-b border-slate-100 dark:border-slate-800 pb-3">
                                 <BadgeDollarSign className="size-4 text-emerald-600" />
                                 <span>Compensation & Banking</span>
@@ -440,7 +431,7 @@ export default function EmployeeShow({ employee }: EmployeeShowProps) {
 
                 {/* Tab 2: Assigned Project Tasks */}
                 {activeTab === 'tasks' && (
-                    <div className="p-6 rounded-3xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 shadow-2xs space-y-4">
+                    <div className="p-6 rounded-xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 shadow-2xs space-y-4">
                         <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-3">
                             <div className="flex items-center gap-2">
                                 <CheckSquare className="size-5 text-blue-600 dark:text-blue-400" />
@@ -497,30 +488,28 @@ export default function EmployeeShow({ employee }: EmployeeShowProps) {
                                                 </td>
                                                 <td className="py-3.5 px-4 whitespace-nowrap">
                                                     <span
-                                                        className={`px-2.5 py-0.5 rounded-full text-[10px] font-extrabold uppercase ${
-                                                            t.priority === 'urgent'
-                                                                ? 'bg-rose-50 text-rose-700 dark:bg-rose-950/50 dark:text-rose-300 border border-rose-200 dark:border-rose-800'
-                                                                : t.priority === 'high'
+                                                        className={`px-2.5 py-0.5 rounded-full text-[10px] font-extrabold uppercase ${t.priority === 'urgent'
+                                                            ? 'bg-rose-50 text-rose-700 dark:bg-rose-950/50 dark:text-rose-300 border border-rose-200 dark:border-rose-800'
+                                                            : t.priority === 'high'
                                                                 ? 'bg-amber-50 text-amber-700 dark:bg-amber-950/50 dark:text-amber-300 border border-amber-200 dark:border-amber-800'
                                                                 : t.priority === 'medium'
-                                                                ? 'bg-blue-50 text-blue-700 dark:bg-blue-950/50 dark:text-blue-300 border border-blue-200 dark:border-blue-800'
-                                                                : 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400 border border-slate-200 dark:border-slate-700'
-                                                        }`}
+                                                                    ? 'bg-blue-50 text-blue-700 dark:bg-blue-950/50 dark:text-blue-300 border border-blue-200 dark:border-blue-800'
+                                                                    : 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400 border border-slate-200 dark:border-slate-700'
+                                                            }`}
                                                     >
                                                         {t.priority}
                                                     </span>
                                                 </td>
                                                 <td className="py-3.5 px-4 whitespace-nowrap">
                                                     <span
-                                                        className={`px-2.5 py-0.5 rounded-full text-[10px] font-extrabold capitalize ${
-                                                            t.status === 'completed'
-                                                                ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800'
-                                                                : t.status === 'in_progress'
+                                                        className={`px-2.5 py-0.5 rounded-full text-[10px] font-extrabold capitalize ${t.status === 'completed'
+                                                            ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800'
+                                                            : t.status === 'in_progress'
                                                                 ? 'bg-blue-50 text-blue-700 dark:bg-blue-950/50 dark:text-blue-300 border border-blue-200 dark:border-blue-800'
                                                                 : t.status === 'in_review'
-                                                                ? 'bg-purple-50 text-purple-700 dark:bg-purple-950/50 dark:text-purple-300 border border-purple-200 dark:border-purple-800'
-                                                                : 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300 border border-slate-200 dark:border-slate-700'
-                                                        }`}
+                                                                    ? 'bg-purple-50 text-purple-700 dark:bg-purple-950/50 dark:text-purple-300 border border-purple-200 dark:border-purple-800'
+                                                                    : 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300 border border-slate-200 dark:border-slate-700'
+                                                            }`}
                                                     >
                                                         {t.status.replace('_', ' ')}
                                                     </span>
@@ -542,7 +531,7 @@ export default function EmployeeShow({ employee }: EmployeeShowProps) {
 
                 {/* Tab 3: Monthly Payroll History */}
                 {activeTab === 'payrolls' && (
-                    <div className="p-6 rounded-3xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 shadow-2xs space-y-4">
+                    <div className="p-6 rounded-xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 shadow-2xs space-y-4">
                         <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-3">
                             <div>
                                 <h3 className="text-base font-extrabold text-slate-900 dark:text-white">
@@ -606,11 +595,10 @@ export default function EmployeeShow({ employee }: EmployeeShowProps) {
                                                         PKR {Number(p.net_salary_pkr).toLocaleString()}
                                                     </td>
                                                     <td className="px-6 py-4">
-                                                        <span className={`px-2.5 py-1 rounded-full text-[11px] font-bold ${
-                                                            isPaid
-                                                                ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800'
-                                                                : 'bg-rose-50 text-rose-700 dark:bg-rose-950/50 dark:text-rose-300 border border-rose-200 dark:border-rose-800'
-                                                        }`}>
+                                                        <span className={`px-2.5 py-1 rounded-full text-[11px] font-bold ${isPaid
+                                                            ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800'
+                                                            : 'bg-rose-50 text-rose-700 dark:bg-rose-950/50 dark:text-rose-300 border border-rose-200 dark:border-rose-800'
+                                                            }`}>
                                                             {isPaid ? 'Paid' : 'Unpaid'}
                                                         </span>
                                                         {p.payment_date && (

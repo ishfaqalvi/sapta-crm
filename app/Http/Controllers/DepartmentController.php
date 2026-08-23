@@ -19,8 +19,13 @@ class DepartmentController extends Controller
     {
         $search = $request->query('search');
 
-        $departments = Department::with(['subDepartments', 'designations'])
-            ->withCount(['employees', 'subDepartments'])
+        $departments = Department::with([
+            'subDepartments' => function ($q) {
+                $q->withCount('employees');
+            },
+            'designations',
+        ])
+            ->withCount(['employees', 'subDepartments', 'designations'])
             ->when($search, function ($query, $search) {
                 $query->where('name', 'like', "%{$search}%")
                     ->orWhere('code', 'like', "%{$search}%")
@@ -89,6 +94,18 @@ class DepartmentController extends Controller
      */
     public function destroy(Department $department): RedirectResponse
     {
+        if ($department->employees()->count() > 0) {
+            return redirect()->back()->with('error', 'Cannot delete department assigned to existing employees.');
+        }
+
+        if ($department->designations()->count() > 0) {
+            return redirect()->back()->with('error', 'Cannot delete department assigned to existing designations.');
+        }
+
+        if ($department->subDepartments()->count() > 0) {
+            return redirect()->back()->with('error', 'Cannot delete department having sub-departments. Delete or reassign sub-departments first.');
+        }
+
         $department->delete();
         return redirect()->back()->with('success', 'Department deleted successfully!');
     }
@@ -146,6 +163,10 @@ class DepartmentController extends Controller
      */
     public function destroySubDepartment(SubDepartment $subDepartment): RedirectResponse
     {
+        if ($subDepartment->employees()->count() > 0) {
+            return redirect()->back()->with('error', 'Cannot delete sub-department assigned to existing employees.');
+        }
+
         $subDepartment->delete();
         return redirect()->back()->with('success', 'Sub-department deleted successfully!');
     }

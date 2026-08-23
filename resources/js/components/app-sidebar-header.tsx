@@ -1,3 +1,4 @@
+import NotificationBell from '@/components/notification-bell';
 import AppearanceToggleDropdown from '@/components/appearance-dropdown';
 import { Breadcrumbs } from '@/components/breadcrumbs';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
@@ -5,7 +6,7 @@ import { SidebarTrigger } from '@/components/ui/sidebar';
 import { UserMenuContent } from '@/components/user-menu-content';
 import { type BreadcrumbItem as BreadcrumbItemType } from '@/types';
 import { usePage } from '@inertiajs/react';
-import { Bell, ChevronDown, Search } from 'lucide-react';
+import { ChevronDown, Search } from 'lucide-react';
 
 export function AppSidebarHeader({ breadcrumbs = [] }: { breadcrumbs?: BreadcrumbItemType[] }) {
     const { auth } = usePage<any>().props;
@@ -31,7 +32,7 @@ export function AppSidebarHeader({ breadcrumbs = [] }: { breadcrumbs?: Breadcrum
                     <Search className="size-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
                     <input
                         type="text"
-                        placeholder="Search client portal..."
+                        placeholder="Search CRM..."
                         className="w-full h-9 pl-9 pr-4 text-xs rounded-xl bg-slate-100/70 dark:bg-slate-900/70 border border-slate-200/60 dark:border-slate-800/60 text-slate-800 dark:text-slate-200 placeholder:text-slate-400 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/15 focus:bg-white dark:focus:bg-slate-950 transition-all"
                     />
                 </div>
@@ -39,11 +40,8 @@ export function AppSidebarHeader({ breadcrumbs = [] }: { breadcrumbs?: Breadcrum
                 {/* Theme Toggle (Light / Dark Mode) */}
                 <AppearanceToggleDropdown />
 
-                {/* Notification Bell */}
-                <button className="relative flex h-9 w-9 items-center justify-center rounded-xl border border-slate-200/80 dark:border-slate-800/80 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-900 transition-colors">
-                    <Bell className="size-4" />
-                    <span className="absolute top-2 right-2 size-2 rounded-full bg-blue-600 ring-2 ring-white dark:ring-slate-950" />
-                </button>
+                {/* Dynamic Notification Bell */}
+                <NotificationBell />
 
                 {/* User Dropdown Button */}
                 {user && (

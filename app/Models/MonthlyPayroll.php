@@ -39,7 +39,7 @@ class MonthlyPayroll extends Model
         'bonuses_pkr' => 'decimal:2',
         'other_deductions_pkr' => 'decimal:2',
         'net_salary_pkr' => 'decimal:2',
-        'payment_date' => 'date',
+        'payment_date' => 'datetime',
     ];
 
     public function employee(): BelongsTo

@@ -38,6 +38,7 @@ export interface CurrencyItem {
     exchange_rate_to_pkr: number;
     is_base: boolean;
     is_active: boolean;
+    usages_count?: number;
     updated_at: string;
 }
 
@@ -62,19 +63,31 @@ export default function CurrenciesIndex({ currencies, stats, filters }: Currenci
     const [deletingCurrency, setDeletingCurrency] = useState<CurrencyItem | null>(null);
     const [isDeleting, setIsDeleting] = useState(false);
 
-    const addForm = useForm({
+    const addForm = useForm<{
+        code: string;
+        name: string;
+        symbol: string;
+        exchange_rate_to_pkr: string | number;
+        is_active: boolean;
+    }>({
         code: '',
         name: '',
         symbol: '$',
-        exchange_rate_to_pkr: '' as string | number,
+        exchange_rate_to_pkr: '',
         is_active: true,
     });
 
-    const editForm = useForm({
+    const editForm = useForm<{
+        code: string;
+        name: string;
+        symbol: string;
+        exchange_rate_to_pkr: string | number;
+        is_active: boolean;
+    }>({
         code: '',
         name: '',
         symbol: '$',
-        exchange_rate_to_pkr: '' as string | number,
+        exchange_rate_to_pkr: '',
         is_active: true,
     });
 
@@ -153,7 +166,7 @@ export default function CurrenciesIndex({ currencies, stats, filters }: Currenci
 
                     <button
                         onClick={() => setIsAddModalOpen(true)}
-                        className="h-11 px-5 text-xs sm:text-sm font-bold rounded-xl bg-gradient-to-r from-[#003796] via-[#0052D4] to-[#1d4ed8] hover:from-[#002a75] hover:to-[#0040b8] text-white shadow-md shadow-blue-600/20 active:scale-[0.99] transition-all inline-flex items-center gap-2 shrink-0 self-start sm:self-auto"
+                        className="h-10 px-3 text-xs font-bold rounded-xl bg-gradient-to-r from-[#003796] via-[#0052D4] to-[#1d4ed8] hover:from-[#002a75] hover:to-[#0040b8] text-white shadow-md shadow-blue-600/20 active:scale-[0.99] transition-all inline-flex items-center gap-2 shrink-0 self-start sm:self-auto cursor-pointer"
                     >
                         <Plus className="size-4" />
                         <span>Add New Currency</span>
@@ -358,7 +371,11 @@ export default function CurrenciesIndex({ currencies, stats, filters }: Currenci
                                             value={addForm.data.code}
                                             onChange={(e) => addForm.setData('code', e.target.value.toUpperCase())}
                                             placeholder="e.g. CAD"
-                                            className="h-11 rounded-xl uppercase font-mono font-extrabold bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-sm font-semibold text-slate-900 dark:text-white focus:bg-white focus:border-blue-600 transition-all"
+                                            className={`h-11 rounded-xl uppercase font-mono font-extrabold bg-slate-50 dark:bg-slate-950 text-sm text-slate-900 dark:text-white transition-all ${
+                                                addForm.errors.code
+                                                    ? 'border-rose-500 ring-2 ring-rose-500/20 focus:border-rose-500 focus:ring-rose-500/20'
+                                                    : 'border-slate-200 dark:border-slate-800 focus:bg-white focus:border-blue-600 focus:ring-4 focus:ring-blue-600/10'
+                                            }`}
                                         />
                                         {addForm.errors.code && <p className="text-xs font-semibold text-rose-500">{addForm.errors.code}</p>}
                                     </div>
@@ -372,7 +389,11 @@ export default function CurrenciesIndex({ currencies, stats, filters }: Currenci
                                             value={addForm.data.symbol}
                                             onChange={(e) => addForm.setData('symbol', e.target.value)}
                                             placeholder="e.g. $ or CAD"
-                                            className="h-11 rounded-xl font-bold bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-sm font-semibold text-slate-900 dark:text-white focus:bg-white focus:border-blue-600 transition-all"
+                                            className={`h-11 rounded-xl font-bold bg-slate-50 dark:bg-slate-950 text-sm text-slate-900 dark:text-white transition-all ${
+                                                addForm.errors.symbol
+                                                    ? 'border-rose-500 ring-2 ring-rose-500/20 focus:border-rose-500 focus:ring-rose-500/20'
+                                                    : 'border-slate-200 dark:border-slate-800 focus:bg-white focus:border-blue-600 focus:ring-4 focus:ring-blue-600/10'
+                                            }`}
                                         />
                                         {addForm.errors.symbol && <p className="text-xs font-semibold text-rose-500">{addForm.errors.symbol}</p>}
                                     </div>
@@ -387,7 +408,11 @@ export default function CurrenciesIndex({ currencies, stats, filters }: Currenci
                                         value={addForm.data.name}
                                         onChange={(e) => addForm.setData('name', e.target.value)}
                                         placeholder="e.g. Canadian Dollar"
-                                        className="h-11 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-sm font-semibold text-slate-900 dark:text-white focus:bg-white focus:border-blue-600 transition-all"
+                                        className={`h-11 rounded-xl bg-slate-50 dark:bg-slate-950 text-sm font-semibold text-slate-900 dark:text-white transition-all ${
+                                            addForm.errors.name
+                                                ? 'border-rose-500 ring-2 ring-rose-500/20 focus:border-rose-500 focus:ring-rose-500/20'
+                                                : 'border-slate-200 dark:border-slate-800 focus:bg-white focus:border-blue-600 focus:ring-4 focus:ring-blue-600/10'
+                                        }`}
                                     />
                                     {addForm.errors.name && <p className="text-xs font-semibold text-rose-500">{addForm.errors.name}</p>}
                                 </div>
@@ -403,7 +428,11 @@ export default function CurrenciesIndex({ currencies, stats, filters }: Currenci
                                         value={addForm.data.exchange_rate_to_pkr}
                                         onChange={(e) => addForm.setData('exchange_rate_to_pkr', e.target.value)}
                                         placeholder="e.g. 205.5000"
-                                        className="h-11 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-sm font-extrabold text-slate-900 dark:text-white focus:bg-white focus:border-emerald-600 transition-all"
+                                        className={`h-11 rounded-xl bg-slate-50 dark:bg-slate-950 text-sm font-extrabold text-slate-900 dark:text-white transition-all ${
+                                            addForm.errors.exchange_rate_to_pkr
+                                                ? 'border-rose-500 ring-2 ring-rose-500/20 focus:border-rose-500 focus:ring-rose-500/20'
+                                                : 'border-slate-200 dark:border-slate-800 focus:bg-white focus:border-emerald-600 focus:ring-4 focus:ring-emerald-600/10'
+                                        }`}
                                     />
                                     {addForm.errors.exchange_rate_to_pkr && <p className="text-xs font-semibold text-rose-500">{addForm.errors.exchange_rate_to_pkr}</p>}
                                 </div>
@@ -421,25 +450,25 @@ export default function CurrenciesIndex({ currencies, stats, filters }: Currenci
                                     </Label>
                                 </div>
 
-                                <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-100 dark:border-slate-800">
+                                <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-100 dark:border-slate-800">
                                     <Button
                                         type="button"
                                         variant="outline"
                                         onClick={() => setIsAddModalOpen(false)}
-                                        className="h-10 px-4 text-xs font-semibold rounded-xl"
+                                        className="h-10 px-5 rounded-xl text-xs font-bold cursor-pointer"
                                     >
                                         Cancel
                                     </Button>
                                     <Button
                                         type="submit"
                                         disabled={addForm.processing}
-                                        className="h-10 px-6 text-xs font-bold rounded-xl bg-gradient-to-r from-[#003796] via-[#0052D4] to-[#1d4ed8] text-white shadow-md shadow-blue-600/20 transition-all"
+                                        className="h-10 px-5 rounded-xl bg-gradient-to-r from-[#003796] via-[#0052D4] to-[#1d4ed8] hover:from-[#002a75] hover:to-[#0040b8] text-white text-xs font-bold shadow-md shadow-blue-600/20 active:scale-[0.99] transition-all cursor-pointer inline-flex items-center gap-2"
                                     >
                                         {addForm.processing ? (
-                                            <div className="flex items-center gap-2">
+                                            <>
                                                 <LoaderCircle className="size-4 animate-spin" />
-                                                <span>Saving...</span>
-                                            </div>
+                                                <span>Saving Currency...</span>
+                                            </>
                                         ) : (
                                             <span>Save Currency</span>
                                         )}
@@ -471,7 +500,7 @@ export default function CurrenciesIndex({ currencies, stats, filters }: Currenci
                                 <button
                                     type="button"
                                     onClick={() => setEditingCurrency(null)}
-                                    className="p-1 rounded-lg text-slate-400 hover:bg-slate-100 hover:text-slate-600 dark:hover:bg-slate-800 dark:hover:text-slate-200"
+                                    className="p-1.5 rounded-xl text-slate-400 hover:bg-slate-100 hover:text-slate-600 dark:hover:bg-slate-800 dark:hover:text-slate-200 cursor-pointer"
                                 >
                                     <X className="size-5" />
                                 </button>
@@ -488,7 +517,11 @@ export default function CurrenciesIndex({ currencies, stats, filters }: Currenci
                                             value={editForm.data.code}
                                             disabled={editingCurrency.is_base}
                                             onChange={(e) => editForm.setData('code', e.target.value.toUpperCase())}
-                                            className="h-11 rounded-xl uppercase font-mono font-extrabold bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-sm font-semibold text-slate-900 dark:text-white focus:bg-white focus:border-blue-600 transition-all"
+                                            className={`h-11 rounded-xl uppercase font-mono font-extrabold bg-slate-50 dark:bg-slate-950 text-sm font-semibold text-slate-900 dark:text-white transition-all ${
+                                                editForm.errors.code
+                                                    ? 'border-rose-500 ring-2 ring-rose-500/20 focus:border-rose-500 focus:ring-rose-500/20'
+                                                    : 'border-slate-200 dark:border-slate-800 focus:bg-white focus:border-blue-600 focus:ring-4 focus:ring-blue-600/10'
+                                            }`}
                                         />
                                         {editForm.errors.code && <p className="text-xs font-semibold text-rose-500">{editForm.errors.code}</p>}
                                     </div>
@@ -501,7 +534,11 @@ export default function CurrenciesIndex({ currencies, stats, filters }: Currenci
                                             id="edit_symbol"
                                             value={editForm.data.symbol}
                                             onChange={(e) => editForm.setData('symbol', e.target.value)}
-                                            className="h-11 rounded-xl font-bold bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-sm font-semibold text-slate-900 dark:text-white focus:bg-white focus:border-blue-600 transition-all"
+                                            className={`h-11 rounded-xl font-bold bg-slate-50 dark:bg-slate-950 text-sm font-semibold text-slate-900 dark:text-white transition-all ${
+                                                editForm.errors.symbol
+                                                    ? 'border-rose-500 ring-2 ring-rose-500/20 focus:border-rose-500 focus:ring-rose-500/20'
+                                                    : 'border-slate-200 dark:border-slate-800 focus:bg-white focus:border-blue-600 focus:ring-4 focus:ring-blue-600/10'
+                                            }`}
                                         />
                                         {editForm.errors.symbol && <p className="text-xs font-semibold text-rose-500">{editForm.errors.symbol}</p>}
                                     </div>
@@ -515,7 +552,11 @@ export default function CurrenciesIndex({ currencies, stats, filters }: Currenci
                                         id="edit_name"
                                         value={editForm.data.name}
                                         onChange={(e) => editForm.setData('name', e.target.value)}
-                                        className="h-11 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-sm font-semibold text-slate-900 dark:text-white focus:bg-white focus:border-blue-600 transition-all"
+                                        className={`h-11 rounded-xl bg-slate-50 dark:bg-slate-950 text-sm font-semibold text-slate-900 dark:text-white transition-all ${
+                                            editForm.errors.name
+                                                ? 'border-rose-500 ring-2 ring-rose-500/20 focus:border-rose-500 focus:ring-rose-500/20'
+                                                : 'border-slate-200 dark:border-slate-800 focus:bg-white focus:border-blue-600 focus:ring-4 focus:ring-blue-600/10'
+                                        }`}
                                     />
                                     {editForm.errors.name && <p className="text-xs font-semibold text-rose-500">{editForm.errors.name}</p>}
                                 </div>
@@ -531,7 +572,11 @@ export default function CurrenciesIndex({ currencies, stats, filters }: Currenci
                                         disabled={editingCurrency.is_base}
                                         value={editForm.data.exchange_rate_to_pkr}
                                         onChange={(e) => editForm.setData('exchange_rate_to_pkr', e.target.value)}
-                                        className="h-11 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-sm font-extrabold text-slate-900 dark:text-white focus:bg-white focus:border-emerald-600 transition-all"
+                                        className={`h-11 rounded-xl bg-slate-50 dark:bg-slate-950 text-sm font-extrabold text-slate-900 dark:text-white transition-all ${
+                                            editForm.errors.exchange_rate_to_pkr
+                                                ? 'border-rose-500 ring-2 ring-rose-500/20 focus:border-rose-500 focus:ring-rose-500/20'
+                                                : 'border-slate-200 dark:border-slate-800 focus:bg-white focus:border-emerald-600 focus:ring-4 focus:ring-emerald-600/10'
+                                        }`}
                                     />
                                     {editForm.errors.exchange_rate_to_pkr && <p className="text-xs font-semibold text-rose-500">{editForm.errors.exchange_rate_to_pkr}</p>}
                                     {editingCurrency.is_base && (
@@ -554,25 +599,25 @@ export default function CurrenciesIndex({ currencies, stats, filters }: Currenci
                                     </div>
                                 )}
 
-                                <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-100 dark:border-slate-800">
+                                <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-100 dark:border-slate-800">
                                     <Button
                                         type="button"
                                         variant="outline"
                                         onClick={() => setEditingCurrency(null)}
-                                        className="h-10 px-4 text-xs font-semibold rounded-xl"
+                                        className="h-10 px-5 rounded-xl text-xs font-bold cursor-pointer"
                                     >
                                         Cancel
                                     </Button>
                                     <Button
                                         type="submit"
                                         disabled={editForm.processing}
-                                        className="h-10 px-6 text-xs font-bold rounded-xl bg-gradient-to-r from-[#003796] via-[#0052D4] to-[#1d4ed8] text-white shadow-md shadow-blue-600/20 transition-all"
+                                        className="h-10 px-5 rounded-xl bg-gradient-to-r from-[#003796] via-[#0052D4] to-[#1d4ed8] hover:from-[#002a75] hover:to-[#0040b8] text-white text-xs font-bold shadow-md shadow-blue-600/20 active:scale-[0.99] transition-all cursor-pointer inline-flex items-center gap-2"
                                     >
                                         {editForm.processing ? (
-                                            <div className="flex items-center gap-2">
+                                            <>
                                                 <LoaderCircle className="size-4 animate-spin" />
-                                                <span>Updating...</span>
-                                            </div>
+                                                <span>Updating Currency...</span>
+                                            </>
                                         ) : (
                                             <span>Update Currency</span>
                                         )}
@@ -585,50 +630,67 @@ export default function CurrenciesIndex({ currencies, stats, filters }: Currenci
 
                 {/* DELETE CONFIRMATION MODAL */}
                 {deletingCurrency && (
-                    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs overflow-y-auto">
-                        <div className="w-full max-w-md rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-6 shadow-2xl space-y-4 animate-in fade-in zoom-in-95 duration-200">
-                            <div className="flex items-center gap-3">
-                                <div className="p-3 rounded-2xl bg-rose-50 dark:bg-rose-950 text-rose-600 dark:text-rose-400 shrink-0">
-                                    <AlertTriangle className="size-6" />
-                                </div>
-                                <div>
-                                    <h3 className="text-base font-extrabold text-slate-900 dark:text-white">
-                                        Delete Currency {deletingCurrency.code}?
-                                    </h3>
-                                    <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-                                        Are you sure you want to remove <strong className="text-slate-900 dark:text-white">{deletingCurrency.name}</strong> ({deletingCurrency.code})?
-                                    </p>
-                                </div>
+                    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-900/60 backdrop-blur-xs overflow-y-auto">
+                        <div className="w-full max-w-md max-h-[90vh] my-auto overflow-y-auto rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-4 sm:p-6 shadow-2xl space-y-4 text-center animate-in fade-in zoom-in-95 duration-200 relative">
+                            <button
+                                type="button"
+                                onClick={() => setDeletingCurrency(null)}
+                                className="absolute top-4 right-4 size-8 rounded-xl text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-all flex items-center justify-center cursor-pointer"
+                            >
+                                <X className="size-4" />
+                            </button>
+
+                            <div className="size-12 rounded-2xl bg-rose-50 dark:bg-rose-950/60 text-rose-600 dark:text-rose-400 mx-auto flex items-center justify-center">
+                                <AlertTriangle className="size-6" />
                             </div>
 
-                            <p className="text-xs text-slate-500 dark:text-slate-400 bg-slate-50 dark:bg-slate-950 p-3 rounded-xl border border-slate-100 dark:border-slate-800">
-                                Existing projects and payment transactions saved in this currency will preserve their recorded exchange rates.
-                            </p>
+                            <div className="space-y-1">
+                                <h3 className="text-base font-black text-slate-900 dark:text-white leading-snug">
+                                    Delete Currency {deletingCurrency.code}?
+                                </h3>
+                                <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
+                                    Are you sure you want to delete <strong className="text-slate-900 dark:text-white">"{deletingCurrency.name}"</strong> ({deletingCurrency.code})? This action cannot be undone.
+                                </p>
+                            </div>
 
-                            <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-100 dark:border-slate-800">
-                                <Button
+                            {/* Base / Usages Check Warning */}
+                            {deletingCurrency.is_base || deletingCurrency.code === 'PKR' ? (
+                                <div className="p-3 rounded-xl bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800 text-xs font-medium text-amber-800 dark:text-amber-300 text-left">
+                                    <strong>Cannot Delete:</strong> Base currency (PKR) is required by the system and cannot be deleted.
+                                </div>
+                            ) : (deletingCurrency.usages_count || 0) > 0 ? (
+                                <div className="p-3 rounded-xl bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800 text-xs font-medium text-amber-800 dark:text-amber-300 text-left">
+                                    <strong>Cannot Delete:</strong> This currency is assigned to {deletingCurrency.usages_count} active transaction(s), invoice(s), client(s), or project(s). Reassign or delete those records first.
+                                </div>
+                            ) : null}
+
+                            <div className="flex items-center justify-center gap-3 pt-2 border-t border-slate-100 dark:border-slate-800">
+                                <button
                                     type="button"
-                                    variant="outline"
                                     onClick={() => setDeletingCurrency(null)}
-                                    className="h-10 px-4 text-xs font-semibold rounded-xl"
+                                    disabled={isDeleting}
+                                    className="h-10 px-4 rounded-xl border border-slate-200 dark:border-slate-800 text-xs font-bold text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                                 >
                                     Cancel
-                                </Button>
-                                <Button
-                                    type="button"
-                                    onClick={confirmDelete}
-                                    disabled={isDeleting}
-                                    className="h-10 px-5 text-xs font-bold rounded-xl bg-rose-600 hover:bg-rose-700 text-white shadow-md shadow-rose-600/20 transition-all"
-                                >
-                                    {isDeleting ? (
-                                        <div className="flex items-center gap-2">
-                                            <LoaderCircle className="size-4 animate-spin" />
-                                            <span>Deleting...</span>
-                                        </div>
-                                    ) : (
-                                        <span>Confirm Delete</span>
-                                    )}
-                                </Button>
+                                </button>
+
+                                {!deletingCurrency.is_base && deletingCurrency.code !== 'PKR' && !(deletingCurrency.usages_count && deletingCurrency.usages_count > 0) && (
+                                    <button
+                                        type="button"
+                                        onClick={confirmDelete}
+                                        disabled={isDeleting}
+                                        className="h-10 px-4 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold inline-flex items-center gap-2 shadow-md shadow-rose-600/20 active:scale-[0.99] cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+                                    >
+                                        {isDeleting ? (
+                                            <>
+                                                <LoaderCircle className="size-4 animate-spin" />
+                                                <span>Deleting...</span>
+                                            </>
+                                        ) : (
+                                            <span>Delete Currency</span>
+                                        )}
+                                    </button>
+                                )}
                             </div>
                         </div>
                     </div>

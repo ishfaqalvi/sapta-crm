@@ -14,8 +14,6 @@ class Invoice extends Model
     protected $fillable = [
         'invoice_number',
         'client_id',
-        'website_project_id',
-        'project_payment_id',
         'currency_code',
         'exchange_rate_to_pkr',
         'subtotal',
@@ -53,22 +51,6 @@ class Invoice extends Model
     }
 
     /**
-     * Relationship: Invoice belongs to a Website Project.
-     */
-    public function websiteProject(): BelongsTo
-    {
-        return $this->belongsTo(WebsiteProject::class, 'website_project_id');
-    }
-
-    /**
-     * Relationship: Invoice belongs to a Project Payment (Milestone).
-     */
-    public function milestonePayment(): BelongsTo
-    {
-        return $this->belongsTo(ProjectPayment::class, 'project_payment_id');
-    }
-
-    /**
      * Relationship: Invoice has many line items.
      */
     public function items(): HasMany
@@ -82,6 +64,129 @@ class Invoice extends Model
     public function creator(): BelongsTo
     {
         return $this->belongsTo(User::class, 'created_by');
+    }
+
+    /**
+     * Auto-synchronize linked polymorphic items when invoice status is 'paid'.
+     */
+    public function syncPaidStatusForItems(): void
+    {
+        foreach ($this->items as $item) {
+            if (!$item->invoiceable_type || !$item->invoiceable_id) {
+                continue;
+            }
+
+            if ($item->invoiceable_type === ProjectPayment::class) {
+                $payment = ProjectPayment::find($item->invoiceable_id);
+                if ($payment && $payment->status !== 'paid') {
+                    $payment->update([
+                        'status' => 'paid',
+                        'paid_at' => $payment->paid_at ?? now()->toDateString(),
+                    ]);
+                }
+            } elseif ($item->invoiceable_type === ServicePayment::class) {
+                $servicePayment = ServicePayment::find($item->invoiceable_id);
+                if ($servicePayment && $servicePayment->status !== 'paid') {
+                    $servicePayment->update([
+                        'status' => 'paid',
+                        'payment_date' => $servicePayment->payment_date ?? now()->toDateString(),
+                        'amount_paid' => $servicePayment->amount_due ?? $item->amount,
+                    ]);
+                }
+            } elseif ($item->invoiceable_type === ClientService::class) {
+                $service = ClientService::find($item->invoiceable_id);
+                if ($service && $service->status !== 'active') {
+                    $service->update([
+                        'status' => 'active',
+                    ]);
+                }
+            } elseif ($item->invoiceable_type === DomainPayment::class) {
+                $domainPayment = DomainPayment::find($item->invoiceable_id);
+                if ($domainPayment && $domainPayment->status !== 'paid') {
+                    $domainPayment->update([
+                        'status' => 'paid',
+                        'paid_at' => $domainPayment->paid_at ?? now()->toDateString(),
+                    ]);
+
+                    // Update parent domain status and advance expiry if renewal
+                    if ($domainPayment->domain) {
+                        $domain = $domainPayment->domain;
+                        $newExpiry = $domain->expiry_date
+                            ? \Carbon\Carbon::parse($domain->expiry_date)->addYear()
+                            : now()->addYear();
+
+                        $domain->update([
+                            'status' => 'active',
+                            'expiry_date' => $newExpiry->format('Y-m-d'),
+                        ]);
+                    }
+                }
+            } elseif ($item->invoiceable_type === HostingPayment::class) {
+                $hostingPayment = HostingPayment::find($item->invoiceable_id);
+                if ($hostingPayment && $hostingPayment->status !== 'paid') {
+                    $hostingPayment->update([
+                        'status' => 'paid',
+                        'paid_at' => $hostingPayment->paid_at ?? now()->toDateString(),
+                    ]);
+
+                    // Update parent hosting status and advance expiry
+                    if ($hostingPayment->hosting) {
+                        $hosting = $hostingPayment->hosting;
+                        $currentExpiry = $hosting->expiry_date ? \Carbon\Carbon::parse($hosting->expiry_date) : now();
+                        $newExpiry = match ($hosting->billing_cycle) {
+                            'monthly' => $currentExpiry->addMonth(),
+                            'quarterly' => $currentExpiry->addMonths(3),
+                            'semi_annual' => $currentExpiry->addMonths(6),
+                            'biennial' => $currentExpiry->addYears(2),
+                            default => $currentExpiry->addYear(),
+                        };
+
+                        $hosting->update([
+                            'status' => 'active',
+                            'expiry_date' => $newExpiry->format('Y-m-d'),
+                        ]);
+                    }
+                }
+            } elseif ($item->invoiceable_type === ClientDomain::class) {
+                $domain = ClientDomain::find($item->invoiceable_id);
+                if ($domain) {
+                    $newExpiry = $domain->expiry_date
+                        ? \Carbon\Carbon::parse($domain->expiry_date)->addYear()
+                        : now()->addYear();
+
+                    $domain->update([
+                        'status' => 'active',
+                        'expiry_date' => $newExpiry->format('Y-m-d'),
+                    ]);
+                }
+            } elseif ($item->invoiceable_type === ClientHosting::class) {
+                $hosting = ClientHosting::find($item->invoiceable_id);
+                if ($hosting) {
+                    $currentExpiry = $hosting->expiry_date ? \Carbon\Carbon::parse($hosting->expiry_date) : now();
+                    $newExpiry = match ($hosting->billing_cycle) {
+                        'monthly' => $currentExpiry->addMonth(),
+                        'quarterly' => $currentExpiry->addMonths(3),
+                        'semi_annual' => $currentExpiry->addMonths(6),
+                        'biennial' => $currentExpiry->addYears(2),
+                        default => $currentExpiry->addYear(),
+                    };
+
+                    $hosting->update([
+                        'status' => 'active',
+                        'expiry_date' => $newExpiry->format('Y-m-d'),
+                    ]);
+                }
+            }
+        }
+    }
+
+    protected static function booted(): void
+    {
+        static::saved(function (Invoice $invoice) {
+            if ($invoice->status === 'paid') {
+                $invoice->syncPaidStatusForItems();
+            }
+        });
     }
 
     /**

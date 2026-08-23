@@ -16,6 +16,7 @@ import {
     Search,
     Trash2,
     Users,
+    X,
 } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 
@@ -153,7 +154,7 @@ export default function EmployeesIndex({
                     {hasPermission(user, 'create-employees') && (
                         <Link
                             href={route('employees.create')}
-                            className="h-11 px-5 text-xs sm:text-sm font-bold rounded-xl bg-gradient-to-r from-[#003796] via-[#0052D4] to-[#1d4ed8] hover:from-[#002a75] hover:to-[#0040b8] text-white shadow-md shadow-blue-600/20 active:scale-[0.99] transition-all inline-flex items-center gap-2 shrink-0"
+                            className="h-10 px-3 text-xs font-bold rounded-xl bg-gradient-to-r from-[#003796] via-[#0052D4] to-[#1d4ed8] hover:from-[#002a75] hover:to-[#0040b8] text-white shadow-md shadow-blue-600/20 active:scale-[0.99] transition-all inline-flex items-center gap-2 shrink-0"
                         >
                             <Plus className="size-4" />
                             <span>Add New Employee</span>
@@ -293,10 +294,10 @@ export default function EmployeesIndex({
                                             {/* Status */}
                                             <td className="px-6 py-4">
                                                 <span className={`px-2.5 py-1 rounded-full text-[11px] font-bold ${emp.status === 'active'
-                                                        ? 'bg-emerald-50 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800'
-                                                        : emp.status === 'inactive'
-                                                            ? 'bg-amber-50 dark:bg-amber-950/50 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-800'
-                                                            : 'bg-rose-50 dark:bg-rose-950/50 text-rose-700 dark:text-rose-300 border border-rose-200 dark:border-rose-800'
+                                                    ? 'bg-emerald-50 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800'
+                                                    : emp.status === 'inactive'
+                                                        ? 'bg-amber-50 dark:bg-amber-950/50 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-800'
+                                                        : 'bg-rose-50 dark:bg-rose-950/50 text-rose-700 dark:text-rose-300 border border-rose-200 dark:border-rose-800'
                                                     }`}>
                                                     {emp.status.charAt(0).toUpperCase() + emp.status.slice(1)}
                                                 </span>
@@ -350,45 +351,49 @@ export default function EmployeesIndex({
 
                 {/* Delete Confirmation Modal */}
                 {deletingEmployee && (
-                    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs overflow-y-auto">
-                        <div className="w-full max-w-md rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-6 shadow-2xl space-y-5 animate-in fade-in zoom-in-95 duration-200">
-                            <div className="flex items-start gap-4">
-                                <div className="p-3 rounded-2xl bg-rose-50 dark:bg-rose-950/50 text-rose-600 dark:text-rose-400 shrink-0">
-                                    <AlertTriangle className="size-6" />
-                                </div>
-                                <div className="space-y-1">
-                                    <h3 className="text-lg font-extrabold text-slate-900 dark:text-white leading-snug">
-                                        Delete Staff Profile?
-                                    </h3>
-                                    <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
-                                        Are you sure you want to delete <span className="font-bold text-slate-800 dark:text-slate-200">"{deletingEmployee.name}"</span> ({deletingEmployee.employee_code})? This action cannot be undone.
-                                    </p>
-                                </div>
+                    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-900/60 backdrop-blur-xs overflow-y-auto">
+                        <div className="w-full max-w-md max-h-[90vh] my-auto overflow-y-auto rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-4 sm:p-6 shadow-2xl space-y-4 text-center animate-in fade-in zoom-in-95 duration-200 relative">
+                            <button
+                                type="button"
+                                onClick={() => setDeletingEmployee(null)}
+                                className="absolute top-4 right-4 size-8 rounded-xl text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-all flex items-center justify-center cursor-pointer"
+                            >
+                                <X className="size-4" />
+                            </button>
+
+                            <div className="size-12 rounded-2xl bg-rose-50 dark:bg-rose-950/60 text-rose-600 dark:text-rose-400 mx-auto flex items-center justify-center">
+                                <AlertTriangle className="size-6" />
                             </div>
 
-                            <div className="flex items-center justify-end gap-3 pt-2">
+                            <div className="space-y-1">
+                                <h3 className="text-base font-black text-slate-900 dark:text-white">Delete Staff Profile?</h3>
+                                <p className="text-xs text-slate-500 dark:text-slate-400">
+                                    Are you sure you want to delete <strong className="text-slate-900 dark:text-white">"{deletingEmployee.name}"</strong> ({deletingEmployee.employee_code})? This action cannot be undone.
+                                </p>
+                            </div>
+
+                            <div className="flex items-center justify-center gap-3 pt-2 border-t border-slate-100 dark:border-slate-800">
                                 <button
                                     type="button"
                                     onClick={() => setDeletingEmployee(null)}
                                     disabled={isDeleting}
-                                    className="h-10 px-4 text-xs font-semibold rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-200 transition-colors disabled:opacity-50"
+                                    className="h-10 px-4 rounded-xl border border-slate-200 dark:border-slate-800 text-xs font-bold text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                                 >
                                     Cancel
                                 </button>
-
                                 <button
                                     type="button"
                                     onClick={handleConfirmDelete}
                                     disabled={isDeleting}
-                                    className="h-10 px-5 text-xs font-bold rounded-xl bg-gradient-to-r from-rose-600 to-red-600 hover:from-rose-700 hover:to-red-700 text-white shadow-md shadow-rose-600/20 active:scale-[0.99] transition-all flex items-center justify-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed"
+                                    className="h-10 px-4 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold inline-flex items-center gap-2 shadow-md shadow-rose-600/20 active:scale-[0.99] cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed transition-all"
                                 >
                                     {isDeleting ? (
-                                        <div className="flex items-center gap-2">
+                                        <>
                                             <LoaderCircle className="size-4 animate-spin" />
                                             <span>Deleting...</span>
-                                        </div>
+                                        </>
                                     ) : (
-                                        <span>Delete</span>
+                                        <span>Delete Staff</span>
                                     )}
                                 </button>
                             </div>

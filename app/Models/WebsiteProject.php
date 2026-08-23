@@ -59,4 +59,9 @@ class WebsiteProject extends Model
     {
         return $this->hasMany(ClientCredential::class, 'website_project_id');
     }
+
+    public function documents(): HasMany
+    {
+        return $this->hasMany(ClientDocument::class, 'website_project_id');
+    }
 }

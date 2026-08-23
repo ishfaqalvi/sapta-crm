@@ -50,14 +50,14 @@ trait HasActiveClientContext
             'websiteProjects' => function ($q) {
                 $q->with(['payments', 'tasks.assignedEmployee'])->latest();
             },
-            'seoRetainers' => function ($q) {
-                $q->with('payments')->latest();
+            'clientServices' => function ($q) {
+                $q->with(['category', 'payments'])->latest();
             },
             'projectPayments' => function ($q) {
                 $q->with('websiteProject')->latest();
             },
-            'seoPayments' => function ($q) {
-                $q->with('seoRetainer')->latest();
+            'servicePayments' => function ($q) {
+                $q->with('service')->latest();
             },
         ]);
     }

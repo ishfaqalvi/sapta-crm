@@ -34,19 +34,24 @@ class Client extends Model
         return 'CLI-' . str_pad((string) $nextId, 4, '0', STR_PAD_LEFT);
     }
 
-    public function seoRetainers()
+    public function servicePayments()
     {
-        return $this->hasMany(SeoRetainer::class);
-    }
-
-    public function seoPayments()
-    {
-        return $this->hasMany(SeoPayment::class);
+        return $this->hasMany(ServicePayment::class, 'client_id');
     }
 
     public function websiteProjects()
     {
         return $this->hasMany(WebsiteProject::class);
+    }
+
+    public function services()
+    {
+        return $this->hasMany(ClientService::class, 'client_id');
+    }
+
+    public function clientServices()
+    {
+        return $this->hasMany(ClientService::class, 'client_id');
     }
 
     public function projectPayments()
@@ -57,6 +62,16 @@ class Client extends Model
     public function credentials()
     {
         return $this->hasMany(ClientCredential::class);
+    }
+
+    public function domains()
+    {
+        return $this->hasMany(ClientDomain::class);
+    }
+
+    public function hostings()
+    {
+        return $this->hasMany(ClientHosting::class);
     }
 
     /**

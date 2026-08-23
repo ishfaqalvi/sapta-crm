@@ -80,8 +80,8 @@ class ServiceCategoryController extends Controller
      */
     public function destroy(ServiceCategory $serviceCategory): RedirectResponse
     {
-        if ($serviceCategory->retainers()->count() > 0) {
-            return redirect()->back()->with('error', 'Cannot delete service category assigned to active retainers.');
+        if ($serviceCategory->services()->count() > 0) {
+            return redirect()->back()->with('error', 'Cannot delete service category assigned to existing client services/retainers.');
         }
 
         $serviceCategory->delete();

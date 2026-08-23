@@ -149,7 +149,7 @@ export default function DesignationsIndex({ designations, departments, filters }
 
                     <Button
                         onClick={() => handleOpenModal()}
-                        className="h-11 px-5 text-xs sm:text-sm font-bold rounded-xl bg-gradient-to-r from-[#003796] via-[#0052D4] to-[#1d4ed8] hover:from-[#002a75] hover:to-[#0040b8] text-white shadow-md shadow-blue-600/20 active:scale-[0.99] transition-all inline-flex items-center gap-2"
+                        className="h-10 px-3 text-xs font-bold rounded-xl bg-gradient-to-r from-[#003796] via-[#0052D4] to-[#1d4ed8] hover:from-[#002a75] hover:to-[#0040b8] text-white shadow-md shadow-blue-600/20 active:scale-[0.99] transition-all inline-flex items-center gap-2 cursor-pointer"
                     >
                         <Plus className="size-4" />
                         <span>Add New Designation</span>
@@ -311,7 +311,11 @@ export default function DesignationsIndex({ designations, departments, filters }
                                         value={form.data.name}
                                         onChange={(e) => form.setData('name', e.target.value)}
                                         placeholder="e.g. Senior Full-Stack Engineer"
-                                        className="h-11 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-sm font-medium text-slate-900 dark:text-white placeholder:text-slate-400 focus:bg-white focus:border-blue-600 focus:outline-none focus:ring-4 focus:ring-blue-600/10 transition-all"
+                                        className={`h-11 rounded-xl bg-slate-50 dark:bg-slate-950 text-sm font-semibold text-slate-900 dark:text-white transition-all ${
+                                            form.errors.name
+                                                ? 'border-rose-500 ring-2 ring-rose-500/20 focus:border-rose-500 focus:ring-rose-500/20'
+                                                : 'border-slate-200 dark:border-slate-800 focus:bg-white focus:border-blue-600 focus:ring-4 focus:ring-blue-600/10'
+                                        }`}
                                     />
                                     {form.errors.name && (
                                         <p className="text-xs font-semibold text-rose-500 mt-1">{form.errors.name}</p>
@@ -327,13 +331,20 @@ export default function DesignationsIndex({ designations, departments, filters }
                                         id="desig_dept"
                                         value={form.data.department_id}
                                         onChange={(e) => form.setData('department_id', e.target.value)}
-                                        className="w-full h-11 px-3 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-xs font-semibold text-slate-900 dark:text-white focus:bg-white focus:border-blue-600 focus:outline-none focus:ring-4 focus:ring-blue-600/10 transition-all"
+                                        className={`w-full h-11 px-3 rounded-xl bg-slate-50 dark:bg-slate-950 text-xs font-semibold text-slate-900 dark:text-white transition-all ${
+                                            form.errors.department_id
+                                                ? 'border-rose-500 ring-2 ring-rose-500/20 focus:border-rose-500 focus:ring-rose-500/20'
+                                                : 'border border-slate-200 dark:border-slate-800 focus:bg-white focus:border-blue-600 focus:outline-none focus:ring-4 focus:ring-blue-600/10'
+                                        }`}
                                     >
                                         <option value="">-- General / All Departments --</option>
                                         {departments.map((d) => (
                                             <option key={d.id} value={d.id}>{d.name}</option>
                                         ))}
                                     </select>
+                                    {form.errors.department_id && (
+                                        <p className="text-xs font-semibold text-rose-500 mt-1">{form.errors.department_id}</p>
+                                    )}
                                 </div>
 
                                 {/* Description */}
@@ -346,8 +357,15 @@ export default function DesignationsIndex({ designations, departments, filters }
                                         value={form.data.description}
                                         onChange={(e) => form.setData('description', e.target.value)}
                                         placeholder="Position responsibilities and scope..."
-                                        className="h-11 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-sm font-medium text-slate-900 dark:text-white placeholder:text-slate-400 focus:bg-white focus:border-blue-600 focus:outline-none focus:ring-4 focus:ring-blue-600/10 transition-all"
+                                        className={`h-11 rounded-xl bg-slate-50 dark:bg-slate-950 text-sm font-medium text-slate-900 dark:text-white transition-all ${
+                                            form.errors.description
+                                                ? 'border-rose-500 ring-2 ring-rose-500/20 focus:border-rose-500 focus:ring-rose-500/20'
+                                                : 'border-slate-200 dark:border-slate-800 focus:bg-white focus:border-blue-600 focus:ring-4 focus:ring-blue-600/10'
+                                        }`}
                                     />
+                                    {form.errors.description && (
+                                        <p className="text-xs font-semibold text-rose-500 mt-1">{form.errors.description}</p>
+                                    )}
                                 </div>
 
                                 {/* Active Status Toggle Card */}
@@ -374,25 +392,26 @@ export default function DesignationsIndex({ designations, departments, filters }
                                 </div>
 
                                 {/* Modal Actions */}
-                                <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-100 dark:border-slate-800">
-                                    <button
+                                <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-100 dark:border-slate-800">
+                                    <Button
                                         type="button"
+                                        variant="outline"
                                         onClick={() => setIsModalOpen(false)}
-                                        className="h-11 px-5 text-xs font-semibold rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-200 transition-colors"
+                                        className="h-10 px-5 rounded-xl text-xs font-bold cursor-pointer"
                                     >
                                         Cancel
-                                    </button>
+                                    </Button>
 
                                     <Button
                                         type="submit"
                                         disabled={form.processing}
-                                        className="h-11 px-6 text-xs sm:text-sm font-bold rounded-xl bg-gradient-to-r from-[#003796] via-[#0052D4] to-[#1d4ed8] hover:from-[#002a75] hover:to-[#0040b8] text-white shadow-md shadow-blue-600/20 active:scale-[0.99] transition-all flex items-center justify-center gap-2"
+                                        className="h-10 px-5 rounded-xl bg-gradient-to-r from-[#003796] via-[#0052D4] to-[#1d4ed8] hover:from-[#002a75] hover:to-[#0040b8] text-white text-xs font-bold shadow-md shadow-blue-600/20 active:scale-[0.99] transition-all cursor-pointer inline-flex items-center gap-2"
                                     >
                                         {form.processing ? (
-                                            <div className="flex items-center gap-2">
+                                            <>
                                                 <LoaderCircle className="size-4 animate-spin" />
                                                 <span>Saving Designation...</span>
-                                            </div>
+                                            </>
                                         ) : (
                                             <span>{editingDesignation ? 'Update Designation' : 'Create Designation'}</span>
                                         )}
@@ -405,47 +424,63 @@ export default function DesignationsIndex({ designations, departments, filters }
 
                 {/* Delete Confirmation Modal */}
                 {deletingDesignation && (
-                    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs overflow-y-auto">
-                        <div className="w-full max-w-md rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-6 shadow-2xl space-y-5 animate-in fade-in zoom-in-95 duration-200">
-                            <div className="flex items-start gap-4">
-                                <div className="p-3 rounded-2xl bg-rose-50 dark:bg-rose-950/50 text-rose-600 dark:text-rose-400 shrink-0">
-                                    <AlertTriangle className="size-6" />
-                                </div>
-                                <div className="space-y-1">
-                                    <h3 className="text-lg font-extrabold text-slate-900 dark:text-white leading-snug">
-                                        Delete Designation?
-                                    </h3>
-                                    <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
-                                        Are you sure you want to delete <span className="font-bold text-slate-800 dark:text-slate-200">"{deletingDesignation.name}"</span>? This action cannot be undone.
-                                    </p>
-                                </div>
+                    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-900/60 backdrop-blur-xs overflow-y-auto">
+                        <div className="w-full max-w-md max-h-[90vh] my-auto overflow-y-auto rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-4 sm:p-6 shadow-2xl space-y-4 text-center animate-in fade-in zoom-in-95 duration-200 relative">
+                            <button
+                                type="button"
+                                onClick={() => setDeletingDesignation(null)}
+                                className="absolute top-4 right-4 size-8 rounded-xl text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-all flex items-center justify-center cursor-pointer"
+                            >
+                                <X className="size-4" />
+                            </button>
+
+                            <div className="size-12 rounded-2xl bg-rose-50 dark:bg-rose-950/60 text-rose-600 dark:text-rose-400 mx-auto flex items-center justify-center">
+                                <AlertTriangle className="size-6" />
                             </div>
 
-                            <div className="flex items-center justify-end gap-3 pt-2">
+                            <div className="space-y-1">
+                                <h3 className="text-base font-black text-slate-900 dark:text-white leading-snug">
+                                    Delete Designation?
+                                </h3>
+                                <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
+                                    Are you sure you want to delete <strong className="text-slate-900 dark:text-white">"{deletingDesignation.name}"</strong>? This action cannot be undone.
+                                </p>
+                            </div>
+
+                            {/* Child employees check */}
+                            {deletingDesignation.employees_count > 0 ? (
+                                <div className="p-3 rounded-xl bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800 text-xs font-medium text-amber-800 dark:text-amber-300 text-left">
+                                    <strong>Cannot Delete:</strong> This designation is assigned to {deletingDesignation.employees_count} employee(s). Reassign or delete those employees first.
+                                </div>
+                            ) : null}
+
+                            <div className="flex items-center justify-center gap-3 pt-2 border-t border-slate-100 dark:border-slate-800">
                                 <button
                                     type="button"
                                     onClick={() => setDeletingDesignation(null)}
                                     disabled={isDeleting}
-                                    className="h-10 px-4 text-xs font-semibold rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-200 transition-colors disabled:opacity-50"
+                                    className="h-10 px-4 rounded-xl border border-slate-200 dark:border-slate-800 text-xs font-bold text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                                 >
                                     Cancel
                                 </button>
 
-                                <button
-                                    type="button"
-                                    onClick={handleConfirmDelete}
-                                    disabled={isDeleting}
-                                    className="h-10 px-5 text-xs font-bold rounded-xl bg-gradient-to-r from-rose-600 to-red-600 hover:from-rose-700 hover:to-red-700 text-white shadow-md shadow-rose-600/20 active:scale-[0.99] transition-all flex items-center justify-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed"
-                                >
-                                    {isDeleting ? (
-                                        <div className="flex items-center gap-2">
-                                            <LoaderCircle className="size-4 animate-spin" />
-                                            <span>Deleting...</span>
-                                        </div>
-                                    ) : (
-                                        <span>Delete</span>
-                                    )}
-                                </button>
+                                {!(deletingDesignation.employees_count > 0) && (
+                                    <button
+                                        type="button"
+                                        onClick={handleConfirmDelete}
+                                        disabled={isDeleting}
+                                        className="h-10 px-4 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold inline-flex items-center gap-2 shadow-md shadow-rose-600/20 active:scale-[0.99] cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+                                    >
+                                        {isDeleting ? (
+                                            <>
+                                                <LoaderCircle className="size-4 animate-spin" />
+                                                <span>Deleting...</span>
+                                            </>
+                                        ) : (
+                                            <span>Delete Designation</span>
+                                        )}
+                                    </button>
+                                )}
                             </div>
                         </div>
                     </div>

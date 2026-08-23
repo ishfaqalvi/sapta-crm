@@ -28,6 +28,16 @@ class CurrencyController extends Controller
         ->orderBy('is_base', 'desc')
         ->latest('updated_at')
         ->paginate(15)
+        ->through(function ($currency) {
+            $code = $currency->code;
+            $currency->usages_count = \App\Models\Invoice::where('currency_code', $code)->count()
+                + \App\Models\Income::where('currency', $code)->count()
+                + \App\Models\Expense::where('currency', $code)->count()
+                + \App\Models\Client::where('currency', $code)->count()
+                + \App\Models\ClientService::where('currency', $code)->count()
+                + \App\Models\WebsiteProject::where('currency', $code)->count();
+            return $currency;
+        })
         ->withQueryString();
 
         $stats = [
@@ -102,6 +112,20 @@ class CurrencyController extends Controller
         }
 
         $code = $currency->code;
+
+        $invoicesCount = \App\Models\Invoice::where('currency_code', $code)->count();
+        $incomesCount = \App\Models\Income::where('currency', $code)->count();
+        $expensesCount = \App\Models\Expense::where('currency', $code)->count();
+        $clientsCount = \App\Models\Client::where('currency', $code)->count();
+        $servicesCount = \App\Models\ClientService::where('currency', $code)->count();
+        $projectsCount = \App\Models\WebsiteProject::where('currency', $code)->count();
+
+        $totalUsages = $invoicesCount + $incomesCount + $expensesCount + $clientsCount + $servicesCount + $projectsCount;
+
+        if ($totalUsages > 0) {
+            return redirect()->back()->with('error', "Cannot delete currency {$code} as it is assigned to existing transactions, clients, or projects.");
+        }
+
         $currency->delete();
 
         return redirect()->back()->with('success', "Currency {$code} deleted successfully.");

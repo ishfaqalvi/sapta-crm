@@ -33,16 +33,25 @@ class SystemSettingsController extends Controller
             'default_project_deadline_days' => '30',
             'monthly_working_days' => '26',
             'default_paid_leaves' => '1.5',
-            'email_notifications' => '1',
+            'email_notifications' => '0',
             'overdue_payment_alerts' => '1',
             'maintenance_mode' => '0',
+            // Notification & Automation Alert Days
+            'domain_alert_first_days' => '30',
+            'domain_alert_urgent_days' => '7',
+            'hosting_alert_first_days' => '15',
+            'hosting_alert_urgent_days' => '7',
+            'invoice_due_alert_days' => '3',
+            'task_due_alert_days' => '1',
+            'daily_digest_enabled' => '1',
         ], $dbSettings);
 
         // Convert boolean flags for React switch inputs
         $settings['auto_exchange_rates'] = (bool) ($settings['auto_exchange_rates'] ?? true);
-        $settings['email_notifications'] = (bool) ($settings['email_notifications'] ?? true);
+        $settings['email_notifications'] = (bool) ($settings['email_notifications'] ?? false);
         $settings['overdue_payment_alerts'] = (bool) ($settings['overdue_payment_alerts'] ?? true);
         $settings['maintenance_mode'] = (bool) ($settings['maintenance_mode'] ?? false);
+        $settings['daily_digest_enabled'] = (bool) ($settings['daily_digest_enabled'] ?? true);
 
         return Inertia::render('settings/system', [
             'settings' => $settings,
@@ -72,6 +81,14 @@ class SystemSettingsController extends Controller
             'email_notifications' => ['nullable', 'boolean'],
             'overdue_payment_alerts' => ['nullable', 'boolean'],
             'maintenance_mode' => ['nullable', 'boolean'],
+            // Notification & Cron Alert Rules Validation
+            'domain_alert_first_days' => ['required', 'integer', 'min:1', 'max:180'],
+            'domain_alert_urgent_days' => ['required', 'integer', 'min:1', 'max:60'],
+            'hosting_alert_first_days' => ['required', 'integer', 'min:1', 'max:180'],
+            'hosting_alert_urgent_days' => ['required', 'integer', 'min:1', 'max:60'],
+            'invoice_due_alert_days' => ['required', 'integer', 'min:1', 'max:60'],
+            'task_due_alert_days' => ['required', 'integer', 'min:1', 'max:30'],
+            'daily_digest_enabled' => ['nullable', 'boolean'],
         ]);
 
         foreach ($validated as $key => $value) {
@@ -79,6 +96,7 @@ class SystemSettingsController extends Controller
                 'company_name', 'company_email', 'company_phone', 'company_address', 'company_tax_id' => 'company',
                 'base_currency', 'invoice_prefix', 'default_tax_rate', 'auto_exchange_rates' => 'finance',
                 'default_project_deadline_days', 'monthly_working_days', 'default_paid_leaves' => 'operations',
+                'domain_alert_first_days', 'domain_alert_urgent_days', 'hosting_alert_first_days', 'hosting_alert_urgent_days', 'invoice_due_alert_days', 'task_due_alert_days', 'daily_digest_enabled' => 'notifications',
                 default => 'system',
             };
 

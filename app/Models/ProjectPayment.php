@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasOneThrough;
 
 class ProjectPayment extends Model
 {
@@ -39,5 +40,22 @@ class ProjectPayment extends Model
     public function client(): BelongsTo
     {
         return $this->belongsTo(Client::class);
+    }
+
+    public function invoice(): HasOneThrough
+    {
+        return $this->hasOneThrough(
+            Invoice::class,
+            InvoiceItem::class,
+            'invoiceable_id',
+            'id',
+            'id',
+            'invoice_id'
+        )->where('invoice_items.invoiceable_type', static::class);
+    }
+
+    public function invoiceItems()
+    {
+        return $this->morphMany(InvoiceItem::class, 'invoiceable');
     }
 }

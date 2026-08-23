@@ -1,5 +1,5 @@
 import Pagination, { type PaginatedData } from '@/components/pagination';
-import SearchableSelect from '@/components/searchable-select';
+import SearchableSelect, { type SelectOption } from '@/components/searchable-select';
 import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem } from '@/types';
 import { Head, router } from '@inertiajs/react';
@@ -9,7 +9,8 @@ import {
     Copy,
     FolderKanban,
     Key,
-    Lock,
+    Layers,
+    RotateCcw,
     Search,
     Shield,
 } from 'lucide-react';
@@ -30,6 +31,7 @@ export interface AdminCredentialListItem {
     id: number;
     client_id: number;
     website_project_id?: number | null;
+    client_service_id?: number | null;
     title: string;
     type?: string;
     username?: string | null;
@@ -47,6 +49,10 @@ export interface AdminCredentialListItem {
         id: number;
         project_name: string;
     };
+    service?: {
+        id: number;
+        service_name: string;
+    };
 }
 
 interface CredentialsIndexProps {
@@ -55,27 +61,66 @@ interface CredentialsIndexProps {
         total: number;
     };
     clients: Array<{ id: number; name: string; company_name?: string; client_code: string }>;
+    projects?: Array<{ id: number; client_id: number; project_name: string }>;
+    services?: Array<{ id: number; client_id: number; service_name: string }>;
     filters?: {
         search?: string;
         client_id?: string;
+        website_project_id?: string;
+        client_service_id?: string;
     };
 }
 
-export default function CredentialsIndex({ credentials, clients, filters }: CredentialsIndexProps) {
+export default function CredentialsIndex({
+    credentials,
+    clients = [],
+    projects = [],
+    services = [],
+    filters,
+}: CredentialsIndexProps) {
     const [searchQuery, setSearchQuery] = useState(filters?.search || '');
     const [clientFilter, setClientFilter] = useState(filters?.client_id || '');
+    const [projectFilter, setProjectFilter] = useState(filters?.website_project_id || '');
+    const [serviceFilter, setServiceFilter] = useState(filters?.client_service_id || '');
     const [copiedId, setCopiedId] = useState<string | null>(null);
 
+    // Filter projects & services based on selected client (if any)
+    const filteredProjects = clientFilter
+        ? projects.filter((p) => String(p.client_id) === String(clientFilter))
+        : projects;
+
+    const filteredServices = clientFilter
+        ? services.filter((s) => String(s.client_id) === String(clientFilter))
+        : services;
+
     // Client Filter Options
-    const clientSelectOptions = clients.map((c) => ({
+    const clientSelectOptions: SelectOption[] = clients.map((c) => ({
         value: String(c.id),
         label: c.name,
         subLabel: `${c.client_code} • ${c.company_name || 'Individual Client'}`,
     }));
 
-    const clientFilterOptions = [
+    const clientFilterOptions: SelectOption[] = [
         { value: '', label: 'All Clients', subLabel: 'Show credentials for all clients' },
         ...clientSelectOptions,
+    ];
+
+    // Project Filter Options
+    const projectFilterOptions: SelectOption[] = [
+        { value: '', label: 'All Projects', subLabel: 'Show credentials for all projects' },
+        ...filteredProjects.map((p) => ({
+            value: String(p.id),
+            label: p.project_name,
+        })),
+    ];
+
+    // Service Filter Options
+    const serviceFilterOptions: SelectOption[] = [
+        { value: '', label: 'All Services', subLabel: 'Show credentials for all services' },
+        ...filteredServices.map((s) => ({
+            value: String(s.id),
+            label: s.service_name,
+        })),
     ];
 
     // Debounced Search & Filter
@@ -91,18 +136,30 @@ export default function CredentialsIndex({ credentials, clients, filters }: Cred
                 {
                     search: searchQuery || undefined,
                     client_id: clientFilter || undefined,
+                    website_project_id: projectFilter || undefined,
+                    client_service_id: serviceFilter || undefined,
                 },
                 { preserveState: true, replace: true }
             );
         }, 300);
         return () => clearTimeout(timer);
-    }, [searchQuery, clientFilter]);
+    }, [searchQuery, clientFilter, projectFilter, serviceFilter]);
+
+    const handleClearFilters = () => {
+        setSearchQuery('');
+        setClientFilter('');
+        setProjectFilter('');
+        setServiceFilter('');
+        router.get('/credentials', {}, { preserveState: true, replace: true });
+    };
 
     const handleCopy = (text: string, idStr: string) => {
         navigator.clipboard.writeText(text);
         setCopiedId(idStr);
         setTimeout(() => setCopiedId(null), 2000);
     };
+
+    const hasActiveFilters = Boolean(searchQuery || clientFilter || projectFilter || serviceFilter);
 
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
@@ -123,27 +180,67 @@ export default function CredentialsIndex({ credentials, clients, filters }: Cred
                 </div>
 
                 {/* Search & Filter Toolbar */}
-                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 p-4 rounded-xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 shadow-xs">
-                    <div className="relative flex-1 w-full md:max-w-md">
-                        <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 size-4 text-slate-400 z-10" />
-                        <input
-                            type="text"
-                            placeholder="Search by title, login details, or client name..."
-                            value={searchQuery}
-                            onChange={(e) => setSearchQuery(e.target.value)}
-                            className="w-full h-10 pl-10 pr-4 rounded-xl bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700/80 text-xs font-medium text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-600/10 transition-all"
-                        />
+                <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 p-4 rounded-xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 shadow-xs">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 flex-1">
+                        {/* Search Input */}
+                        <div className="relative w-full">
+                            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 size-4 text-slate-400 z-10" />
+                            <input
+                                type="text"
+                                placeholder="Search by title, login details, or client name..."
+                                value={searchQuery}
+                                onChange={(e) => setSearchQuery(e.target.value)}
+                                className="w-full h-10 pl-10 pr-4 rounded-xl bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700/80 text-xs font-medium text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-600/10 transition-all"
+                            />
+                        </div>
+
+                        {/* Client Filter */}
+                        <div className="w-full">
+                            <SearchableSelect
+                                options={clientFilterOptions}
+                                value={clientFilter}
+                                onChange={(val) => {
+                                    setClientFilter(val);
+                                    setProjectFilter(''); // Reset project filter if client changes
+                                    setServiceFilter(''); // Reset service filter if client changes
+                                }}
+                                placeholder="Filter by Client"
+                                searchPlaceholder="Type client name..."
+                            />
+                        </div>
+
+                        {/* Project Filter */}
+                        <div className="w-full">
+                            <SearchableSelect
+                                options={projectFilterOptions}
+                                value={projectFilter}
+                                onChange={(val) => setProjectFilter(val)}
+                                placeholder="Filter by Project"
+                                searchPlaceholder="Type project name..."
+                            />
+                        </div>
+
+                        {/* Service Filter */}
+                        <div className="w-full">
+                            <SearchableSelect
+                                options={serviceFilterOptions}
+                                value={serviceFilter}
+                                onChange={(val) => setServiceFilter(val)}
+                                placeholder="Filter by Service"
+                                searchPlaceholder="Type service name..."
+                            />
+                        </div>
                     </div>
 
-                    <div className="w-full md:w-72">
-                        <SearchableSelect
-                            options={clientFilterOptions}
-                            value={clientFilter}
-                            onChange={(val) => setClientFilter(val)}
-                            placeholder="Filter by Client"
-                            searchPlaceholder="Type client name..."
-                        />
-                    </div>
+                    {hasActiveFilters && (
+                        <button
+                            onClick={handleClearFilters}
+                            className="h-10 px-3 text-xs font-bold rounded-xl text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/60 border border-rose-200 dark:border-rose-800 transition-all inline-flex items-center gap-1.5 shrink-0 cursor-pointer"
+                        >
+                            <RotateCcw className="size-3.5" />
+                            <span>Reset Filters</span>
+                        </button>
+                    )}
                 </div>
 
                 {/* Credentials Cards Grid */}
@@ -191,6 +288,13 @@ export default function CredentialsIndex({ credentials, clients, filters }: Cred
                                                                 <span className="truncate max-w-[140px]">{cred.project.project_name}</span>
                                                             </span>
                                                         )}
+
+                                                        {cred.service && (
+                                                            <span className="px-2 py-0.5 rounded-md bg-emerald-50 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300 font-bold border border-emerald-200/80 dark:border-emerald-800 flex items-center gap-1">
+                                                                <Layers className="size-3" />
+                                                                <span className="truncate max-w-[140px]">{cred.service.service_name}</span>
+                                                            </span>
+                                                        )}
                                                     </div>
                                                 </div>
                                             </div>
@@ -199,12 +303,16 @@ export default function CredentialsIndex({ credentials, clients, filters }: Cred
                                                 <button
                                                     type="button"
                                                     onClick={() => handleCopy(fullContent, `cred-${cred.id}`)}
-                                                    className="h-8 px-3 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 hover:bg-blue-600 hover:text-white dark:hover:bg-blue-600 transition-all font-bold text-[11px] inline-flex items-center gap-1.5 cursor-pointer shrink-0"
+                                                    className={`h-8 px-3 rounded-xl transition-all font-bold text-xs inline-flex items-center gap-1.5 cursor-pointer shrink-0 ${
+                                                        copiedId === `cred-${cred.id}`
+                                                            ? 'bg-emerald-50 dark:bg-emerald-950/80 text-emerald-700 dark:text-emerald-300 border border-emerald-200/80 dark:border-emerald-800'
+                                                            : 'bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400 hover:bg-gradient-to-r hover:from-[#003796] hover:via-[#0052D4] hover:to-[#1d4ed8] hover:text-white border border-blue-200/60 dark:border-blue-800/60 hover:border-transparent'
+                                                    }`}
                                                     title="Copy All Credentials"
                                                 >
                                                     {copiedId === `cred-${cred.id}` ? (
                                                         <>
-                                                            <Check className="size-3.5 text-emerald-400" />
+                                                            <Check className="size-3.5 text-emerald-600 dark:text-emerald-400" />
                                                             <span className="text-[10px] font-extrabold text-emerald-600 dark:text-emerald-400">Copied!</span>
                                                         </>
                                                     ) : (

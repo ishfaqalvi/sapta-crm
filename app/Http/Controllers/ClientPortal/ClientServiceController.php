@@ -5,7 +5,10 @@ namespace App\Http\Controllers\ClientPortal;
 use App\Http\Controllers\Controller;
 use App\Models\Client;
 use App\Models\ClientService;
+use App\Models\ClientCredential;
 use App\Models\Currency;
+use App\Models\Invoice;
+use App\Models\InvoiceItem;
 use App\Models\ServicePayment;
 use App\Models\SystemSetting;
 use App\Services\CurrencyService;
@@ -49,6 +52,16 @@ class ClientServiceController extends Controller
 
         $query = ClientService::where('client_id', $clientId)
             ->with(['category'])
+            ->withSum([
+                'payments as collected_amount' => function ($q) {
+                    $q->where('status', 'paid');
+                }
+            ], 'amount_due')
+            ->withSum([
+                'payments as due_amount' => function ($q) {
+                    $q->where('status', '!=', 'paid');
+                }
+            ], 'amount_due')
             ->withCount([
                 'payments as paid_payments_count' => function ($q) {
                     $q->where('status', 'paid');
@@ -117,7 +130,13 @@ class ClientServiceController extends Controller
         $service->load([
             'category',
             'payments' => function ($q) {
-                $q->orderBy('billing_month', 'desc');
+                $q->with('invoice')->orderBy('billing_month', 'desc');
+            },
+            'credentials' => function ($q) {
+                $q->orderBy('created_at', 'desc');
+            },
+            'documents' => function ($q) {
+                $q->orderBy('created_at', 'desc');
             },
         ]);
 
@@ -137,6 +156,76 @@ class ClientServiceController extends Controller
         ]);
     }
 
+    /*
+    |--------------------------------------------------------------------------
+    | Service Credentials Handlers
+    |--------------------------------------------------------------------------
+    */
+    public function storeCredential(Request $request): RedirectResponse
+    {
+        $this->authorizePermission('create-client-portal-service-credentials');
+
+        $clientId = $this->getClientId();
+
+        $validated = $request->validate([
+            'title' => 'required|string|max:255',
+            'type' => ['required', Rule::in(['hosting', 'cms', 'database', 'domain', 'api', 'other'])],
+            'client_service_id' => 'nullable|exists:client_services,id',
+            'website_project_id' => 'nullable|exists:website_projects,id',
+            'username' => 'nullable|string|max:255',
+            'password' => 'nullable|string|max:500',
+            'url' => 'nullable|string|max:500',
+            'notes' => 'nullable|string|max:2000',
+        ]);
+
+        $validated['client_id'] = $clientId;
+
+        ClientCredential::create($validated);
+
+        return redirect()->back()->with('success', 'Credential created successfully.');
+    }
+
+    public function updateCredential(Request $request, ClientCredential $credential): RedirectResponse
+    {
+        $this->authorizePermission('edit-client-portal-service-credentials');
+
+        $clientId = $this->getClientId();
+
+        if ($credential->client_id !== $clientId) {
+            abort(403, 'Unauthorized access to credential');
+        }
+
+        $validated = $request->validate([
+            'title' => 'required|string|max:255',
+            'type' => ['required', Rule::in(['hosting', 'cms', 'database', 'domain', 'api', 'other'])],
+            'client_service_id' => 'nullable|exists:client_services,id',
+            'website_project_id' => 'nullable|exists:website_projects,id',
+            'username' => 'nullable|string|max:255',
+            'password' => 'nullable|string|max:500',
+            'url' => 'nullable|string|max:500',
+            'notes' => 'nullable|string|max:2000',
+        ]);
+
+        $credential->update($validated);
+
+        return redirect()->back()->with('success', 'Credential updated successfully.');
+    }
+
+    public function destroyCredential(ClientCredential $credential): RedirectResponse
+    {
+        $this->authorizePermission('delete-client-portal-service-credentials');
+
+        $clientId = $this->getClientId();
+
+        if ($credential->client_id !== $clientId) {
+            abort(403, 'Unauthorized access to credential');
+        }
+
+        $credential->delete();
+
+        return redirect()->back()->with('success', 'Credential deleted successfully.');
+    }
+
     /**
      * Store a newly created Client Service for the authenticated client.
      */
@@ -145,13 +234,13 @@ class ClientServiceController extends Controller
         $this->authorizePermission('create-client-portal-services');
 
         $clientId = $this->getClientId();
+        $client = $this->getClientModel();
 
         $validated = $request->validate([
             'category_id' => 'required|exists:service_categories,id',
             'service_name' => 'required|string|max:255',
             'monthly_fee' => 'required|numeric|min:0',
             'contract_months' => 'nullable|integer|min:1|max:120',
-            'currency' => 'required|string|max:10',
             'start_date' => 'required|date',
             'billing_day' => 'required|integer|between:1,31',
             'status' => ['required', Rule::in(['active', 'paused', 'stopped'])],
@@ -159,6 +248,7 @@ class ClientServiceController extends Controller
         ]);
 
         $validated['client_id'] = $clientId;
+        $validated['currency'] = $client->currency ?? 'USD';
 
         $rate = CurrencyService::getRate($validated['currency']);
         $validated['exchange_rate'] = $rate;
@@ -174,8 +264,7 @@ class ClientServiceController extends Controller
             'amount_due' => $service->monthly_fee,
             'amount_paid' => 0.00,
             'exchange_rate' => $rate,
-            'amount_paid_pkr' => 0.00,
-            'status' => 'due_pending',
+            'amount_paid_pkr' => 0.00
         ]);
 
         return redirect()->back()->with('success', 'Service created successfully.');
@@ -189,6 +278,7 @@ class ClientServiceController extends Controller
         $this->authorizePermission('edit-client-portal-services');
 
         $clientId = $this->getClientId();
+        $client = $this->getClientModel();
 
         if ($service->client_id !== $clientId) {
             abort(403, 'Unauthorized access to Client Service');
@@ -199,13 +289,13 @@ class ClientServiceController extends Controller
             'service_name' => 'required|string|max:255',
             'monthly_fee' => 'required|numeric|min:0',
             'contract_months' => 'nullable|integer|min:1|max:120',
-            'currency' => 'required|string|max:10',
             'start_date' => 'required|date',
             'billing_day' => 'required|integer|between:1,31',
             'status' => ['required', Rule::in(['active', 'paused', 'stopped'])],
             'notes' => 'nullable|string|max:2000',
         ]);
 
+        $validated['currency'] = $client->currency ?? $service->currency ?? 'USD';
         $rate = CurrencyService::getRate($validated['currency']);
         $validated['exchange_rate'] = $rate;
         $validated['monthly_fee_pkr'] = round((float) $validated['monthly_fee'] * $rate, 2);
@@ -247,7 +337,7 @@ class ClientServiceController extends Controller
      */
     public function generateMonthlyBatch(Request $request): RedirectResponse
     {
-        $this->authorizePermission('edit-client-portal-services');
+        $this->authorizePermission('create-client-portal-service-payments');
 
         $clientId = $this->getClientId();
 
@@ -258,7 +348,6 @@ class ClientServiceController extends Controller
             'amount_paid' => 'nullable|numeric|min:0',
             'payment_date' => 'nullable|date',
             'status' => 'nullable|string',
-            'payment_method' => 'nullable|string',
             'notes' => 'nullable|string',
         ]);
 
@@ -283,8 +372,6 @@ class ClientServiceController extends Controller
                     'exchange_rate' => $rate,
                     'amount_paid_pkr' => round((float) ($request->amount_paid ?? 0) * $rate, 2),
                     'payment_date' => $request->payment_date,
-                    'status' => $request->status ?? 'due_pending',
-                    'payment_method' => $request->payment_method,
                     'notes' => $request->notes,
                 ]
             );
@@ -325,7 +412,7 @@ class ClientServiceController extends Controller
      */
     public function updatePayment(Request $request, ServicePayment $servicePayment): RedirectResponse
     {
-        $this->authorizePermission('edit-client-portal-services');
+        $this->authorizePermission('edit-client-portal-service-payments');
 
         $clientId = $this->getClientId();
 
@@ -359,7 +446,7 @@ class ClientServiceController extends Controller
      */
     public function destroyPayment(ServicePayment $servicePayment): RedirectResponse
     {
-        $this->authorizePermission('delete-client-portal-services');
+        $this->authorizePermission('delete-client-portal-service-payments');
 
         $clientId = $this->getClientId();
 
@@ -367,8 +454,147 @@ class ClientServiceController extends Controller
             abort(403, 'Unauthorized access to Service Payment record');
         }
 
+        if ($servicePayment->status === 'paid') {
+            return redirect()->back()->with('error', 'Paid service payment records cannot be deleted.');
+        }
+
         $servicePayment->delete();
 
         return redirect()->back()->with('success', 'Service payment record deleted successfully.');
+    }
+
+    /**
+     * Generate an official system Invoice for a Service Payment record.
+     */
+    public function generatePaymentInvoice(ServicePayment $servicePayment): RedirectResponse
+    {
+        $this->authorizePermission('create-client-portal-invoices');
+
+        $clientId = $this->getClientId();
+
+        if ($servicePayment->client_id !== $clientId) {
+            abort(403, 'Unauthorized access to Service Payment record');
+        }
+
+        if ($servicePayment->invoice()->exists()) {
+            return redirect()->back()->with('error', 'An invoice has already been generated for this service payment record.');
+        }
+
+        $service = $servicePayment->service;
+        $currency = $service ? ($service->currency ?? 'USD') : 'USD';
+        $rate = CurrencyService::getRate($currency);
+
+        $invoiceNumber = Invoice::generateNextInvoiceNumber();
+
+        $invoice = Invoice::create([
+            'invoice_number' => $invoiceNumber,
+            'client_id' => $servicePayment->client_id,
+            'currency_code' => $currency,
+            'exchange_rate_to_pkr' => $rate,
+            'subtotal' => $servicePayment->amount_due,
+            'tax_rate' => 0.00,
+            'tax_amount' => 0.00,
+            'discount' => 0.00,
+            'total_amount' => $servicePayment->amount_due,
+            'total_amount_pkr' => round((float) $servicePayment->amount_due * $rate, 2),
+            'issue_date' => now()->toDateString(),
+            'due_date' => now()->addDays(7)->toDateString(),
+            'status' => 'due',
+            'notes' => 'Invoice generated for service: ' . ($service ? $service->service_name : 'Subscription') . ' (' . $servicePayment->billing_month . ')',
+            'created_by' => Auth::id(),
+        ]);
+
+        InvoiceItem::create([
+            'invoice_id' => $invoice->id,
+            'description' => 'Service Subscription: ' . ($service ? $service->service_name : 'Subscription') . ' - Billing Month: ' . $servicePayment->billing_month,
+            'quantity' => 1.00,
+            'unit_price' => $servicePayment->amount_due,
+            'amount' => $servicePayment->amount_due,
+            'invoiceable_type' => ServicePayment::class,
+            'invoiceable_id' => $servicePayment->id,
+        ]);
+
+        return redirect()->back()->with('success', "Invoice {$invoiceNumber} generated successfully for service payment.");
+    }
+
+    /**
+     * Store uploaded document for Client Service in Client Portal.
+     */
+    public function storeDocument(Request $request, ClientService $service): RedirectResponse
+    {
+        $this->authorizePermission('create-client-portal-service-documents');
+
+        $clientId = $this->getClientId();
+
+        if ($service->client_id !== $clientId) {
+            abort(403, 'Unauthorized access to service');
+        }
+
+        $allowedExtensions = ['pdf', 'doc', 'docx', 'xls', 'xlsx', 'csv', 'png', 'jpg', 'jpeg', 'webp'];
+
+        $request->validate([
+            'title' => ['required', 'string', 'max:255'],
+            'file' => [
+                'required',
+                'file',
+                'max:25600',
+                function ($attribute, $value, $fail) use ($allowedExtensions) {
+                    if (!$value || !method_exists($value, 'getClientOriginalExtension'))
+                        return;
+                    $ext = strtolower($value->getClientOriginalExtension());
+                    if (!in_array($ext, $allowedExtensions)) {
+                        $fail('The file field must be a file of type: ' . implode(', ', $allowedExtensions) . '.');
+                    }
+                },
+            ],
+        ]);
+
+        $file = $request->file('file');
+        $originalName = $file->getClientOriginalName();
+        $extension = strtolower($file->getClientOriginalExtension());
+        $fileSize = $file->getSize();
+
+        $destinationPath = public_path('uploads/documents');
+        if (!file_exists($destinationPath)) {
+            mkdir($destinationPath, 0755, true);
+        }
+
+        $filename = time() . '_' . uniqid() . '.' . $extension;
+        $file->move($destinationPath, $filename);
+        $filePath = '/uploads/documents/' . $filename;
+
+        \App\Models\ClientDocument::create([
+            'client_id' => $clientId,
+            'client_service_id' => $service->id,
+            'title' => $request->input('title'),
+            'file_path' => $filePath,
+            'file_name' => $originalName,
+            'file_type' => $extension,
+            'file_size' => $fileSize,
+        ]);
+
+        return redirect()->back()->with('success', 'Document uploaded successfully.');
+    }
+
+    /**
+     * Delete document attached to Client Service in Client Portal.
+     */
+    public function destroyDocument(ClientService $service, \App\Models\ClientDocument $document): RedirectResponse
+    {
+        $this->authorizePermission('delete-client-portal-service-documents');
+
+        $clientId = $this->getClientId();
+
+        if ($service->client_id !== $clientId || $document->client_service_id !== $service->id) {
+            abort(403, 'Unauthorized access');
+        }
+
+        $physicalPath = public_path($document->file_path);
+        if (file_exists($physicalPath)) {
+            @unlink($physicalPath);
+        }
+        $document->delete();
+
+        return redirect()->back()->with('success', 'Document deleted successfully.');
     }
 }

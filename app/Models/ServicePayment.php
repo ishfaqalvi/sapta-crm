@@ -41,4 +41,21 @@ class ServicePayment extends Model
     {
         return $this->belongsTo(Client::class);
     }
+
+    public function invoice(): \Illuminate\Database\Eloquent\Relations\HasOneThrough
+    {
+        return $this->hasOneThrough(
+            Invoice::class,
+            InvoiceItem::class,
+            'invoiceable_id',
+            'id',
+            'id',
+            'invoice_id'
+        )->where('invoice_items.invoiceable_type', static::class);
+    }
+
+    public function invoiceItems()
+    {
+        return $this->morphMany(InvoiceItem::class, 'invoiceable');
+    }
 }

@@ -414,7 +414,7 @@ export default function ClientPortalProfileIndex({ client, currencies = [], isAd
                                     <button
                                         type="submit"
                                         disabled={profileForm.processing}
-                                        className="bg-gradient-to-r from-[#003796] via-[#0052D4] to-[#1d4ed8] hover:opacity-95 disabled:opacity-50 text-white text-xs font-bold px-6 py-2.5 rounded-xl shadow-md shadow-blue-500/20 transition-all cursor-pointer flex items-center gap-2"
+                                        className="inline-flex items-center justify-center gap-2 h-10 px-3 rounded-xl bg-gradient-to-r from-[#003796] via-[#0052D4] to-[#1d4ed8] hover:opacity-95 disabled:opacity-50 text-white text-xs font-bold shadow-md shadow-blue-600/20 transition-all cursor-pointer"
                                     >
                                         <CheckCircle2 className="size-4" />
                                         <span>{profileForm.processing ? 'Saving...' : 'Save Profile Details'}</span>
@@ -475,30 +475,32 @@ export default function ClientPortalProfileIndex({ client, currencies = [], isAd
                                         </div>
 
                                         <div className="space-y-1.5 flex-1 min-w-0">
-                                            <div className="flex flex-wrap items-center gap-2">
-                                                <label className="px-3.5 py-2 rounded-xl bg-gradient-to-r from-[#003796] via-[#0052D4] to-[#1d4ed8] hover:opacity-95 text-white text-xs font-bold transition-all shadow-md shadow-blue-500/20 cursor-pointer inline-flex items-center gap-1.5">
-                                                    <Camera className="size-3.5" />
-                                                    <span>Upload Photo</span>
-                                                    <input
-                                                        type="file"
-                                                        accept="image/jpeg,image/png,image/gif,image/webp"
-                                                        onChange={handleAvatarUpload}
-                                                        className="hidden"
-                                                    />
-                                                </label>
+                                            {hasPermission(user, 'edit-client-portal-profile') && (
+                                                <div className="flex flex-wrap items-center gap-2">
+                                                    <label className="inline-flex items-center justify-center gap-1.5 h-10 px-3 rounded-xl bg-gradient-to-r from-[#003796] via-[#0052D4] to-[#1d4ed8] hover:opacity-95 text-white text-xs font-bold transition-all shadow-md shadow-blue-600/20 cursor-pointer">
+                                                        <Camera className="size-3.5" />
+                                                        <span>Upload Photo</span>
+                                                        <input
+                                                            type="file"
+                                                            accept="image/jpeg,image/png,image/gif,image/webp"
+                                                            onChange={handleAvatarUpload}
+                                                            className="hidden"
+                                                        />
+                                                    </label>
 
-                                                {client.user.avatar && (
-                                                    <button
-                                                        type="button"
-                                                        onClick={handleRemoveAvatar}
-                                                        disabled={avatarForm.processing}
-                                                        className="px-3 py-1.5 rounded-xl bg-rose-50 dark:bg-rose-950/40 text-rose-600 dark:text-rose-400 hover:bg-rose-600 hover:text-white dark:hover:bg-rose-600 text-xs font-bold transition-all cursor-pointer inline-flex items-center gap-1.5 border border-rose-200/60 dark:border-rose-800/80 disabled:opacity-50"
-                                                    >
-                                                        <Trash2 className="size-3.5" />
-                                                        <span>Remove</span>
-                                                    </button>
-                                                )}
-                                            </div>
+                                                    {client.user.avatar && (
+                                                        <button
+                                                            type="button"
+                                                            onClick={handleRemoveAvatar}
+                                                            disabled={avatarForm.processing}
+                                                            className="inline-flex items-center justify-center gap-1.5 h-10 px-3 rounded-xl bg-rose-50 dark:bg-rose-950/40 text-rose-600 dark:text-rose-400 hover:bg-rose-600 hover:text-white dark:hover:bg-rose-600 text-xs font-bold transition-all cursor-pointer border border-rose-200/60 dark:border-rose-800/80 disabled:opacity-50"
+                                                        >
+                                                            <Trash2 className="size-3.5" />
+                                                            <span>Remove</span>
+                                                        </button>
+                                                    )}
+                                                </div>
+                                            )}
                                             <p className="text-[10px] text-slate-400 font-medium">
                                                 JPG, PNG, GIF, or WEBP (Max 4MB).
                                             </p>
@@ -532,24 +534,26 @@ export default function ClientPortalProfileIndex({ client, currencies = [], isAd
                                                 )}
                                             </div>
 
-                                            <div className="flex items-center justify-between pt-2 gap-3">
-                                                <button
-                                                    type="button"
-                                                    onClick={() => setShowRevokeModal(true)}
-                                                    className="px-4 py-2.5 rounded-xl bg-rose-50 dark:bg-rose-950/50 text-rose-600 dark:text-rose-400 hover:bg-rose-600 hover:text-white border border-rose-200 dark:border-rose-800/80 text-xs font-extrabold transition-all cursor-pointer shadow-2xs flex items-center gap-1.5 shrink-0"
-                                                >
-                                                    <UserX className="size-3.5" />
-                                                    <span>Revoke Access</span>
-                                                </button>
-                                                <button
-                                                    type="submit"
-                                                    disabled={adminResetForm.processing}
-                                                    className="bg-gradient-to-r from-[#003796] via-[#0052D4] to-[#1d4ed8] hover:opacity-95 disabled:opacity-50 text-white text-xs font-bold px-5 py-2.5 rounded-xl shadow-md shadow-blue-500/20 transition-all cursor-pointer flex items-center gap-2"
-                                                >
-                                                    <KeyRound className="size-4" />
-                                                    <span>{adminResetForm.processing ? 'Resetting...' : 'Reset Password'}</span>
-                                                </button>
-                                            </div>
+                                            {hasPermission(user, 'edit-client-portal-profile') && (
+                                                <div className="flex items-center justify-between pt-2 gap-3">
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => setShowRevokeModal(true)}
+                                                        className="inline-flex items-center justify-center gap-1.5 h-10 px-3 rounded-xl bg-rose-50 dark:bg-rose-950/50 text-rose-600 dark:text-rose-400 hover:bg-rose-600 hover:text-white border border-rose-200 dark:border-rose-800/80 text-xs font-bold transition-all cursor-pointer shadow-2xs shrink-0"
+                                                    >
+                                                        <UserX className="size-3.5" />
+                                                        <span>Revoke Access</span>
+                                                    </button>
+                                                    <button
+                                                        type="submit"
+                                                        disabled={adminResetForm.processing}
+                                                        className="inline-flex items-center justify-center gap-2 h-10 px-3 rounded-xl bg-gradient-to-r from-[#003796] via-[#0052D4] to-[#1d4ed8] hover:opacity-95 disabled:opacity-50 text-white text-xs font-bold shadow-md shadow-blue-600/20 transition-all cursor-pointer"
+                                                    >
+                                                        <KeyRound className="size-4" />
+                                                        <span>{adminResetForm.processing ? 'Resetting...' : 'Reset Password'}</span>
+                                                    </button>
+                                                </div>
+                                            )}
                                         </form>
                                     </div>
                                 ) : (
@@ -600,16 +604,18 @@ export default function ClientPortalProfileIndex({ client, currencies = [], isAd
                                             />
                                         </div>
 
-                                        <div className="flex justify-end pt-3 border-t border-slate-100 dark:border-slate-800">
-                                            <button
-                                                type="submit"
-                                                disabled={passwordForm.processing}
-                                                className="bg-gradient-to-r from-[#003796] via-[#0052D4] to-[#1d4ed8] hover:opacity-95 disabled:opacity-50 text-white text-xs font-bold px-6 py-2.5 rounded-xl shadow-md shadow-blue-500/20 transition-all cursor-pointer flex items-center gap-2"
-                                            >
-                                                <Lock className="size-4" />
-                                                <span>{passwordForm.processing ? 'Updating...' : 'Update Password'}</span>
-                                            </button>
-                                        </div>
+                                        {hasPermission(user, 'edit-client-portal-profile') && (
+                                            <div className="flex justify-end pt-3 border-t border-slate-100 dark:border-slate-800">
+                                                <button
+                                                    type="submit"
+                                                    disabled={passwordForm.processing}
+                                                    className="inline-flex items-center justify-center gap-2 h-10 px-3 rounded-xl bg-gradient-to-r from-[#003796] via-[#0052D4] to-[#1d4ed8] hover:opacity-95 disabled:opacity-50 text-white text-xs font-bold shadow-md shadow-blue-600/20 transition-all cursor-pointer"
+                                                >
+                                                    <Lock className="size-4" />
+                                                    <span>{passwordForm.processing ? 'Updating...' : 'Update Password'}</span>
+                                                </button>
+                                            </div>
+                                        )}
                                     </form>
                                 )}
                             </div>
@@ -675,16 +681,18 @@ export default function ClientPortalProfileIndex({ client, currencies = [], isAd
                                             )}
                                         </div>
 
-                                        <div className="flex justify-end pt-3 border-t border-slate-100 dark:border-slate-800">
-                                            <button
-                                                type="submit"
-                                                disabled={createAccountForm.processing}
-                                                className="bg-gradient-to-r from-[#003796] via-[#0052D4] to-[#1d4ed8] hover:opacity-95 disabled:opacity-50 text-white text-xs font-bold px-6 py-2.5 rounded-xl shadow-md shadow-blue-500/20 transition-all cursor-pointer flex items-center gap-2"
-                                            >
-                                                <UserCheck className="size-4" />
-                                                <span>{createAccountForm.processing ? 'Creating...' : 'Create Portal Account'}</span>
-                                            </button>
-                                        </div>
+                                        {hasPermission(user, 'manage-client-portal-account') && (
+                                            <div className="flex justify-end pt-3 border-t border-slate-100 dark:border-slate-800">
+                                                <button
+                                                    type="submit"
+                                                    disabled={createAccountForm.processing}
+                                                    className="inline-flex items-center justify-center gap-2 h-10 px-3 rounded-xl bg-gradient-to-r from-[#003796] via-[#0052D4] to-[#1d4ed8] hover:opacity-95 disabled:opacity-50 text-white text-xs font-bold shadow-md shadow-blue-600/20 transition-all cursor-pointer"
+                                                >
+                                                    <UserCheck className="size-4" />
+                                                    <span>{createAccountForm.processing ? 'Creating...' : 'Create Portal Account'}</span>
+                                                </button>
+                                            </div>
+                                        )}
                                     </form>
                                 )}
                             </div>
@@ -703,13 +711,21 @@ export default function ClientPortalProfileIndex({ client, currencies = [], isAd
                 {/* CONFIRM REVOKE ACCESS MODAL */}
                 {showRevokeModal && (
                     <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-900/60 backdrop-blur-xs overflow-y-auto">
-                        <div className="w-full max-w-md max-h-[90vh] my-auto overflow-y-auto rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-4 sm:p-6 shadow-2xl space-y-5 animate-in fade-in zoom-in-95 duration-200">
+                        <div className="w-full max-w-md max-h-[90vh] my-auto overflow-y-auto rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-4 sm:p-6 shadow-2xl space-y-5 animate-in fade-in zoom-in-95 duration-200 relative">
+                            <button
+                                type="button"
+                                onClick={() => setShowRevokeModal(false)}
+                                className="absolute top-4 right-4 size-8 rounded-xl text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-all flex items-center justify-center cursor-pointer"
+                            >
+                                <X className="size-4" />
+                            </button>
+
                             <div className="flex items-start gap-4">
                                 <div className="p-3 rounded-2xl bg-rose-50 dark:bg-rose-950/50 text-rose-600 dark:text-rose-400 shrink-0">
                                     <AlertTriangle className="size-6" />
                                 </div>
                                 <div className="space-y-1">
-                                    <h3 className="text-lg font-extrabold text-slate-900 dark:text-white leading-snug">
+                                    <h3 className="text-base font-black text-slate-900 dark:text-white leading-snug">
                                         Revoke Portal Account Access?
                                     </h3>
                                     <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
@@ -718,12 +734,12 @@ export default function ClientPortalProfileIndex({ client, currencies = [], isAd
                                 </div>
                             </div>
 
-                            <div className="flex items-center justify-end gap-3 pt-2">
+                            <div className="flex items-center justify-end gap-3 pt-2 border-t border-slate-100 dark:border-slate-800">
                                 <button
                                     type="button"
                                     onClick={() => setShowRevokeModal(false)}
                                     disabled={isRevoking}
-                                    className="h-10 px-4 text-xs font-semibold rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-200 transition-colors disabled:opacity-50 cursor-pointer"
+                                    className="h-10 px-3 text-xs font-bold rounded-xl border border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none cursor-pointer"
                                 >
                                     Cancel
                                 </button>
@@ -732,7 +748,7 @@ export default function ClientPortalProfileIndex({ client, currencies = [], isAd
                                     type="button"
                                     onClick={handleConfirmRevoke}
                                     disabled={isRevoking}
-                                    className="h-10 px-5 text-xs font-bold rounded-xl bg-gradient-to-r from-rose-600 to-red-600 hover:from-rose-700 hover:to-red-700 text-white shadow-md shadow-rose-600/20 active:scale-[0.99] transition-all flex items-center justify-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed cursor-pointer"
+                                    className="h-10 px-3 text-xs font-bold rounded-xl bg-rose-600 hover:bg-rose-700 text-white shadow-md shadow-rose-600/20 active:scale-[0.99] transition-all inline-flex items-center justify-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed disabled:pointer-events-none cursor-pointer"
                                 >
                                     {isRevoking ? (
                                         <div className="flex items-center gap-2">

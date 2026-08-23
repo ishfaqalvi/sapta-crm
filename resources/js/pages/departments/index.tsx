@@ -41,6 +41,7 @@ interface SubDepartmentItem {
     code: string | null;
     description: string | null;
     is_active: boolean;
+    employees_count?: number;
 }
 
 interface DepartmentItem {
@@ -51,6 +52,7 @@ interface DepartmentItem {
     is_active: boolean;
     employees_count: number;
     sub_departments_count: number;
+    designations_count?: number;
     sub_departments: SubDepartmentItem[];
 }
 
@@ -75,7 +77,14 @@ export default function DepartmentsIndex({ departments, filters }: DepartmentsIn
     const [editingSubDept, setEditingSubDept] = useState<SubDepartmentItem | null>(null);
 
     // Delete Modal state
-    const [deletingTarget, setDeletingTarget] = useState<{ type: 'dept' | 'sub_dept'; id: number; name: string } | null>(null);
+    const [deletingTarget, setDeletingTarget] = useState<{
+        type: 'dept' | 'sub_dept';
+        id: number;
+        name: string;
+        employees_count?: number;
+        sub_departments_count?: number;
+        designations_count?: number;
+    } | null>(null);
     const [isDeleting, setIsDeleting] = useState(false);
 
     // Department Form
@@ -237,7 +246,7 @@ export default function DepartmentsIndex({ departments, filters }: DepartmentsIn
 
                     <Button
                         onClick={() => handleOpenDeptModal()}
-                        className="h-11 px-5 text-xs sm:text-sm font-bold rounded-xl bg-gradient-to-r from-[#003796] via-[#0052D4] to-[#1d4ed8] hover:from-[#002a75] hover:to-[#0040b8] text-white shadow-md shadow-blue-600/20 active:scale-[0.99] transition-all inline-flex items-center gap-2"
+                        className="h-10 px-3 text-xs font-bold rounded-xl bg-gradient-to-r from-[#003796] via-[#0052D4] to-[#1d4ed8] hover:from-[#002a75] hover:to-[#0040b8] text-white shadow-md shadow-blue-600/20 active:scale-[0.99] transition-all inline-flex items-center gap-2 cursor-pointer"
                     >
                         <Plus className="size-4" />
                         <span>Add New Department</span>
@@ -292,7 +301,7 @@ export default function DepartmentsIndex({ departments, filters }: DepartmentsIn
                                                             {hasSubDepts ? (
                                                                 <button
                                                                     onClick={() => toggleExpand(dept.id)}
-                                                                    className="p-1 rounded-lg hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-500 transition-colors"
+                                                                    className="p-1 rounded-lg hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-500 transition-colors cursor-pointer"
                                                                 >
                                                                     {isExpanded ? <ChevronDown className="size-4" /> : <ChevronRight className="size-4" />}
                                                                 </button>
@@ -355,7 +364,7 @@ export default function DepartmentsIndex({ departments, filters }: DepartmentsIn
                                                         <div className="flex items-center justify-end gap-1.5">
                                                             <button
                                                                 onClick={() => handleOpenSubDeptModal(dept.id)}
-                                                                className="size-8 rounded-xl bg-purple-50 dark:bg-purple-950/60 text-purple-600 dark:text-purple-400 hover:bg-purple-600 hover:text-white dark:hover:bg-purple-600 dark:hover:text-white transition-all flex items-center justify-center shadow-2xs"
+                                                                className="size-8 rounded-xl bg-purple-50 dark:bg-purple-950/40 text-purple-600 dark:text-purple-400 hover:bg-purple-600 hover:text-white dark:hover:bg-purple-600 dark:hover:text-white transition-all flex items-center justify-center shadow-2xs cursor-pointer"
                                                                 title="Add Sub-Department"
                                                             >
                                                                 <FolderPlus className="size-3.5" />
@@ -363,15 +372,22 @@ export default function DepartmentsIndex({ departments, filters }: DepartmentsIn
 
                                                             <button
                                                                 onClick={() => handleOpenDeptModal(dept)}
-                                                                className="size-8 rounded-xl bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400 hover:bg-blue-600 hover:text-white dark:hover:bg-blue-600 dark:hover:text-white transition-all flex items-center justify-center shadow-2xs"
+                                                                className="size-8 rounded-xl bg-indigo-50 dark:bg-indigo-950/40 text-indigo-600 dark:indigo-400 hover:bg-indigo-600 hover:text-white dark:hover:bg-indigo-600 dark:hover:text-white transition-all flex items-center justify-center shadow-2xs cursor-pointer"
                                                                 title="Edit Department"
                                                             >
                                                                 <Edit2 className="size-3.5" />
                                                             </button>
 
                                                             <button
-                                                                onClick={() => setDeletingTarget({ type: 'dept', id: dept.id, name: dept.name })}
-                                                                className="size-8 rounded-xl bg-rose-50 dark:bg-rose-950/40 text-rose-600 dark:text-rose-400 hover:bg-rose-600 hover:text-white dark:hover:bg-rose-600 dark:hover:text-white transition-all flex items-center justify-center shadow-2xs"
+                                                                onClick={() => setDeletingTarget({
+                                                                    type: 'dept',
+                                                                    id: dept.id,
+                                                                    name: dept.name,
+                                                                    employees_count: dept.employees_count,
+                                                                    sub_departments_count: dept.sub_departments_count,
+                                                                    designations_count: dept.designations_count,
+                                                                })}
+                                                                className="size-8 rounded-xl bg-rose-50 dark:bg-rose-950/40 text-rose-600 dark:text-rose-400 hover:bg-rose-600 hover:text-white dark:hover:bg-rose-600 dark:hover:text-white transition-all flex items-center justify-center shadow-2xs cursor-pointer"
                                                                 title="Delete Department"
                                                             >
                                                                 <Trash2 className="size-3.5" />
@@ -398,7 +414,9 @@ export default function DepartmentsIndex({ departments, filters }: DepartmentsIn
                                                             <td className="px-6 py-3 text-slate-400 italic">
                                                                 Sub-Unit
                                                             </td>
-                                                            <td className="px-6 py-3 text-slate-400">—</td>
+                                                            <td className="px-6 py-3 text-slate-500 font-semibold">
+                                                                {sub.employees_count !== undefined ? `${sub.employees_count} Employees` : '—'}
+                                                            </td>
                                                             <td className="px-6 py-3">
                                                                 <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${sub.is_active ? 'bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300' : 'bg-slate-200 dark:bg-slate-800 text-slate-600'}`}>
                                                                     {sub.is_active ? 'Active' : 'Inactive'}
@@ -408,15 +426,20 @@ export default function DepartmentsIndex({ departments, filters }: DepartmentsIn
                                                                 <div className="flex items-center justify-end gap-1.5">
                                                                     <button
                                                                         onClick={() => handleOpenSubDeptModal(dept.id, sub)}
-                                                                        className="size-7 rounded-lg bg-blue-50 text-blue-600 hover:bg-blue-600 hover:text-white flex items-center justify-center transition-colors"
+                                                                        className="size-7 rounded-lg bg-blue-50 text-blue-600 hover:bg-blue-600 hover:text-white flex items-center justify-center transition-colors cursor-pointer"
                                                                         title="Edit Sub-Department"
                                                                     >
                                                                         <Edit2 className="size-3" />
                                                                     </button>
 
                                                                     <button
-                                                                        onClick={() => setDeletingTarget({ type: 'sub_dept', id: sub.id, name: sub.name })}
-                                                                        className="size-7 rounded-lg bg-rose-50 text-rose-600 hover:bg-rose-600 hover:text-white flex items-center justify-center transition-colors"
+                                                                        onClick={() => setDeletingTarget({
+                                                                            type: 'sub_dept',
+                                                                            id: sub.id,
+                                                                            name: sub.name,
+                                                                            employees_count: sub.employees_count,
+                                                                        })}
+                                                                        className="size-7 rounded-lg bg-rose-50 text-rose-600 hover:bg-rose-600 hover:text-white flex items-center justify-center transition-colors cursor-pointer"
                                                                         title="Delete Sub-Department"
                                                                     >
                                                                         <Trash2 className="size-3" />
@@ -484,7 +507,11 @@ export default function DepartmentsIndex({ departments, filters }: DepartmentsIn
                                             value={deptForm.data.name}
                                             onChange={(e) => deptForm.setData('name', e.target.value)}
                                             placeholder="e.g. Software Engineering"
-                                            className="h-11 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-sm font-medium text-slate-900 dark:text-white placeholder:text-slate-400 focus:bg-white focus:border-blue-600 focus:outline-none focus:ring-4 focus:ring-blue-600/10 transition-all"
+                                            className={`h-11 rounded-xl bg-slate-50 dark:bg-slate-950 text-sm font-semibold text-slate-900 dark:text-white transition-all ${
+                                                deptForm.errors.name
+                                                    ? 'border-rose-500 ring-2 ring-rose-500/20 focus:border-rose-500 focus:ring-rose-500/20'
+                                                    : 'border-slate-200 dark:border-slate-800 focus:bg-white focus:border-blue-600 focus:ring-4 focus:ring-blue-600/10'
+                                            }`}
                                         />
                                         {deptForm.errors.name && (
                                             <p className="text-xs font-semibold text-rose-500 mt-1">{deptForm.errors.name}</p>
@@ -501,7 +528,11 @@ export default function DepartmentsIndex({ departments, filters }: DepartmentsIn
                                             value={deptForm.data.code}
                                             onChange={(e) => deptForm.setData('code', e.target.value.toUpperCase())}
                                             placeholder="e.g. DEV"
-                                            className="h-11 rounded-xl uppercase font-extrabold bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-sm text-slate-900 dark:text-white placeholder:text-slate-400 focus:bg-white focus:border-blue-600 focus:outline-none focus:ring-4 focus:ring-blue-600/10 transition-all"
+                                            className={`h-11 rounded-xl uppercase font-extrabold bg-slate-50 dark:bg-slate-950 text-sm text-slate-900 dark:text-white transition-all ${
+                                                deptForm.errors.code
+                                                    ? 'border-rose-500 ring-2 ring-rose-500/20 focus:border-rose-500 focus:ring-rose-500/20'
+                                                    : 'border-slate-200 dark:border-slate-800 focus:bg-white focus:border-blue-600 focus:ring-4 focus:ring-blue-600/10'
+                                            }`}
                                         />
                                         {deptForm.errors.code && (
                                             <p className="text-xs font-semibold text-rose-500 mt-1">{deptForm.errors.code}</p>
@@ -519,8 +550,15 @@ export default function DepartmentsIndex({ departments, filters }: DepartmentsIn
                                         value={deptForm.data.description}
                                         onChange={(e) => deptForm.setData('description', e.target.value)}
                                         placeholder="Brief description of department scope and operations..."
-                                        className="h-11 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-sm font-medium text-slate-900 dark:text-white placeholder:text-slate-400 focus:bg-white focus:border-blue-600 focus:outline-none focus:ring-4 focus:ring-blue-600/10 transition-all"
+                                        className={`h-11 rounded-xl bg-slate-50 dark:bg-slate-950 text-sm font-medium text-slate-900 dark:text-white transition-all ${
+                                            deptForm.errors.description
+                                                ? 'border-rose-500 ring-2 ring-rose-500/20 focus:border-rose-500 focus:ring-rose-500/20'
+                                                : 'border-slate-200 dark:border-slate-800 focus:bg-white focus:border-blue-600 focus:ring-4 focus:ring-blue-600/10'
+                                        }`}
                                     />
+                                    {deptForm.errors.description && (
+                                        <p className="text-xs font-semibold text-rose-500 mt-1">{deptForm.errors.description}</p>
+                                    )}
                                 </div>
 
                                 {/* Active Status Toggle Card */}
@@ -547,27 +585,28 @@ export default function DepartmentsIndex({ departments, filters }: DepartmentsIn
                                 </div>
 
                                 {/* Modal Actions */}
-                                <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-100 dark:border-slate-800">
-                                    <button
+                                <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-100 dark:border-slate-800">
+                                    <Button
                                         type="button"
+                                        variant="outline"
                                         onClick={() => setIsDeptModalOpen(false)}
-                                        className="h-11 px-5 text-xs font-semibold rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-200 transition-colors"
+                                        className="h-10 px-5 rounded-xl text-xs font-bold cursor-pointer"
                                     >
                                         Cancel
-                                    </button>
+                                    </Button>
 
                                     <Button
                                         type="submit"
                                         disabled={deptForm.processing}
-                                        className="h-11 px-6 text-xs sm:text-sm font-bold rounded-xl bg-gradient-to-r from-[#003796] via-[#0052D4] to-[#1d4ed8] hover:from-[#002a75] hover:to-[#0040b8] text-white shadow-md shadow-blue-600/20 active:scale-[0.99] transition-all flex items-center justify-center gap-2"
+                                        className="h-10 px-5 rounded-xl bg-gradient-to-r from-[#003796] via-[#0052D4] to-[#1d4ed8] hover:from-[#002a75] hover:to-[#0040b8] text-white text-xs font-bold shadow-md shadow-blue-600/20 active:scale-[0.99] transition-all cursor-pointer inline-flex items-center gap-2"
                                     >
                                         {deptForm.processing ? (
-                                            <div className="flex items-center gap-2">
+                                            <>
                                                 <LoaderCircle className="size-4 animate-spin" />
                                                 <span>Saving Department...</span>
-                                            </div>
+                                            </>
                                         ) : (
-                                            <span>{editingDept ? 'Update Department' : 'Create Department'}</span>
+                                            <span>{editingDept ? 'Update Department' : 'Save Department'}</span>
                                         )}
                                     </Button>
                                 </div>
@@ -598,7 +637,7 @@ export default function DepartmentsIndex({ departments, filters }: DepartmentsIn
 
                                 <button
                                     onClick={() => setIsSubDeptModalOpen(false)}
-                                    className="p-2 rounded-xl text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+                                    className="p-2 rounded-xl text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
                                 >
                                     <X className="size-5" />
                                 </button>
@@ -617,7 +656,11 @@ export default function DepartmentsIndex({ departments, filters }: DepartmentsIn
                                             value={subDeptForm.data.name}
                                             onChange={(e) => subDeptForm.setData('name', e.target.value)}
                                             placeholder="e.g. Frontend Engineering"
-                                            className="h-11 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-sm font-medium text-slate-900 dark:text-white placeholder:text-slate-400 focus:bg-white focus:border-purple-600 focus:outline-none focus:ring-4 focus:ring-purple-600/10 transition-all"
+                                            className={`h-11 rounded-xl bg-slate-50 dark:bg-slate-950 text-sm font-semibold text-slate-900 dark:text-white transition-all ${
+                                                subDeptForm.errors.name
+                                                    ? 'border-rose-500 ring-2 ring-rose-500/20 focus:border-rose-500 focus:ring-rose-500/20'
+                                                    : 'border-slate-200 dark:border-slate-800 focus:bg-white focus:border-purple-600 focus:ring-4 focus:ring-purple-600/10'
+                                            }`}
                                         />
                                         {subDeptForm.errors.name && (
                                             <p className="text-xs font-semibold text-rose-500 mt-1">{subDeptForm.errors.name}</p>
@@ -634,8 +677,15 @@ export default function DepartmentsIndex({ departments, filters }: DepartmentsIn
                                             value={subDeptForm.data.code}
                                             onChange={(e) => subDeptForm.setData('code', e.target.value.toUpperCase())}
                                             placeholder="e.g. FE"
-                                            className="h-11 rounded-xl uppercase font-extrabold bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-sm text-slate-900 dark:text-white placeholder:text-slate-400 focus:bg-white focus:border-purple-600 focus:outline-none focus:ring-4 focus:ring-purple-600/10 transition-all"
+                                            className={`h-11 rounded-xl uppercase font-extrabold bg-slate-50 dark:bg-slate-950 text-sm text-slate-900 dark:text-white transition-all ${
+                                                subDeptForm.errors.code
+                                                    ? 'border-rose-500 ring-2 ring-rose-500/20 focus:border-rose-500 focus:ring-rose-500/20'
+                                                    : 'border-slate-200 dark:border-slate-800 focus:bg-white focus:border-purple-600 focus:ring-4 focus:ring-purple-600/10'
+                                            }`}
                                         />
+                                        {subDeptForm.errors.code && (
+                                            <p className="text-xs font-semibold text-rose-500 mt-1">{subDeptForm.errors.code}</p>
+                                        )}
                                     </div>
                                 </div>
 
@@ -649,8 +699,15 @@ export default function DepartmentsIndex({ departments, filters }: DepartmentsIn
                                         value={subDeptForm.data.description}
                                         onChange={(e) => subDeptForm.setData('description', e.target.value)}
                                         placeholder="Sub-unit responsibilities and scope..."
-                                        className="h-11 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-sm font-medium text-slate-900 dark:text-white placeholder:text-slate-400 focus:bg-white focus:border-purple-600 focus:outline-none focus:ring-4 focus:ring-purple-600/10 transition-all"
+                                        className={`h-11 rounded-xl bg-slate-50 dark:bg-slate-950 text-sm font-medium text-slate-900 dark:text-white transition-all ${
+                                            subDeptForm.errors.description
+                                                ? 'border-rose-500 ring-2 ring-rose-500/20 focus:border-rose-500 focus:ring-rose-500/20'
+                                                : 'border-slate-200 dark:border-slate-800 focus:bg-white focus:border-purple-600 focus:ring-4 focus:ring-purple-600/10'
+                                        }`}
                                     />
+                                    {subDeptForm.errors.description && (
+                                        <p className="text-xs font-semibold text-rose-500 mt-1">{subDeptForm.errors.description}</p>
+                                    )}
                                 </div>
 
                                 {/* Active Status Toggle Card */}
@@ -677,25 +734,26 @@ export default function DepartmentsIndex({ departments, filters }: DepartmentsIn
                                 </div>
 
                                 {/* Modal Actions */}
-                                <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-100 dark:border-slate-800">
-                                    <button
+                                <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-100 dark:border-slate-800">
+                                    <Button
                                         type="button"
+                                        variant="outline"
                                         onClick={() => setIsSubDeptModalOpen(false)}
-                                        className="h-11 px-5 text-xs font-semibold rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-200 transition-colors"
+                                        className="h-10 px-5 rounded-xl text-xs font-bold cursor-pointer"
                                     >
                                         Cancel
-                                    </button>
+                                    </Button>
 
                                     <Button
                                         type="submit"
                                         disabled={subDeptForm.processing}
-                                        className="h-11 px-6 text-xs sm:text-sm font-bold rounded-xl bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white shadow-md shadow-purple-600/20 active:scale-[0.99] transition-all flex items-center justify-center gap-2"
+                                        className="h-10 px-5 rounded-xl bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white text-xs font-bold shadow-md shadow-purple-600/20 active:scale-[0.99] transition-all cursor-pointer inline-flex items-center gap-2"
                                     >
                                         {subDeptForm.processing ? (
-                                            <div className="flex items-center gap-2">
+                                            <>
                                                 <LoaderCircle className="size-4 animate-spin" />
                                                 <span>Saving Sub-Unit...</span>
-                                            </div>
+                                            </>
                                         ) : (
                                             <span>{editingSubDept ? 'Update Sub-Unit' : 'Save Sub-Unit'}</span>
                                         )}
@@ -708,47 +766,70 @@ export default function DepartmentsIndex({ departments, filters }: DepartmentsIn
 
                 {/* Delete Confirmation Modal */}
                 {deletingTarget && (
-                    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs overflow-y-auto">
-                        <div className="w-full max-w-md rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-6 shadow-2xl space-y-5 animate-in fade-in zoom-in-95 duration-200">
-                            <div className="flex items-start gap-4">
-                                <div className="p-3 rounded-2xl bg-rose-50 dark:bg-rose-950/50 text-rose-600 dark:text-rose-400 shrink-0">
-                                    <AlertTriangle className="size-6" />
-                                </div>
-                                <div className="space-y-1">
-                                    <h3 className="text-lg font-extrabold text-slate-900 dark:text-white leading-snug">
-                                        Delete {deletingTarget.type === 'dept' ? 'Department' : 'Sub-Department'}?
-                                    </h3>
-                                    <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
-                                        Are you sure you want to delete <span className="font-bold text-slate-800 dark:text-slate-200">"{deletingTarget.name}"</span>? This action cannot be undone.
-                                    </p>
-                                </div>
+                    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-900/60 backdrop-blur-xs overflow-y-auto">
+                        <div className="w-full max-w-md max-h-[90vh] my-auto overflow-y-auto rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-4 sm:p-6 shadow-2xl space-y-4 text-center animate-in fade-in zoom-in-95 duration-200 relative">
+                            <button
+                                type="button"
+                                onClick={() => setDeletingTarget(null)}
+                                className="absolute top-4 right-4 size-8 rounded-xl text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-all flex items-center justify-center cursor-pointer"
+                            >
+                                <X className="size-4" />
+                            </button>
+
+                            <div className="size-12 rounded-2xl bg-rose-50 dark:bg-rose-950/60 text-rose-600 dark:text-rose-400 mx-auto flex items-center justify-center">
+                                <AlertTriangle className="size-6" />
                             </div>
 
-                            <div className="flex items-center justify-end gap-3 pt-2">
+                            <div className="space-y-1">
+                                <h3 className="text-base font-black text-slate-900 dark:text-white leading-snug">
+                                    Delete {deletingTarget.type === 'dept' ? 'Department' : 'Sub-Department'}?
+                                </h3>
+                                <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
+                                    Are you sure you want to delete <strong className="text-slate-900 dark:text-white">"{deletingTarget.name}"</strong>? This action cannot be undone.
+                                </p>
+                            </div>
+
+                            {/* Child records checks */}
+                            {deletingTarget.type === 'dept' && ((deletingTarget.employees_count || 0) > 0 || (deletingTarget.sub_departments_count || 0) > 0 || (deletingTarget.designations_count || 0) > 0) ? (
+                                <div className="p-3 rounded-xl bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800 text-xs font-medium text-amber-800 dark:text-amber-300 text-left">
+                                    <strong>Cannot Delete:</strong> This department has {deletingTarget.employees_count || 0} assigned employee(s), {deletingTarget.sub_departments_count || 0} sub-department(s), and {deletingTarget.designations_count || 0} designation(s). Reassign or delete them first.
+                                </div>
+                            ) : deletingTarget.type === 'sub_dept' && (deletingTarget.employees_count || 0) > 0 ? (
+                                <div className="p-3 rounded-xl bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800 text-xs font-medium text-amber-800 dark:text-amber-300 text-left">
+                                    <strong>Cannot Delete:</strong> This sub-department is assigned to {deletingTarget.employees_count} employee(s). Reassign or delete those employees first.
+                                </div>
+                            ) : null}
+
+                            <div className="flex items-center justify-center gap-3 pt-2 border-t border-slate-100 dark:border-slate-800">
                                 <button
                                     type="button"
                                     onClick={() => setDeletingTarget(null)}
                                     disabled={isDeleting}
-                                    className="h-10 px-4 text-xs font-semibold rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-200 transition-colors disabled:opacity-50"
+                                    className="h-10 px-4 rounded-xl border border-slate-200 dark:border-slate-800 text-xs font-bold text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                                 >
                                     Cancel
                                 </button>
 
-                                <button
-                                    type="button"
-                                    onClick={handleConfirmDelete}
-                                    disabled={isDeleting}
-                                    className="h-10 px-5 text-xs font-bold rounded-xl bg-gradient-to-r from-rose-600 to-red-600 hover:from-rose-700 hover:to-red-700 text-white shadow-md shadow-rose-600/20 active:scale-[0.99] transition-all flex items-center justify-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed"
-                                >
-                                    {isDeleting ? (
-                                        <div className="flex items-center gap-2">
-                                            <LoaderCircle className="size-4 animate-spin" />
-                                            <span>Deleting...</span>
-                                        </div>
-                                    ) : (
-                                        <span>Delete</span>
-                                    )}
-                                </button>
+                                {!(
+                                    (deletingTarget.type === 'dept' && ((deletingTarget.employees_count || 0) > 0 || (deletingTarget.sub_departments_count || 0) > 0 || (deletingTarget.designations_count || 0) > 0)) ||
+                                    (deletingTarget.type === 'sub_dept' && (deletingTarget.employees_count || 0) > 0)
+                                ) && (
+                                    <button
+                                        type="button"
+                                        onClick={handleConfirmDelete}
+                                        disabled={isDeleting}
+                                        className="h-10 px-4 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold inline-flex items-center gap-2 shadow-md shadow-rose-600/20 active:scale-[0.99] cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+                                    >
+                                        {isDeleting ? (
+                                            <>
+                                                <LoaderCircle className="size-4 animate-spin" />
+                                                <span>Deleting...</span>
+                                            </>
+                                        ) : (
+                                            <span>Delete</span>
+                                        )}
+                                    </button>
+                                )}
                             </div>
                         </div>
                     </div>

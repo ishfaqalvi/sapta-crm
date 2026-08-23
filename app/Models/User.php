@@ -25,7 +25,9 @@ class User extends Authenticatable
         'avatar',
         'password',
         'type',
+        'is_active',
         'client_id',
+        'employee_id',
     ];
 
     /**
@@ -44,9 +46,22 @@ class User extends Authenticatable
         return $this->type === 'client';
     }
 
+    /**
+     * Check if user is an employee type user.
+     */
+    public function isEmployee(): bool
+    {
+        return $this->type === 'employee';
+    }
+
     public function client()
     {
         return $this->belongsTo(Client::class);
+    }
+
+    public function employee()
+    {
+        return $this->belongsTo(Employee::class);
     }
 
     /**
@@ -69,6 +84,7 @@ class User extends Authenticatable
         return [
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
+            'is_active' => 'boolean',
         ];
     }
 

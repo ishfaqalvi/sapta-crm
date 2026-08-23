@@ -17,7 +17,7 @@ class OverviewController extends Controller
     /**
      * Retrieve the authenticated client model securely from session.
      */
-    protected function getAuthenticatedClient(): Client
+    protected function getAuthenticatedClient(bool $withRelations = true): Client
     {
         $user = Auth::user();
 
@@ -27,18 +27,28 @@ class OverviewController extends Controller
 
         $client = Client::findOrFail($user->client_id);
 
+        if (!$withRelations) {
+            return $client;
+        }
+
         return $client->load([
             'websiteProjects' => function ($q) {
                 $q->with(['payments', 'tasks.assignedEmployee'])->latest();
             },
-            'seoRetainers' => function ($q) {
-                $q->with('payments')->latest();
+            'clientServices' => function ($q) {
+                $q->with(['category', 'payments'])->latest();
             },
             'projectPayments' => function ($q) {
                 $q->with('websiteProject')->latest();
             },
-            'seoPayments' => function ($q) {
-                $q->with('seoRetainer')->latest();
+            'domains' => function ($q) {
+                $q->with('payments')->latest();
+            },
+            'hostings' => function ($q) {
+                $q->with('payments')->latest();
+            },
+            'credentials' => function ($q) {
+                $q->latest();
             },
         ]);
     }
@@ -48,12 +58,29 @@ class OverviewController extends Controller
      */
     public function index(): Response
     {
-        $this->authorizePermission('view-client-portal-overview');
+        $user = Auth::user();
+        if (!$user) {
+            abort(401, 'Unauthenticated');
+        }
 
-        $client = $this->getAuthenticatedClient();
+        $canViewOverview = $user->hasRole('Super Admin')
+            || ($user->hasPermissionTo('view-client-portal-overview') || $user->can('view-client-portal-overview'));
+
+        $client = $this->getAuthenticatedClient($canViewOverview);
+
+        $invoices = [];
+        if ($canViewOverview && $client->id) {
+            $invoices = \App\Models\Invoice::where('client_id', $client->id)
+                ->with('items')
+                ->latest()
+                ->take(15)
+                ->get();
+        }
 
         return Inertia::render('client-portal/overview/index', [
             'client' => $client,
+            'invoices' => $invoices,
+            'canViewOverview' => $canViewOverview,
         ]);
     }
 }
