@@ -18,6 +18,7 @@ import {
     Layers,
     LayoutGrid,
     LineChart,
+    ListTodo,
     Settings,
     ShieldCheck,
     Tag,
@@ -34,6 +35,8 @@ interface PermissionNavItem {
     url: string;
     icon?: any;
     permission?: string;
+    employeeOnly?: boolean;
+    hideForEmployee?: boolean;
 }
 
 interface PermissionNavGroup {
@@ -50,6 +53,12 @@ const rawNavGroups: PermissionNavGroup[] = [
                 url: '/dashboard',
                 icon: LayoutGrid,
                 permission: 'view-dashboard',
+            },
+            {
+                title: 'My Assigned Tasks',
+                url: '/my-tasks',
+                icon: ListTodo,
+                employeeOnly: true,
             },
             {
                 title: 'Client Hub',
@@ -199,10 +208,16 @@ export function AppSidebar() {
     const { auth } = usePage().props as unknown as SharedData;
     const user = auth?.user;
 
-    // Dynamically filter navigation groups and items based on permissions
+    // Dynamically filter navigation groups and items based on permissions and user type
     const filteredNavGroups: NavGroup[] = rawNavGroups
         .map((group) => {
             const allowedItems = group.items.filter((item) => {
+                if (item.employeeOnly && user?.type !== 'employee') {
+                    return false;
+                }
+                if (item.hideForEmployee && user?.type === 'employee') {
+                    return false;
+                }
                 if (!item.permission) return true;
                 return hasPermission(user, item.permission);
             });

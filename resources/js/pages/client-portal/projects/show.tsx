@@ -134,6 +134,7 @@ export default function ClientPortalProjectsShow({
 }: ClientPortalProjectsShowProps) {
     const { auth } = usePage().props as unknown as SharedData & { errors?: Record<string, string> };
     const user = auth?.user;
+    const canViewBudget = hasPermission(user, 'view-client-portal-project-budget');
 
     const employeeOptions = [
         { value: '', label: 'Unassigned (Select Employee...)' },
@@ -149,7 +150,8 @@ export default function ClientPortalProjectsShow({
         if (typeof window !== 'undefined') {
             const params = new URLSearchParams(window.location.search);
             const tab = params.get('tab');
-            if (tab === 'budget' || tab === 'tasks' || tab === 'credentials' || tab === 'details' || tab === 'documents') {
+            if (tab === 'budget' && canViewBudget) return 'budget';
+            if (tab === 'tasks' || tab === 'credentials' || tab === 'details' || tab === 'documents') {
                 return tab;
             }
         }
@@ -210,6 +212,9 @@ export default function ClientPortalProjectsShow({
     const [generatingInvoiceId, setGeneratingInvoiceId] = useState<number | null>(null);
     const [confirmingInvoiceMilestone, setConfirmingInvoiceMilestone] = useState<ProjectPaymentItem | null>(null);
 
+    const [confirmingPaidMilestone, setConfirmingPaidMilestone] = useState<ProjectPaymentItem | null>(null);
+    const [markingPaidMilestoneId, setMarkingPaidMilestoneId] = useState<number | null>(null);
+
     const handleExecuteGenerateInvoice = () => {
         if (!confirmingInvoiceMilestone) return;
         const milestoneId = confirmingInvoiceMilestone.id;
@@ -221,6 +226,21 @@ export default function ClientPortalProjectsShow({
                 preserveScroll: true,
                 onSuccess: () => setConfirmingInvoiceMilestone(null),
                 onFinish: () => setGeneratingInvoiceId(null),
+            }
+        );
+    };
+
+    const handleExecuteMarkMilestonePaid = () => {
+        if (!confirmingPaidMilestone) return;
+        const milestoneId = confirmingPaidMilestone.id;
+        setMarkingPaidMilestoneId(milestoneId);
+        router.post(
+            `/client-portal/projects/milestones/${milestoneId}/mark-as-paid`,
+            {},
+            {
+                preserveScroll: true,
+                onSuccess: () => setConfirmingPaidMilestone(null),
+                onFinish: () => setMarkingPaidMilestoneId(null),
             }
         );
     };
@@ -598,7 +618,7 @@ export default function ClientPortalProjectsShow({
                         </button>
 
                         {/* TAB 2: Budget & Invoices */}
-                        {hasPermission(user, 'view-client-portal-project-milestones') && (
+                        {canViewBudget && (
                             <button
                                 type="button"
                                 onClick={() => setActiveTab('budget')}
@@ -816,7 +836,7 @@ export default function ClientPortalProjectsShow({
                 )}
 
                 {/* TAB 2: BUDGET & INVOICES */}
-                {activeTab === 'budget' && (
+                {activeTab === 'budget' && canViewBudget && (
                     <div className="space-y-4">
                         {/* Financial Stat Cards */}
                         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
@@ -902,6 +922,7 @@ export default function ClientPortalProjectsShow({
                                             <th className="px-3 py-3">Amount</th>
                                             <th className="px-3 py-3">Status</th>
                                             <th className="px-3 py-3">Paid Date</th>
+                                            <th className="px-3 py-3">Invoice Ref</th>
                                             <th className="px-3 py-3 text-right">Actions</th>
                                         </tr>
                                     </thead>
@@ -936,8 +957,42 @@ export default function ClientPortalProjectsShow({
                                                     <td className="px-3 py-3.5 font-medium text-slate-500">
                                                         {pay.status === 'paid' && pay.paid_at ? formatDateOnly(pay.paid_at) : '-'}
                                                     </td>
+                                                    <td className="px-3 py-3.5 whitespace-nowrap">
+                                                        {pay.invoice ? (
+                                                            <Link
+                                                                href={`/client-portal/invoices/${pay.invoice.id}`}
+                                                                className="font-mono font-bold text-blue-600 dark:text-blue-400 hover:underline inline-flex items-center gap-1.5"
+                                                            >
+                                                                <span>{pay.invoice.invoice_number}</span>
+                                                                <span
+                                                                    className={`text-[9px] uppercase px-1.5 py-0.5 rounded font-black ${pay.invoice.status === 'paid'
+                                                                        ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300 border border-emerald-200/50'
+                                                                        : 'bg-amber-50 text-amber-700 dark:bg-amber-950/60 dark:text-amber-300 border border-amber-200/50'
+                                                                        }`}
+                                                                >
+                                                                    {pay.invoice.status}
+                                                                </span>
+                                                            </Link>
+                                                        ) : (
+                                                            <span className="text-slate-400 italic text-[11px]">No Invoice</span>
+                                                        )}
+                                                    </td>
                                                     <td className="px-3 py-3.5 text-right">
                                                         <div className="flex items-center justify-end gap-1.5">
+                                                            {/* MARK AS PAID BUTTON (Only if invoice exists & milestone is unpaid) */}
+                                                            {pay.invoice && pay.status !== 'paid' && hasPermission(user, 'edit-client-portal-project-milestones') && (
+                                                                <button
+                                                                    type="button"
+                                                                    disabled={markingPaidMilestoneId === pay.id}
+                                                                    onClick={() => setConfirmingPaidMilestone(pay)}
+                                                                    className="h-8 px-2.5 rounded-lg bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-600 hover:text-white dark:hover:bg-emerald-600 dark:hover:text-white font-bold text-xs inline-flex items-center gap-1.5 cursor-pointer shadow-2xs transition-all border border-emerald-200/50"
+                                                                    title="Mark Milestone as Paid"
+                                                                >
+                                                                    <CheckCircle2 className="size-3.5" />
+                                                                    <span>Mark as Paid</span>
+                                                                </button>
+                                                            )}
+
                                                             {/* GENERATE OR PRINT INVOICE BUTTON */}
                                                             {pay.invoice ? (
                                                                 <a
@@ -1480,6 +1535,46 @@ export default function ClientPortalProjectsShow({
                                     ) : (
                                         <span>Delete Milestone</span>
                                     )}
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                )}
+
+                {/* MARK MILESTONE AS PAID CONFIRMATION MODAL */}
+                {confirmingPaidMilestone && (
+                    <div className="fixed inset-0 z-50 bg-slate-950/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
+                        <div className="bg-white dark:bg-slate-900 rounded-3xl p-4 sm:p-6 max-w-md w-full max-h-[90vh] my-auto overflow-y-auto border border-slate-200 dark:border-slate-800 shadow-2xl space-y-4">
+                            <div className="flex items-center gap-3 text-emerald-600 dark:text-emerald-400">
+                                <div className="p-2.5 rounded-2xl bg-emerald-50 dark:bg-emerald-950">
+                                    <CheckCircle2 className="size-6" />
+                                </div>
+                                <div>
+                                    <h3 className="font-extrabold text-slate-900 dark:text-white text-base">Mark Milestone as Paid</h3>
+                                    <p className="text-xs text-slate-500 dark:text-slate-400">Confirm payment receipt</p>
+                                </div>
+                            </div>
+
+                            <p className="text-xs text-slate-600 dark:text-slate-300 font-medium">
+                                Are you sure you want to mark milestone <strong className="text-slate-900 dark:text-white">{confirmingPaidMilestone.milestone_title}</strong> ({formatCurrency(confirmingPaidMilestone.amount)}) as Paid? This will also mark its linked invoice as Paid if all milestone items are completed.
+                            </p>
+
+                            <div className="flex items-center justify-end gap-3 pt-2">
+                                <button
+                                    type="button"
+                                    onClick={() => setConfirmingPaidMilestone(null)}
+                                    className="h-10 px-3 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 text-slate-700 dark:text-slate-300 text-xs font-bold transition-all cursor-pointer"
+                                >
+                                    Cancel
+                                </button>
+                                <button
+                                    type="button"
+                                    disabled={markingPaidMilestoneId !== null}
+                                    onClick={handleExecuteMarkMilestonePaid}
+                                    className="h-10 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold transition-all shadow-md shadow-emerald-600/20 inline-flex items-center gap-2 cursor-pointer disabled:opacity-50"
+                                >
+                                    {markingPaidMilestoneId !== null && <LoaderCircle className="size-3.5 animate-spin" />}
+                                    <span>Confirm & Mark as Paid</span>
                                 </button>
                             </div>
                         </div>

@@ -32,6 +32,7 @@ import {
     Mail,
     MapPin,
     MessageSquare,
+    Package,
     Phone,
     PieChart as PieIcon,
     Printer,
@@ -207,6 +208,8 @@ export default function ClientPortalOverview({
     const page = usePage();
     const authUser = (page.props.auth as any)?.user;
     const isAdmin = authUser?.type === 'admin';
+    const canViewProjectBudget = hasPermission(authUser, 'view-client-portal-project-budget');
+    const canViewServiceBudget = hasPermission(authUser, 'view-client-portal-service-budget');
 
     const [activeTabSection, setActiveTabSection] = useState<'projects' | 'services' | 'infrastructure' | 'invoices'>('projects');
 
@@ -388,87 +391,171 @@ export default function ClientPortalOverview({
 
                 {/* 1. Main High-Impact KPI Metric Cards Grid (4 Sleek & Compact Cards) */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                    {/* Card 1: Total Project Budget */}
-                    <div className="bg-white dark:bg-slate-900 rounded-xl p-4 sm:p-4.5 border border-slate-200/80 dark:border-slate-800 shadow-2xs hover:shadow-md transition-all duration-200 space-y-2 relative overflow-hidden group">
-                        <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-blue-500 via-indigo-500 to-cyan-400" />
-                        <div className="flex items-center justify-between">
-                            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400">Total Project Budget</span>
-                            <div className="size-8 rounded-lg bg-gradient-to-br from-blue-500 to-indigo-600 text-white flex items-center justify-center shadow-xs group-hover:scale-105 transition-transform">
-                                <DollarSign className="size-4" />
+                    {/* Card 1: Total Project Budget or Total Projects */}
+                    {canViewProjectBudget ? (
+                        <div className="bg-white dark:bg-slate-900 rounded-xl p-4 sm:p-4.5 border border-slate-200/80 dark:border-slate-800 shadow-2xs hover:shadow-md transition-all duration-200 space-y-2 relative overflow-hidden group">
+                            <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-blue-500 via-indigo-500 to-cyan-400" />
+                            <div className="flex items-center justify-between">
+                                <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400">Total Project Budget</span>
+                                <div className="size-8 rounded-lg bg-gradient-to-br from-blue-500 to-indigo-600 text-white flex items-center justify-center shadow-xs group-hover:scale-105 transition-transform">
+                                    <DollarSign className="size-4" />
+                                </div>
+                            </div>
+                            <div>
+                                <div className="text-lg sm:text-xl font-black text-slate-900 dark:text-white font-mono tracking-tight">
+                                    {formatCurrency(totalProjectBudget)}
+                                </div>
+                                <div className="text-[11px] text-slate-500 dark:text-slate-400 font-medium mt-1 flex items-center gap-1.5">
+                                    <FolderKanban className="size-3 text-blue-500 shrink-0" />
+                                    <span>{projectsList.length} Projects ({activeProjects.length} Active)</span>
+                                </div>
                             </div>
                         </div>
-                        <div>
-                            <div className="text-lg sm:text-xl font-black text-slate-900 dark:text-white font-mono tracking-tight">
-                                {formatCurrency(totalProjectBudget)}
+                    ) : (
+                        <div className="bg-white dark:bg-slate-900 rounded-xl p-4 sm:p-4.5 border border-slate-200/80 dark:border-slate-800 shadow-2xs hover:shadow-md transition-all duration-200 space-y-2 relative overflow-hidden group">
+                            <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-blue-500 via-indigo-500 to-cyan-400" />
+                            <div className="flex items-center justify-between">
+                                <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400">Total Projects</span>
+                                <div className="size-8 rounded-lg bg-gradient-to-br from-blue-500 to-indigo-600 text-white flex items-center justify-center shadow-xs group-hover:scale-105 transition-transform">
+                                    <Globe className="size-4" />
+                                </div>
                             </div>
-                            <div className="text-[11px] text-slate-500 dark:text-slate-400 font-medium mt-1 flex items-center gap-1.5">
-                                <FolderKanban className="size-3 text-blue-500 shrink-0" />
-                                <span>{projectsList.length} Projects ({activeProjects.length} Active)</span>
+                            <div>
+                                <div className="text-lg sm:text-xl font-black text-slate-900 dark:text-white font-mono tracking-tight">
+                                    {projectsList.length}
+                                </div>
+                                <div className="text-[11px] text-slate-500 dark:text-slate-400 font-medium mt-1 flex items-center gap-1.5">
+                                    <FolderKanban className="size-3 text-blue-500 shrink-0" />
+                                    <span>All Client Workspaces</span>
+                                </div>
                             </div>
                         </div>
-                    </div>
+                    )}
 
-                    {/* Card 2: Cleared Receipts */}
-                    <div className="bg-white dark:bg-slate-900 rounded-xl p-4 sm:p-4.5 border border-slate-200/80 dark:border-slate-800 shadow-2xs hover:shadow-md transition-all duration-200 space-y-2 relative overflow-hidden group">
-                        <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-emerald-400 via-teal-500 to-emerald-600" />
-                        <div className="flex items-center justify-between">
-                            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400">Cleared Funds</span>
-                            <div className="size-8 rounded-lg bg-gradient-to-br from-emerald-500 to-teal-600 text-white flex items-center justify-center shadow-xs group-hover:scale-105 transition-transform">
-                                <BadgeDollarSign className="size-4" />
+                    {/* Card 2: Cleared Receipts or Active Projects */}
+                    {canViewProjectBudget ? (
+                        <div className="bg-white dark:bg-slate-900 rounded-xl p-4 sm:p-4.5 border border-slate-200/80 dark:border-slate-800 shadow-2xs hover:shadow-md transition-all duration-200 space-y-2 relative overflow-hidden group">
+                            <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-emerald-400 via-teal-500 to-emerald-600" />
+                            <div className="flex items-center justify-between">
+                                <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400">Cleared Funds</span>
+                                <div className="size-8 rounded-lg bg-gradient-to-br from-emerald-500 to-teal-600 text-white flex items-center justify-center shadow-xs group-hover:scale-105 transition-transform">
+                                    <BadgeDollarSign className="size-4" />
+                                </div>
+                            </div>
+                            <div>
+                                <div className="text-lg sm:text-xl font-black text-emerald-600 dark:text-emerald-400 font-mono tracking-tight">
+                                    {formatCurrency(totalProjectPaid)}
+                                </div>
+                                <div className="text-[11px] text-slate-500 dark:text-slate-400 font-medium mt-1 flex items-center gap-1.5">
+                                    <span className="px-1.5 py-0.2 rounded text-[10px] font-black bg-emerald-50 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800">
+                                        {paymentProgress}%
+                                    </span>
+                                    <span>Budget Received</span>
+                                </div>
                             </div>
                         </div>
-                        <div>
-                            <div className="text-lg sm:text-xl font-black text-emerald-600 dark:text-emerald-400 font-mono tracking-tight">
-                                {formatCurrency(totalProjectPaid)}
+                    ) : (
+                        <div className="bg-white dark:bg-slate-900 rounded-xl p-4 sm:p-4.5 border border-slate-200/80 dark:border-slate-800 shadow-2xs hover:shadow-md transition-all duration-200 space-y-2 relative overflow-hidden group">
+                            <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-purple-400 via-indigo-500 to-purple-600" />
+                            <div className="flex items-center justify-between">
+                                <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400">In Progress</span>
+                                <div className="size-8 rounded-lg bg-gradient-to-br from-purple-500 to-indigo-600 text-white flex items-center justify-center shadow-xs group-hover:scale-105 transition-transform">
+                                    <Clock className="size-4" />
+                                </div>
                             </div>
-                            <div className="text-[11px] text-slate-500 dark:text-slate-400 font-medium mt-1 flex items-center gap-1.5">
-                                <span className="px-1.5 py-0.2 rounded text-[10px] font-black bg-emerald-50 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800">
-                                    {paymentProgress}%
-                                </span>
-                                <span>Budget Received</span>
+                            <div>
+                                <div className="text-lg sm:text-xl font-black text-purple-600 dark:text-purple-400 font-mono tracking-tight">
+                                    {activeProjects.length}
+                                </div>
+                                <div className="text-[11px] text-slate-500 dark:text-slate-400 font-medium mt-1 flex items-center gap-1.5">
+                                    <CheckCircle2 className="size-3 text-purple-500 shrink-0" />
+                                    <span>Active Project Deliveries</span>
+                                </div>
                             </div>
                         </div>
-                    </div>
+                    )}
 
-                    {/* Card 3: Pending Balance */}
-                    <div className="bg-white dark:bg-slate-900 rounded-xl p-4 sm:p-4.5 border border-slate-200/80 dark:border-slate-800 shadow-2xs hover:shadow-md transition-all duration-200 space-y-2 relative overflow-hidden group">
-                        <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-amber-400 via-rose-500 to-orange-500" />
-                        <div className="flex items-center justify-between">
-                            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400">Pending Balance</span>
-                            <div className="size-8 rounded-lg bg-gradient-to-br from-amber-500 to-rose-500 text-white flex items-center justify-center shadow-xs group-hover:scale-105 transition-transform">
-                                <Receipt className="size-4" />
+                    {/* Card 3: Pending Balance or Completed Projects */}
+                    {canViewProjectBudget ? (
+                        <div className="bg-white dark:bg-slate-900 rounded-xl p-4 sm:p-4.5 border border-slate-200/80 dark:border-slate-800 shadow-2xs hover:shadow-md transition-all duration-200 space-y-2 relative overflow-hidden group">
+                            <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-amber-400 via-rose-500 to-orange-500" />
+                            <div className="flex items-center justify-between">
+                                <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400">Pending Balance</span>
+                                <div className="size-8 rounded-lg bg-gradient-to-br from-amber-500 to-rose-500 text-white flex items-center justify-center shadow-xs group-hover:scale-105 transition-transform">
+                                    <Receipt className="size-4" />
+                                </div>
+                            </div>
+                            <div>
+                                <div className="text-lg sm:text-xl font-black text-amber-600 dark:text-amber-400 font-mono tracking-tight">
+                                    {formatCurrency(pendingProjectBalance)}
+                                </div>
+                                <div className="text-[11px] text-slate-500 dark:text-slate-400 font-medium mt-1 flex items-center gap-1.5">
+                                    <Clock className="size-3 text-amber-500 shrink-0" />
+                                    <span>Upcoming Milestones</span>
+                                </div>
                             </div>
                         </div>
-                        <div>
-                            <div className="text-lg sm:text-xl font-black text-amber-600 dark:text-amber-400 font-mono tracking-tight">
-                                {formatCurrency(pendingProjectBalance)}
+                    ) : (
+                        <div className="bg-white dark:bg-slate-900 rounded-xl p-4 sm:p-4.5 border border-slate-200/80 dark:border-slate-800 shadow-2xs hover:shadow-md transition-all duration-200 space-y-2 relative overflow-hidden group">
+                            <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-emerald-400 via-teal-500 to-emerald-600" />
+                            <div className="flex items-center justify-between">
+                                <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400">Completed</span>
+                                <div className="size-8 rounded-lg bg-gradient-to-br from-emerald-500 to-teal-600 text-white flex items-center justify-center shadow-xs group-hover:scale-105 transition-transform">
+                                    <CheckCircle2 className="size-4" />
+                                </div>
                             </div>
-                            <div className="text-[11px] text-slate-500 dark:text-slate-400 font-medium mt-1 flex items-center gap-1.5">
-                                <Clock className="size-3 text-amber-500 shrink-0" />
-                                <span>Upcoming Milestones</span>
+                            <div>
+                                <div className="text-lg sm:text-xl font-black text-emerald-600 dark:text-emerald-400 font-mono tracking-tight">
+                                    {completedProjects.length}
+                                </div>
+                                <div className="text-[11px] text-slate-500 dark:text-slate-400 font-medium mt-1 flex items-center gap-1.5">
+                                    <CheckSquare className="size-3 text-emerald-500 shrink-0" />
+                                    <span>Finished Projects</span>
+                                </div>
                             </div>
                         </div>
-                    </div>
+                    )}
 
-                    {/* Card 4: Monthly Retainers */}
-                    <div className="bg-white dark:bg-slate-900 rounded-xl p-4 sm:p-4.5 border border-slate-200/80 dark:border-slate-800 shadow-2xs hover:shadow-md transition-all duration-200 space-y-2 relative overflow-hidden group">
-                        <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-cyan-400 via-teal-500 to-blue-500" />
-                        <div className="flex items-center justify-between">
-                            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400">Monthly Run-Rate</span>
-                            <div className="size-8 rounded-lg bg-gradient-to-br from-cyan-500 to-blue-600 text-white flex items-center justify-center shadow-xs group-hover:scale-105 transition-transform">
-                                <LineChart className="size-4" />
+                    {/* Card 4: Monthly Retainers or Total Services */}
+                    {canViewServiceBudget ? (
+                        <div className="bg-white dark:bg-slate-900 rounded-xl p-4 sm:p-4.5 border border-slate-200/80 dark:border-slate-800 shadow-2xs hover:shadow-md transition-all duration-200 space-y-2 relative overflow-hidden group">
+                            <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-cyan-400 via-teal-500 to-blue-500" />
+                            <div className="flex items-center justify-between">
+                                <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400">Monthly Run-Rate</span>
+                                <div className="size-8 rounded-lg bg-gradient-to-br from-cyan-500 to-blue-600 text-white flex items-center justify-center shadow-xs group-hover:scale-105 transition-transform">
+                                    <LineChart className="size-4" />
+                                </div>
+                            </div>
+                            <div>
+                                <div className="text-lg sm:text-xl font-black text-cyan-600 dark:text-cyan-400 font-mono tracking-tight">
+                                    {formatCurrency(totalServicesMonthly)} <span className="text-[11px] text-slate-400 font-normal">/ mo</span>
+                                </div>
+                                <div className="text-[11px] text-slate-500 dark:text-slate-400 font-medium mt-1 flex items-center gap-1.5">
+                                    <Zap className="size-3 text-cyan-500 shrink-0" />
+                                    <span>{activeServicesList.length} Active Services</span>
+                                </div>
                             </div>
                         </div>
-                        <div>
-                            <div className="text-lg sm:text-xl font-black text-cyan-600 dark:text-cyan-400 font-mono tracking-tight">
-                                {formatCurrency(totalServicesMonthly)} <span className="text-[11px] text-slate-400 font-normal">/ mo</span>
+                    ) : (
+                        <div className="bg-white dark:bg-slate-900 rounded-xl p-4 sm:p-4.5 border border-slate-200/80 dark:border-slate-800 shadow-2xs hover:shadow-md transition-all duration-200 space-y-2 relative overflow-hidden group">
+                            <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-cyan-400 via-teal-500 to-blue-500" />
+                            <div className="flex items-center justify-between">
+                                <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400">Total Services</span>
+                                <div className="size-8 rounded-lg bg-gradient-to-br from-cyan-500 to-blue-600 text-white flex items-center justify-center shadow-xs group-hover:scale-105 transition-transform">
+                                    <Package className="size-4" />
+                                </div>
                             </div>
-                            <div className="text-[11px] text-slate-500 dark:text-slate-400 font-medium mt-1 flex items-center gap-1.5">
-                                <Zap className="size-3 text-cyan-500 shrink-0" />
-                                <span>{activeServicesList.length} Active Services</span>
+                            <div>
+                                <div className="text-lg sm:text-xl font-black text-cyan-600 dark:text-cyan-400 font-mono tracking-tight">
+                                    {clientServicesList.length}
+                                </div>
+                                <div className="text-[11px] text-slate-500 dark:text-slate-400 font-medium mt-1 flex items-center gap-1.5">
+                                    <Zap className="size-3 text-cyan-500 shrink-0" />
+                                    <span>{activeServicesList.length} Active Services</span>
+                                </div>
                             </div>
                         </div>
-                    </div>
+                    )}
                 </div>
 
                 {/* Secondary Quick Summary Pills Bar */}
@@ -840,7 +927,9 @@ export default function ClientPortalOverview({
                                                         {project.project_name}
                                                     </h4>
                                                     <div className="flex flex-wrap items-center gap-4 mt-1.5 text-xs text-slate-400 font-medium">
-                                                        <span>Budget: <strong className="text-slate-800 dark:text-slate-200 font-bold">{formatCurrency(project.total_budget)}</strong></span>
+                                                        {canViewProjectBudget && (
+                                                            <span>Budget: <strong className="text-slate-800 dark:text-slate-200 font-bold">{formatCurrency(project.total_budget)}</strong></span>
+                                                        )}
                                                         {project.start_date && (
                                                             <span className="flex items-center gap-1">
                                                                 <Calendar className="size-3.5 text-blue-500" />
@@ -944,12 +1033,20 @@ export default function ClientPortalOverview({
                                             </div>
 
                                             <div className="pt-2 border-t border-slate-200/60 dark:border-slate-700/60 flex items-center justify-between">
-                                                <div>
-                                                    <span className="text-lg font-black text-purple-600 dark:text-purple-400 font-mono">
-                                                        {formatCurrency(service.monthly_fee)}
-                                                    </span>
-                                                    <span className="text-xs text-slate-400"> / month</span>
-                                                </div>
+                                                {canViewServiceBudget ? (
+                                                    <div>
+                                                        <span className="text-lg font-black text-purple-600 dark:text-purple-400 font-mono">
+                                                            {formatCurrency(service.monthly_fee)}
+                                                        </span>
+                                                        <span className="text-xs text-slate-400"> / month</span>
+                                                    </div>
+                                                ) : (
+                                                    <div>
+                                                        <span className="text-xs font-bold text-slate-500 dark:text-slate-400 capitalize">
+                                                            Status: <strong className="text-slate-700 dark:text-slate-300">{service.status}</strong>
+                                                        </span>
+                                                    </div>
+                                                )}
                                                 <Link
                                                     href={`/client-portal/services/${service.id}`}
                                                     className="text-xs font-bold text-blue-600 dark:text-blue-400 hover:underline inline-flex items-center gap-1"

@@ -16,6 +16,7 @@ interface InvoicesShowProps {
         company_phone: string;
         company_email: string;
         company_address: string;
+        company_tax_id?: string;
     };
 }
 
@@ -48,35 +49,22 @@ export default function InvoicesShow({ invoice, companyInfo }: InvoicesShowProps
         switch (status) {
             case 'paid':
                 return (
-                    <span className="px-3 py-1 rounded-full bg-emerald-50 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300 text-xs font-extrabold border border-emerald-200 uppercase tracking-wider inline-flex items-center gap-1.5">
-                        <CheckCircle2 className="size-3.5" />
+                    <span className="px-4 py-1.5 rounded-xl bg-emerald-600 text-white text-xs font-black uppercase tracking-widest inline-flex items-center gap-1.5 shadow-md shadow-emerald-600/20 border border-emerald-500">
+                        <CheckCircle2 className="size-4" />
                         <span>PAID</span>
-                    </span>
-                );
-            case 'sent':
-                return (
-                    <span className="px-3 py-1 rounded-full bg-blue-50 text-blue-700 dark:bg-blue-950/60 dark:text-blue-300 text-xs font-extrabold border border-blue-200 uppercase tracking-wider inline-flex items-center gap-1.5">
-                        <Clock className="size-3.5" />
-                        <span>SENT</span>
-                    </span>
-                );
-            case 'overdue':
-                return (
-                    <span className="px-3 py-1 rounded-full bg-rose-50 text-rose-700 dark:bg-rose-950/60 dark:text-rose-300 text-xs font-extrabold border border-rose-200 uppercase tracking-wider inline-flex items-center gap-1.5">
-                        <Clock className="size-3.5" />
-                        <span>OVERDUE</span>
                     </span>
                 );
             case 'cancelled':
                 return (
-                    <span className="px-3 py-1 rounded-full bg-slate-100 text-slate-500 text-xs font-extrabold border border-slate-200 uppercase tracking-wider">
+                    <span className="px-4 py-1.5 rounded-xl bg-slate-200 text-slate-700 dark:bg-slate-700 dark:text-slate-200 text-xs font-black uppercase tracking-widest inline-flex items-center gap-1.5">
                         CANCELLED
                     </span>
                 );
             default:
                 return (
-                    <span className="px-3 py-1 rounded-full bg-slate-100 text-slate-700 dark:bg-slate-800 text-xs font-extrabold border border-slate-200 uppercase tracking-wider">
-                        DRAFT
+                    <span className="px-4 py-1.5 rounded-xl bg-rose-600 text-white text-xs font-black uppercase tracking-widest inline-flex items-center gap-1.5 shadow-md shadow-rose-600/20 border border-rose-500">
+                        <Clock className="size-4" />
+                        <span>UNPAID</span>
                     </span>
                 );
         }
@@ -111,25 +99,56 @@ export default function InvoicesShow({ invoice, companyInfo }: InvoicesShowProps
                 </div>
 
                 {/* Main Printable Invoice Card */}
-                <div className="p-6 sm:p-10 rounded-3xl bg-white dark:bg-slate-900 border border-slate-200/90 dark:border-slate-800 shadow-xl space-y-8">
+                <div className="relative overflow-hidden p-6 sm:p-10 rounded-3xl bg-white dark:bg-slate-900 border border-slate-200/90 dark:border-slate-800 shadow-xl space-y-8">
+                    {/* Prominent Diagonal Corner Ribbon (Inset) */}
+                    <div className="absolute top-0 right-0 w-36 h-36 overflow-hidden pointer-events-none z-20 select-none">
+                        {invoice.status === 'paid' ? (
+                            <div className="absolute top-7 -right-10 w-44 rotate-45 text-center py-1 bg-emerald-600 text-white font-black text-[11px] uppercase tracking-widest shadow-md shadow-emerald-950/20 border-y border-emerald-400">
+                                PAID
+                            </div>
+                        ) : (
+                            <div className="absolute top-7 -right-10 w-44 rotate-45 text-center py-1 bg-rose-600 text-white font-black text-[11px] uppercase tracking-widest shadow-md shadow-rose-950/20 border-y border-rose-400">
+                                UNPAID
+                            </div>
+                        )}
+                    </div>
+
                     {/* Invoice Header */}
                     <div className="flex flex-col sm:flex-row justify-between items-start gap-6 pb-6 border-b border-slate-100 dark:border-slate-800">
-                        <div className="space-y-1">
-                            <h2 className="text-xl font-extrabold text-blue-600 dark:text-blue-400 uppercase tracking-tight">
-                                {companyInfo.company_name}
-                            </h2>
-                            <p className="text-xs text-slate-500 dark:text-slate-400">{companyInfo.company_address}</p>
-                            <p className="text-xs text-slate-500 dark:text-slate-400">Phone: {companyInfo.company_phone} | {companyInfo.company_email}</p>
+                        <div className="flex items-center gap-3">
+                            <div className="size-12 rounded-2xl bg-gradient-to-tr from-[#003796] via-[#0052D4] to-[#1d4ed8] text-white flex items-center justify-center font-extrabold text-xl shadow-md overflow-hidden shrink-0 border-2 border-white dark:border-slate-800">
+                                <img
+                                    src="/app-logo-icon.png"
+                                    alt="Sapta Technologies"
+                                    className="size-full object-contain p-2"
+                                    onError={(e) => {
+                                        e.currentTarget.style.display = 'none';
+                                    }}
+                                />
+                            </div>
+                            <div>
+                                <div className="flex items-center gap-1.5">
+                                    <span className="text-xl font-extrabold text-slate-900 dark:text-white tracking-tight">SAPTA</span>
+                                    <span className="text-xl font-extrabold text-blue-600 dark:text-blue-400 tracking-tight">TECHNOLOGIES</span>
+                                </div>
+                                <p className="text-xs text-slate-500 dark:text-slate-400 font-medium">
+                                    {companyInfo.company_email} {companyInfo.company_phone ? ` • ${companyInfo.company_phone}` : ''}
+                                </p>
+                                {companyInfo.company_address && (
+                                    <p className="text-[11px] text-slate-400 mt-0.5">
+                                        {companyInfo.company_address} {companyInfo.company_tax_id ? ` | NTN: ${companyInfo.company_tax_id}` : ''}
+                                    </p>
+                                )}
+                            </div>
                         </div>
 
-                        <div className="text-left sm:text-right space-y-1">
+                        <div className="text-left sm:text-right space-y-1 pr-8 sm:pr-10">
                             <h1 className="text-2xl font-black text-slate-900 dark:text-white uppercase tracking-widest">
                                 INVOICE
                             </h1>
                             <p className="text-sm font-mono font-extrabold text-blue-600 dark:text-blue-400">
                                 {invoice.invoice_number}
                             </p>
-                            <div className="pt-1">{getStatusBadge(invoice.status)}</div>
                         </div>
                     </div>
 

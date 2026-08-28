@@ -62,7 +62,7 @@
             margin-top: 2px;
         }
 
-        /* Status Badges */
+        /* Status Badges & Prominent Stamp */
         .status-badge {
             display: inline-block;
             padding: 4px 10px;
@@ -78,6 +78,39 @@
         .status-draft { background-color: #f1f5f9; color: #475569; border: 1px solid #e2e8f0; }
         .status-overdue { background-color: #ffe4e6; color: #be123c; border: 1px solid #fecdd3; }
         .status-cancelled { background-color: #f1f5f9; color: #64748b; border: 1px solid #cbd5e1; }
+
+        /* Diagonal Status Ribbon */
+        .status-corner-banner {
+            position: absolute;
+            top: 0px;
+            right: 0px;
+            width: 130px;
+            height: 130px;
+            overflow: hidden;
+            z-index: 100;
+        }
+        .status-corner-ribbon {
+            position: absolute;
+            top: 26px;
+            right: -32px;
+            width: 140px;
+            padding: 5px 0;
+            text-align: center;
+            font-size: 10.5px;
+            font-weight: 900;
+            letter-spacing: 1.5px;
+            text-transform: uppercase;
+            color: #ffffff;
+            transform: rotate(45deg);
+            -webkit-transform: rotate(45deg);
+            box-shadow: 0 2px 4px rgba(0,0,0,0.15);
+        }
+        .ribbon-paid {
+            background-color: #16a34a;
+        }
+        .ribbon-unpaid {
+            background-color: #dc2626;
+        }
 
         /* Divider Bar */
         .header-divider {
@@ -221,8 +254,20 @@
 </head>
 <body>
 
+    <!-- Diagonal Status Ribbon (Inset) -->
+    <div class="status-corner-banner">
+        @if(strtolower($invoice->status) === 'paid')
+            <div class="status-corner-ribbon ribbon-paid">PAID</div>
+        @else
+            <div class="status-corner-ribbon ribbon-unpaid">UNPAID</div>
+        @endif
+    </div>
+
     @php
-        $logoPath = public_path('logo.png');
+        $logoPath = public_path('app-logo-icon.png');
+        if (!file_exists($logoPath)) {
+            $logoPath = public_path('logo.png');
+        }
         if (!file_exists($logoPath)) {
             $logoPath = public_path('logo_clean.png');
         }
@@ -234,11 +279,19 @@
     <table class="table-layout">
         <tr>
             <td style="width: 55%;">
-                @if($logoData)
-                    <img src="data:{{ $logoMime }};base64,{{ $logoData }}" class="logo-img" alt="Company Logo" />
-                @else
-                    <div class="company-name">{{ $company['name'] ?? 'SAPTA TECHNOLOGIES' }}</div>
-                @endif
+                <table style="border-collapse: collapse; margin-bottom: 6px;">
+                    <tr>
+                        @if($logoData)
+                            <td style="vertical-align: middle; padding-right: 12px;">
+                                <img src="data:{{ $logoMime }};base64,{{ $logoData }}" class="logo-img" alt="Company Logo" style="max-height: 48px; width: auto;" />
+                            </td>
+                        @endif
+                        <td style="vertical-align: middle;">
+                            <div class="company-name">SAPTA <span style="color: #0052D4;">TECHNOLOGIES</span></div>
+                            <div style="font-size: 8.5px; font-weight: 700; color: #64748b; letter-spacing: 1px; text-transform: uppercase;">Software & Cloud Solutions</div>
+                        </td>
+                    </tr>
+                </table>
                 <div class="company-meta">
                     <strong>{{ $company['name'] ?? 'Sapta Technologies' }}</strong><br>
                     {{ $company['address'] ?? 'Software Technology Park, Lahore, Pakistan' }}<br>
@@ -248,14 +301,9 @@
                     @endif
                 </div>
             </td>
-            <td style="width: 45%; text-align: right;">
+            <td style="width: 45%; text-align: right; padding-top: 10px;">
                 <div class="invoice-main-title">INVOICE</div>
                 <div class="invoice-num-text">{{ $invoice->invoice_number }}</div>
-                <div style="margin-top: 4px;">
-                    <span class="status-badge status-{{ strtolower($invoice->status) }}">
-                        {{ strtoupper($invoice->status) }}
-                    </span>
-                </div>
             </td>
         </tr>
     </table>

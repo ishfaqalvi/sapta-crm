@@ -64,11 +64,26 @@ class ProjectController extends Controller
             ->paginate(12)
             ->withQueryString();
 
+        $allProjects = WebsiteProject::with('payments')->where('client_id', $clientId)->get();
+
+        $totalBudget = (float) $allProjects->sum('total_budget');
+        $totalCollected = (float) $allProjects->sum(function ($proj) {
+            return (float) $proj->payments->where('status', 'paid')->sum('amount');
+        });
+        $totalPending = (float) $allProjects->sum(function ($proj) {
+            $budget = (float) $proj->total_budget;
+            $collected = (float) $proj->payments->where('status', 'paid')->sum('amount');
+            return max(0, $budget - $collected);
+        });
+
         $stats = [
-            'total' => WebsiteProject::where('client_id', $clientId)->count(),
-            'in_progress' => WebsiteProject::where('client_id', $clientId)->where('status', 'in_progress')->count(),
-            'on_hold' => WebsiteProject::where('client_id', $clientId)->where('status', 'on_hold')->count(),
-            'completed' => WebsiteProject::where('client_id', $clientId)->where('status', 'completed')->count(),
+            'total' => $allProjects->count(),
+            'in_progress' => $allProjects->where('status', 'in_progress')->count(),
+            'on_hold' => $allProjects->where('status', 'on_hold')->count(),
+            'completed' => $allProjects->where('status', 'completed')->count(),
+            'total_budget' => $totalBudget,
+            'total_collected' => $totalCollected,
+            'total_pending' => $totalPending,
         ];
 
         return Inertia::render('client-portal/projects/index', [
@@ -97,13 +112,23 @@ class ProjectController extends Controller
 
         $client = $this->getClientModel();
 
+        $user = Auth::user();
+        $employee = null;
+        if ($user && ($user->type === 'employee' || $user->employee_id)) {
+            $employee = $user->employee ?: Employee::where('user_id', $user->id)->first();
+        }
+
         $project->load([
             'client',
             'category',
             'payments' => function ($q) {
                 $q->with('invoice')->orderBy('created_at', 'desc');
             },
-            'tasks' => function ($q) {
+            'tasks' => function ($q) use ($user, $employee) {
+                if ($user && $user->type === 'employee') {
+                    $employeeId = $employee ? $employee->id : 0;
+                    $q->where('assigned_employee_id', $employeeId);
+                }
                 $q->with('assignedEmployee:id,name,employee_code,avatar')->orderBy('due_date', 'asc');
             },
             'credentials' => function ($q) {
@@ -505,6 +530,10 @@ class ProjectController extends Controller
 
         $milestone->update($validated);
 
+        if (($validated['status'] ?? $milestone->status) === 'paid') {
+            Invoice::syncItemAndCheckInvoicePaid($milestone);
+        }
+
         return redirect()->back()->with('success', 'Project milestone updated successfully.');
     }
 
@@ -575,6 +604,30 @@ class ProjectController extends Controller
         ]);
 
         return redirect()->back()->with('success', "Invoice {$invoiceNumber} generated successfully.");
+    }
+
+    public function markMilestoneAsPaid(ProjectPayment $milestone): RedirectResponse
+    {
+        $this->authorizePermission('edit-client-portal-project-milestones');
+
+        $clientId = $this->getClientId();
+
+        if ($milestone->client_id !== $clientId) {
+            abort(403, 'Unauthorized access to milestone');
+        }
+
+        if (!$milestone->invoice()->exists()) {
+            return redirect()->back()->with('error', 'Please generate an invoice before marking this milestone as paid.');
+        }
+
+        $milestone->update([
+            'status' => 'paid',
+            'paid_at' => $milestone->paid_at ?? now()->toDateString(),
+        ]);
+
+        Invoice::syncItemAndCheckInvoicePaid($milestone);
+
+        return redirect()->back()->with('success', "Milestone '{$milestone->milestone_title}' marked as Paid successfully.");
     }
 
     /*

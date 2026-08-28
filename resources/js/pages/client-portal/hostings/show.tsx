@@ -10,6 +10,7 @@ import {
     AlertTriangle,
     ArrowLeft,
     Calendar,
+    CheckCircle2,
     Clock,
     CreditCard,
     DollarSign,
@@ -273,6 +274,28 @@ export default function ClientPortalHostingShow({
     const openGenerateInvoiceModal = (payment: HostingPaymentItem) => {
         setSelectedPayment(payment);
         setIsGenerateInvoiceModalOpen(true);
+    };
+
+    // Mark as Paid State & Submit
+    const [confirmingPaidPayment, setConfirmingPaidPayment] = useState<HostingPaymentItem | null>(null);
+    const [isMarkingPaidPayment, setIsMarkingPaidPayment] = useState(false);
+
+    const handleMarkPaymentPaidSubmit = () => {
+        if (!confirmingPaidPayment) return;
+        setIsMarkingPaidPayment(true);
+        router.post(
+            `/client-portal/hostings/payments/${confirmingPaidPayment.id}/mark-as-paid`,
+            {},
+            {
+                preserveScroll: true,
+                onSuccess: () => {
+                    setConfirmingPaidPayment(null);
+                    setIsMarkingPaidPayment(false);
+                },
+                onError: () => setIsMarkingPaidPayment(false),
+                onFinish: () => setIsMarkingPaidPayment(false),
+            }
+        );
     };
 
     const handleGenerateInvoiceSubmit = () => {
@@ -856,10 +879,15 @@ export default function ClientPortalHostingShow({
                                                             {payment.invoice ? (
                                                                 <Link
                                                                     href={`/client-portal/invoices/${payment.invoice.id}`}
-                                                                    className="font-mono font-bold text-blue-600 hover:underline inline-flex items-center gap-1.5"
+                                                                    className="font-mono font-bold text-blue-600 dark:text-blue-400 hover:underline inline-flex items-center gap-1.5"
                                                                 >
                                                                     <span>{payment.invoice.invoice_number}</span>
-                                                                    <span className="text-[9px] uppercase px-1.5 py-0.2 rounded bg-slate-100 dark:bg-slate-800 text-slate-600">
+                                                                    <span
+                                                                        className={`text-[9px] uppercase px-1.5 py-0.5 rounded font-black ${payment.invoice.status === 'paid'
+                                                                            ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300 border border-emerald-200/50'
+                                                                            : 'bg-amber-50 text-amber-700 dark:bg-amber-950/60 dark:text-amber-300 border border-amber-200/50'
+                                                                            }`}
+                                                                    >
                                                                         {payment.invoice.status}
                                                                     </span>
                                                                 </Link>
@@ -870,6 +898,20 @@ export default function ClientPortalHostingShow({
 
                                                         <td className="px-4 py-3.5 text-right whitespace-nowrap">
                                                             <div className="inline-flex items-center gap-1.5">
+                                                                {/* 0. Mark as Paid (Only if invoice exists & payment is unpaid) */}
+                                                                {hasInvoice && !isPaid && hasPermission(user, 'edit-client-portal-hosting-payments') && (
+                                                                    <button
+                                                                        type="button"
+                                                                        disabled={isMarkingPaidPayment}
+                                                                        onClick={() => setConfirmingPaidPayment(payment)}
+                                                                        className="h-8 px-2.5 rounded-lg bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-600 hover:text-white dark:hover:bg-emerald-600 dark:hover:text-white font-bold text-xs inline-flex items-center gap-1.5 cursor-pointer shadow-2xs transition-all border border-emerald-200/50"
+                                                                        title="Mark Hosting Payment as Paid"
+                                                                    >
+                                                                        <CheckCircle2 className="size-3.5" />
+                                                                        <span>Mark as Paid</span>
+                                                                    </button>
+                                                                )}
+
                                                                 {/* 1. Generate Invoice or Print Invoice */}
                                                                 {hasInvoice ? (
                                                                     hasPermission(user, 'print-client-portal-invoices') && (
@@ -1631,6 +1673,52 @@ export default function ClientPortalHostingShow({
                                     ) : (
                                         <span>Delete Package</span>
                                     )}
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                )}
+
+                {/* MARK HOSTING PAYMENT AS PAID CONFIRMATION MODAL */}
+                {confirmingPaidPayment && (
+                    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-900/60 backdrop-blur-xs overflow-y-auto">
+                        <div className="w-full max-w-md max-h-[90vh] my-auto overflow-y-auto rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-4 sm:p-6 shadow-2xl space-y-4 text-center animate-in fade-in zoom-in-95 duration-200 relative">
+                            <button
+                                type="button"
+                                onClick={() => setConfirmingPaidPayment(null)}
+                                className="absolute top-4 right-4 size-8 rounded-xl text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-all flex items-center justify-center cursor-pointer"
+                            >
+                                <X className="size-4" />
+                            </button>
+
+                            <div className="size-12 rounded-2xl bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400 mx-auto flex items-center justify-center">
+                                <CheckCircle2 className="size-6" />
+                            </div>
+
+                            <div className="space-y-1">
+                                <h3 className="text-base font-extrabold text-slate-900 dark:text-white">Mark Hosting Payment as Paid</h3>
+                                <p className="text-xs text-slate-500 dark:text-slate-400">
+                                    Confirm payment receipt for <strong>"{confirmingPaidPayment.title}"</strong> ({formatCurrency(confirmingPaidPayment.amount)}). This will renew the hosting status and mark its linked invoice as Paid if all items are settled.
+                                </p>
+                            </div>
+
+                            <div className="flex items-center justify-center gap-3 pt-2 border-t border-slate-100 dark:border-slate-800">
+                                <button
+                                    type="button"
+                                    onClick={() => setConfirmingPaidPayment(null)}
+                                    disabled={isMarkingPaidPayment}
+                                    className="h-10 px-3 rounded-xl border border-slate-200 dark:border-slate-800 text-xs font-bold text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+                                >
+                                    Cancel
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={handleMarkPaymentPaidSubmit}
+                                    disabled={isMarkingPaidPayment}
+                                    className="h-10 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold inline-flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed shadow-md shadow-emerald-600/20 cursor-pointer transition-all"
+                                >
+                                    {isMarkingPaidPayment && <LoaderCircle className="size-4 animate-spin" />}
+                                    <span>Confirm & Mark as Paid</span>
                                 </button>
                             </div>
                         </div>

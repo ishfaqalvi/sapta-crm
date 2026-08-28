@@ -16,6 +16,7 @@ use App\Traits\AuthorizesClientPortalAccess;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -91,12 +92,22 @@ class ClientServiceController extends Controller
         $allServices = ClientService::where('client_id', $clientId)->get();
         $activeServices = $allServices->where('status', 'active');
 
+        $totalCollected = (float) ServicePayment::where('client_id', $clientId)
+            ->where('status', 'paid')
+            ->sum(DB::raw('CASE WHEN amount_paid > 0 THEN amount_paid ELSE amount_due END'));
+
+        $totalPending = (float) ServicePayment::where('client_id', $clientId)
+            ->where('status', '!=', 'paid')
+            ->sum(DB::raw('CASE WHEN amount_due > amount_paid THEN (amount_due - amount_paid) ELSE amount_due END'));
+
         $stats = [
             'total' => $allServices->count(),
             'active' => $activeServices->count(),
             'paused' => $allServices->where('status', 'paused')->count(),
             'stopped' => $allServices->where('status', 'stopped')->count(),
-            'monthly_recurring_total' => $activeServices->sum('monthly_fee'),
+            'monthly_recurring_total' => (float) $activeServices->sum('monthly_fee'),
+            'total_collected' => $totalCollected,
+            'total_pending' => $totalPending,
         ];
 
         $currencies = Currency::where('is_active', true)->select('code', 'name', 'symbol')->get();
@@ -249,6 +260,7 @@ class ClientServiceController extends Controller
 
         $validated['client_id'] = $clientId;
         $validated['currency'] = $client->currency ?? 'USD';
+        $validated['contract_months'] = $request->filled('contract_months') && (int) $request->contract_months > 0 ? (int) $request->contract_months : null;
 
         $rate = CurrencyService::getRate($validated['currency']);
         $validated['exchange_rate'] = $rate;
@@ -296,6 +308,7 @@ class ClientServiceController extends Controller
         ]);
 
         $validated['currency'] = $client->currency ?? $service->currency ?? 'USD';
+        $validated['contract_months'] = $request->filled('contract_months') && (int) $request->contract_months > 0 ? (int) $request->contract_months : null;
         $rate = CurrencyService::getRate($validated['currency']);
         $validated['exchange_rate'] = $rate;
         $validated['monthly_fee_pkr'] = round((float) $validated['monthly_fee'] * $rate, 2);
@@ -438,6 +451,10 @@ class ClientServiceController extends Controller
 
         $servicePayment->update($validated);
 
+        if ($validated['status'] === 'paid') {
+            Invoice::syncItemAndCheckInvoicePaid($servicePayment);
+        }
+
         return redirect()->back()->with('success', 'Service payment updated successfully.');
     }
 
@@ -515,6 +532,42 @@ class ClientServiceController extends Controller
         ]);
 
         return redirect()->back()->with('success', "Invoice {$invoiceNumber} generated successfully for service payment.");
+    }
+
+    /**
+     * Mark a Service Payment record as Paid.
+     */
+    public function markPaymentAsPaid(ServicePayment $servicePayment): RedirectResponse
+    {
+        $this->authorizePermission('edit-client-portal-service-payments');
+
+        $clientId = $this->getClientId();
+
+        if ($servicePayment->client_id !== $clientId) {
+            abort(403, 'Unauthorized access to Service Payment record');
+        }
+
+        if (!$servicePayment->invoice()->exists()) {
+            return redirect()->back()->with('error', 'Please generate an invoice before marking this service payment as paid.');
+        }
+
+        $servicePayment->load('service');
+        $currency = $servicePayment->service ? $servicePayment->service->currency : 'AED';
+        $rate = CurrencyService::getRate($currency);
+
+        $amountPaid = $servicePayment->amount_due > 0 ? $servicePayment->amount_due : $servicePayment->amount_paid;
+
+        $servicePayment->update([
+            'status' => 'paid',
+            'amount_paid' => $amountPaid,
+            'exchange_rate' => $rate,
+            'amount_paid_pkr' => round((float) $amountPaid * $rate, 2),
+            'payment_date' => $servicePayment->payment_date ?? now()->toDateString(),
+        ]);
+
+        Invoice::syncItemAndCheckInvoicePaid($servicePayment);
+
+        return redirect()->back()->with('success', "Service payment for {$servicePayment->billing_month} marked as Paid successfully.");
     }
 
     /**

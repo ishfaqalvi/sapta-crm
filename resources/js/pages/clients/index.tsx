@@ -182,15 +182,15 @@ export default function ClientsIndex({ clients, stats, filters }: ClientsIndexPr
                 {/* Table Grid */}
                 <div className="rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/90 dark:border-slate-800 shadow-xs overflow-hidden">
                     <div className="overflow-x-auto">
-                        <table className="w-full text-left text-xs text-slate-600 dark:text-slate-300">
+                        <table className="w-full min-w-[1050px] text-left text-xs text-slate-600 dark:text-slate-300 whitespace-nowrap">
                             <thead className="bg-slate-50 dark:bg-slate-950/70 border-b border-slate-200/80 dark:border-slate-800 uppercase tracking-wider text-[11px] font-bold text-slate-500 dark:text-slate-400">
                                 <tr>
-                                    <th className="px-6 py-4">Client & Company</th>
-                                    <th className="px-6 py-4">Contact Person</th>
-                                    <th className="px-6 py-4">Phone / Location</th>
-                                    <th className="px-6 py-4">Currency</th>
-                                    <th className="px-6 py-4">Status</th>
-                                    <th className="px-6 py-4 text-right">Actions</th>
+                                    <th className="px-6 py-4 whitespace-nowrap">Client & Company</th>
+                                    <th className="px-6 py-4 whitespace-nowrap">Contact Person</th>
+                                    <th className="px-6 py-4 whitespace-nowrap">Phone / Location</th>
+                                    <th className="px-6 py-4 whitespace-nowrap">Currency</th>
+                                    <th className="px-6 py-4 whitespace-nowrap">Status</th>
+                                    <th className="px-6 py-4 text-right whitespace-nowrap">Actions</th>
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
@@ -198,34 +198,35 @@ export default function ClientsIndex({ clients, stats, filters }: ClientsIndexPr
                                     clients.data.map((client) => (
                                         <tr key={client.id} className="hover:bg-slate-50/70 dark:hover:bg-slate-800/40 transition-colors">
                                             {/* Client Info & Logo Tile */}
-                                            <td className="px-6 py-4">
+                                            <td className="px-6 py-4 whitespace-nowrap">
                                                 <div className="flex items-center gap-3">
                                                     <div className="relative size-10 rounded-xl bg-gradient-to-tr from-[#003796] via-[#0052D4] to-[#1d4ed8] text-white font-extrabold text-xs flex items-center justify-center shadow-xs overflow-hidden shrink-0 border border-white/20">
                                                         {client.name.charAt(0).toUpperCase()}
                                                     </div>
 
-                                                    <div>
-                                                        <div className="flex items-center gap-2">
-                                                            <Link
-                                                                href={`/clients/view/${client.id}`}
-                                                                className="font-extrabold text-slate-900 dark:text-white text-sm hover:text-blue-600 dark:hover:text-blue-400 transition-colors text-left"
-                                                            >
-                                                                {client.name}
-                                                            </Link>
-                                                            <span className="px-2 py-0.5 rounded-md bg-slate-100 dark:bg-slate-800 text-[10px] font-bold text-slate-600 dark:text-slate-400 border border-slate-200/60 dark:border-slate-800 font-mono">
-                                                                {client.client_code}
-                                                            </span>
-                                                        </div>
+                                                    <div className="flex items-center gap-2 whitespace-nowrap">
+                                                        <Link
+                                                            href={`/clients/view/${client.id}`}
+                                                            className="font-extrabold text-slate-900 dark:text-white text-sm hover:text-blue-600 dark:hover:text-blue-400 transition-colors text-left"
+                                                        >
+                                                            {client.name}
+                                                        </Link>
+                                                        <span className="px-2 py-0.5 rounded-md bg-slate-100 dark:bg-slate-800 text-[10px] font-bold text-slate-600 dark:text-slate-400 border border-slate-200/60 dark:border-slate-800 font-mono shrink-0">
+                                                            {client.client_code}
+                                                        </span>
                                                         {client.company_name ? (
-                                                            <Link
-                                                                href={`/clients/view/${client.id}`}
-                                                                className="text-slate-400 text-xs block mt-0.5 hover:text-blue-600 dark:hover:text-blue-400 transition-colors text-left font-medium"
-                                                            >
-                                                                {client.company_name}
-                                                            </Link>
+                                                            <span className="text-slate-400 dark:text-slate-500 text-xs font-medium flex items-center gap-1.5 whitespace-nowrap">
+                                                                <span className="text-slate-300 dark:text-slate-600">•</span>
+                                                                <Link
+                                                                    href={`/clients/view/${client.id}`}
+                                                                    className="text-slate-600 dark:text-slate-300 font-semibold hover:text-blue-600 dark:hover:text-blue-400 transition-colors text-left"
+                                                                >
+                                                                    {client.company_name}
+                                                                </Link>
+                                                            </span>
                                                         ) : (
-                                                            <span className="text-slate-400 text-xs italic block mt-0.5">
-                                                                Individual Client
+                                                            <span className="text-slate-400 text-xs italic whitespace-nowrap">
+                                                                (Individual Client)
                                                             </span>
                                                         )}
                                                     </div>
@@ -233,7 +234,7 @@ export default function ClientsIndex({ clients, stats, filters }: ClientsIndexPr
                                             </td>
 
                                             {/* Contact Person & Email */}
-                                            <td className="px-6 py-4">
+                                            <td className="px-6 py-4 whitespace-nowrap">
                                                 <div className="space-y-1">
                                                     <span className="font-extrabold text-slate-900 dark:text-white text-xs block">
                                                         {client.contact_person}
@@ -250,7 +251,7 @@ export default function ClientsIndex({ clients, stats, filters }: ClientsIndexPr
                                             </td>
 
                                             {/* Phone & Location */}
-                                            <td className="px-6 py-4">
+                                            <td className="px-6 py-4 whitespace-nowrap">
                                                 <div className="space-y-1">
                                                     <span className="font-mono text-xs text-slate-800 dark:text-slate-200 font-semibold flex items-center gap-1">
                                                         <Phone className="size-3 text-slate-400" />
@@ -266,14 +267,14 @@ export default function ClientsIndex({ clients, stats, filters }: ClientsIndexPr
                                             </td>
 
                                             {/* Currency Badge */}
-                                            <td className="px-6 py-4">
+                                            <td className="px-6 py-4 whitespace-nowrap">
                                                 <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md bg-blue-50 dark:bg-blue-950/60 text-blue-700 dark:text-blue-300 font-extrabold font-mono text-[11px] border border-blue-100 dark:border-blue-900/40">
                                                     {client.currency}
                                                 </span>
                                             </td>
 
                                             {/* Status */}
-                                            <td className="px-6 py-4">
+                                            <td className="px-6 py-4 whitespace-nowrap">
                                                 <span className={`px-2.5 py-1 rounded-full text-[11px] font-bold inline-flex items-center gap-1 ${client.status === 'active'
                                                     ? 'bg-emerald-50 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800'
                                                     : 'bg-amber-50 dark:bg-amber-950/50 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-800'

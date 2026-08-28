@@ -40,7 +40,8 @@ use App\Http\Controllers\{
     ClientHostingController,
     InvoiceController,
     ReportController,
-    NotificationController
+    NotificationController,
+    MyTaskController
 };
 use App\Http\Controllers\Settings\{
     ProfileController,
@@ -88,6 +89,13 @@ Route::middleware(['web', 'auth'])->group(function () {
         Route::delete('{id}', 'destroy')->name('destroy');
         Route::delete('clear-all', 'clearAll')->name('clearAll');
     });
+
+    // My Assigned Tasks (Employee Portal)
+    Route::controller(MyTaskController::class)->prefix('my-tasks')->as('my-tasks.')->group(function () {
+        Route::get('/', 'index')->name('index');
+        Route::post('{task}/status', 'updateStatus')->name('status');
+        Route::put('{task}/status', 'updateStatus');
+    });
 });
 
 /*
@@ -132,6 +140,7 @@ Route::group(['prefix' => 'client-portal', 'as' => 'client-portal.', 'middleware
             Route::put('milestones/update/{milestone}', 'updateMilestone')->name('milestones.update');
             Route::delete('milestones/destroy/{milestone}', 'destroyMilestone')->name('milestones.destroy');
             Route::post('milestones/{milestone}/generate-invoice', 'generateMilestoneInvoice')->name('milestones.generate-invoice');
+            Route::post('milestones/{milestone}/mark-as-paid', 'markMilestoneAsPaid')->name('milestones.mark-as-paid');
 
             // Credentials Sub-routes
             Route::post('credentials/store', 'storeCredential')->name('credentials.store');
@@ -156,6 +165,7 @@ Route::group(['prefix' => 'client-portal', 'as' => 'client-portal.', 'middleware
 
             Route::post('payments/generate', 'generateMonthlyBatch')->name('payments.generate');
             Route::post('payments/{servicePayment}/generate-invoice', 'generatePaymentInvoice')->name('payments.generate-invoice');
+            Route::post('payments/{servicePayment}/mark-as-paid', 'markPaymentAsPaid')->name('payments.mark-as-paid');
             Route::put('payments/update/{servicePayment}', 'updatePayment')->name('payments.update');
             Route::delete('payments/destroy/{servicePayment}', 'destroyPayment')->name('payments.destroy');
 
@@ -220,6 +230,7 @@ Route::group(['prefix' => 'client-portal', 'as' => 'client-portal.', 'middleware
         Route::put('payments/update/{payment}', 'updatePayment')->name('payments.update');
         Route::delete('payments/destroy/{payment}', 'destroyPayment')->name('payments.destroy');
         Route::post('payments/{payment}/generate-invoice', 'generatePaymentInvoice')->name('payments.generate-invoice');
+        Route::post('payments/{payment}/mark-as-paid', 'markPaymentAsPaid')->name('payments.mark-as-paid');
     });
 
     /*
@@ -240,6 +251,7 @@ Route::group(['prefix' => 'client-portal', 'as' => 'client-portal.', 'middleware
         Route::put('payments/update/{payment}', 'updatePayment')->name('payments.update');
         Route::delete('payments/destroy/{payment}', 'destroyPayment')->name('payments.destroy');
         Route::post('payments/{payment}/generate-invoice', 'generatePaymentInvoice')->name('payments.generate-invoice');
+        Route::post('payments/{payment}/mark-as-paid', 'markPaymentAsPaid')->name('payments.mark-as-paid');
     });
 
     /*

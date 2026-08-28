@@ -69,6 +69,9 @@ interface ClientPortalProjectsIndexProps {
         in_progress: number;
         on_hold: number;
         completed: number;
+        total_budget: number;
+        total_collected: number;
+        total_pending: number;
     };
     filters: {
         search?: string;
@@ -97,6 +100,7 @@ export default function ClientPortalProjectsIndex({
     const [isDeleting, setIsDeleting] = useState(false);
 
     const isFirstRender = useRef(true);
+    const canViewBudget = hasPermission(user, 'view-client-portal-project-budget');
 
     useEffect(() => {
         if (isFirstRender.current) {
@@ -122,31 +126,52 @@ export default function ClientPortalProjectsIndex({
         return () => clearTimeout(timer);
     }, [searchQuery, selectedStatus]);
 
-    const formatDateOnly = (dateStr: string | null) => {
-        if (!dateStr) return 'Flexible';
-        const cleanDate = dateStr.split('T')[0].split(' ')[0];
-        const parts = cleanDate.split('-');
-        if (parts.length === 3) {
-            const year = parseInt(parts[0], 10);
-            const month = parseInt(parts[1], 10) - 1;
-            const day = parseInt(parts[2], 10);
-            if (!isNaN(year) && !isNaN(month) && !isNaN(day) && month >= 0 && month < 12) {
-                const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-                const formattedDay = day < 10 ? `0${day}` : `${day}`;
-                return `${formattedDay} ${months[month]} ${year}`;
-            }
-        }
-        return cleanDate;
+    const formatCurrency = (amount: number | string, currencyCode: string = client.currency || 'USD') => {
+        const num = typeof amount === 'string' ? parseFloat(amount) || 0 : amount;
+        return num.toLocaleString('en-US', {
+            style: 'currency',
+            currency: currencyCode,
+            maximumFractionDigits: 0,
+        });
     };
 
-    const handleDelete = () => {
+    const formatDateOnly = (dateStr: string | null | undefined): string => {
+        if (!dateStr) return '-';
+        const datePart = dateStr.includes('T') ? dateStr.split('T')[0] : dateStr.split(' ')[0];
+        const parts = datePart.split('-');
+        if (parts.length === 3) {
+            const year = parseInt(parts[0], 10);
+            const monthIndex = parseInt(parts[1], 10) - 1;
+            const day = parseInt(parts[2], 10);
+            if (!isNaN(year) && !isNaN(monthIndex) && !isNaN(day) && monthIndex >= 0 && monthIndex < 12) {
+                const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+                return `${day < 10 ? `0${day}` : `${day}`} ${months[monthIndex]} ${year}`;
+            }
+        }
+        return datePart;
+    };
+
+    const getProjectFinancials = (proj: WebsiteProjectData) => {
+        const total = parseFloat(String(proj.total_budget || 0)) || 0;
+        let collected = 0;
+        if (proj.payments && Array.isArray(proj.payments)) {
+            collected = proj.payments
+                .filter((p: any) => p.status === 'paid')
+                .reduce((sum: number, p: any) => sum + (parseFloat(String(p.amount || 0)) || 0), 0);
+        }
+        const pending = Math.max(0, total - collected);
+        return { total, collected, pending };
+    };
+
+    const handleDeleteProject = () => {
         if (!deletingProject || isDeleting) return;
+
         setIsDeleting(true);
-        router.delete(`/client-portal/projects/destroy/${deletingProject.id}`, {
+        router.delete(`/client-portal/projects/${deletingProject.id}`, {
             preserveScroll: true,
-            onFinish: () => setIsDeleting(false),
             onSuccess: () => {
                 setDeletingProject(null);
+                setIsDeleting(false);
             },
             onError: () => {
                 setIsDeleting(false);
@@ -154,36 +179,26 @@ export default function ClientPortalProjectsIndex({
         });
     };
 
-    // Calculate budget metrics helper
-    const getProjectFinancials = (proj: WebsiteProjectData) => {
-        const total = typeof proj.total_budget === 'number' ? proj.total_budget : parseFloat(proj.total_budget || '0');
-        const collected = (proj.payments || [])
-            .filter((p: any) => p.status === 'paid')
-            .reduce((sum: number, p: any) => sum + (typeof p.amount === 'number' ? p.amount : parseFloat(p.amount || '0')), 0);
-        const remaining = Math.max(0, total - collected);
-        return { total, collected, remaining };
-    };
-
     return (
-        <ClientPortalLayout client={client} activeTab="projects">
-            <Head title="Projects" />
+        <ClientPortalLayout client={client} breadcrumbs={breadcrumbs} activeTab="projects">
+            <Head title={`Projects Directory - ${client.name}`} />
 
-            <div className="flex h-full flex-1 flex-col gap-6 p-2 sm:p-6 bg-slate-50/50 dark:bg-slate-950">
-                {/* Page Header */}
+            <div className="p-2 md:p-6 w-full space-y-6">
+                {/* Header Title & Add Button */}
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                     <div>
-                        <h1 className="text-xl sm:text-2xl font-extrabold text-slate-900 dark:text-white tracking-tight">
-                            Projects & Deliverables
+                        <h1 className="text-xl font-extrabold text-slate-900 dark:text-white tracking-tight">
+                            Projects Directory
                         </h1>
-                        <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 mt-0.5">
-                            Track client projects, total budget, collected payments, remaining balances, tasks, and project credentials.
+                        <p className="text-slate-500 dark:text-slate-400 text-xs mt-0.5">
+                            Manage and track active software, web development, and digital milestones for your workspace.
                         </p>
                     </div>
 
                     {hasPermission(user, 'create-client-portal-projects') && (
                         <Link
                             href="/client-portal/projects/create"
-                            className="h-10 px-3 rounded-xl bg-gradient-to-r from-[#003796] via-[#0052D4] to-[#1d4ed8] hover:opacity-95 text-white text-xs font-bold transition-all shadow-md shadow-blue-500/20 flex items-center justify-center gap-2 self-start sm:self-auto cursor-pointer"
+                            className="h-10 px-4 rounded-xl bg-gradient-to-r from-[#003796] via-[#0052D4] to-[#1d4ed8] hover:opacity-95 text-white text-xs font-bold transition-all shadow-md shadow-blue-500/20 flex items-center justify-center gap-2 self-start sm:self-auto"
                         >
                             <Plus className="size-4" />
                             <span>Create New Project</span>
@@ -192,47 +207,113 @@ export default function ClientPortalProjectsIndex({
                 </div>
 
                 {/* KPI Stat Cards */}
-                <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
-                    <div className="p-4 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 shadow-xs flex items-center justify-between">
-                        <div>
-                            <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400">Total Projects</p>
-                            <h3 className="text-xl font-extrabold text-slate-900 dark:text-white mt-0.5">{stats.total}</h3>
+                {canViewBudget ? (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                        <div className="p-4 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 shadow-xs flex items-center justify-between">
+                            <div>
+                                <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400">Total Projects</p>
+                                <h3 className="text-xl font-extrabold text-slate-900 dark:text-white mt-0.5">{stats.total}</h3>
+                                <p className="text-[10px] text-slate-500 dark:text-slate-400 font-semibold mt-1">
+                                    {stats.in_progress} In Progress • {stats.completed} Done
+                                </p>
+                            </div>
+                            <div className="size-11 rounded-2xl bg-blue-50 dark:bg-blue-950 text-blue-600 dark:text-blue-400 flex items-center justify-center shrink-0">
+                                <Globe className="size-5" />
+                            </div>
                         </div>
-                        <div className="size-10 rounded-xl bg-blue-50 dark:bg-blue-950 text-blue-600 dark:text-blue-400 flex items-center justify-center">
-                            <Globe className="size-5" />
-                        </div>
-                    </div>
 
-                    <div className="p-4 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 shadow-xs flex items-center justify-between">
-                        <div>
-                            <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400">In Progress</p>
-                            <h3 className="text-xl font-extrabold text-purple-600 dark:text-purple-400 mt-0.5">{stats.in_progress}</h3>
+                        <div className="p-4 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 shadow-xs flex items-center justify-between">
+                            <div>
+                                <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400">Total Budget</p>
+                                <h3 className="text-xl font-extrabold text-slate-900 dark:text-white mt-0.5">
+                                    {formatCurrency(stats.total_budget || 0)}
+                                </h3>
+                                <p className="text-[10px] text-blue-600 dark:text-blue-400 font-bold mt-1">
+                                    Across all projects
+                                </p>
+                            </div>
+                            <div className="size-11 rounded-2xl bg-indigo-50 dark:bg-indigo-950 text-indigo-600 dark:text-indigo-400 flex items-center justify-center shrink-0">
+                                <BadgeDollarSign className="size-5" />
+                            </div>
                         </div>
-                        <div className="size-10 rounded-xl bg-purple-50 dark:bg-purple-950 text-purple-600 dark:text-purple-400 flex items-center justify-center">
-                            <Clock className="size-5" />
-                        </div>
-                    </div>
 
-                    <div className="p-4 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 shadow-xs flex items-center justify-between">
-                        <div>
-                            <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400">On Hold</p>
-                            <h3 className="text-xl font-extrabold text-amber-600 dark:text-amber-400 mt-0.5">{stats.on_hold}</h3>
+                        <div className="p-4 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 shadow-xs flex items-center justify-between">
+                            <div>
+                                <p className="text-[11px] font-bold uppercase tracking-wider text-emerald-600 dark:text-emerald-400">Collected</p>
+                                <h3 className="text-xl font-extrabold text-emerald-600 dark:text-emerald-400 mt-0.5">
+                                    {formatCurrency(stats.total_collected || 0)}
+                                </h3>
+                                <p className="text-[10px] text-emerald-600/80 font-bold mt-1">
+                                    Paid milestones
+                                </p>
+                            </div>
+                            <div className="size-11 rounded-2xl bg-emerald-50 dark:bg-emerald-950 text-emerald-600 dark:text-emerald-400 flex items-center justify-center shrink-0">
+                                <CheckCircle2 className="size-5" />
+                            </div>
                         </div>
-                        <div className="size-10 rounded-xl bg-amber-50 dark:bg-amber-950 text-amber-600 dark:text-amber-400 flex items-center justify-center">
-                            <PauseCircle className="size-5" />
-                        </div>
-                    </div>
 
-                    <div className="p-4 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 shadow-xs flex items-center justify-between">
-                        <div>
-                            <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400">Completed</p>
-                            <h3 className="text-xl font-extrabold text-emerald-600 dark:text-emerald-400 mt-0.5">{stats.completed}</h3>
-                        </div>
-                        <div className="size-10 rounded-xl bg-emerald-50 dark:bg-emerald-950 text-emerald-600 dark:text-emerald-400 flex items-center justify-center">
-                            <CheckCircle2 className="size-5" />
+                        <div className="p-4 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 shadow-xs flex items-center justify-between">
+                            <div>
+                                <p className="text-[11px] font-bold uppercase tracking-wider text-amber-600 dark:text-amber-400">Pending</p>
+                                <h3 className="text-xl font-extrabold text-amber-600 dark:text-amber-400 mt-0.5">
+                                    {formatCurrency(stats.total_pending || 0)}
+                                </h3>
+                                <p className="text-[10px] text-amber-600/80 font-bold mt-1">
+                                    Remaining to collect
+                                </p>
+                            </div>
+                            <div className="size-11 rounded-2xl bg-amber-50 dark:bg-amber-950 text-amber-600 dark:text-amber-400 flex items-center justify-center shrink-0">
+                                <Clock className="size-5" />
+                            </div>
                         </div>
                     </div>
-                </div>
+                ) : (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                        <div className="p-4 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 shadow-xs flex items-center justify-between">
+                            <div>
+                                <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400">Total Projects</p>
+                                <h3 className="text-xl font-extrabold text-slate-900 dark:text-white mt-0.5">{stats.total}</h3>
+                                <p className="text-[10px] text-slate-500 dark:text-slate-400 font-semibold mt-1">All Workspaces</p>
+                            </div>
+                            <div className="size-11 rounded-2xl bg-blue-50 dark:bg-blue-950 text-blue-600 dark:text-blue-400 flex items-center justify-center shrink-0">
+                                <Globe className="size-5" />
+                            </div>
+                        </div>
+
+                        <div className="p-4 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 shadow-xs flex items-center justify-between">
+                            <div>
+                                <p className="text-[11px] font-bold uppercase tracking-wider text-purple-600 dark:text-purple-400">In Progress</p>
+                                <h3 className="text-xl font-extrabold text-purple-600 dark:text-purple-400 mt-0.5">{stats.in_progress}</h3>
+                                <p className="text-[10px] text-purple-500 font-semibold mt-1">Active Deliveries</p>
+                            </div>
+                            <div className="size-11 rounded-2xl bg-purple-50 dark:bg-purple-950 text-purple-600 dark:text-purple-400 flex items-center justify-center shrink-0">
+                                <Clock className="size-5" />
+                            </div>
+                        </div>
+
+                        <div className="p-4 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 shadow-xs flex items-center justify-between">
+                            <div>
+                                <p className="text-[11px] font-bold uppercase tracking-wider text-amber-600 dark:text-amber-400">On Hold</p>
+                                <h3 className="text-xl font-extrabold text-amber-600 dark:text-amber-400 mt-0.5">{stats.on_hold}</h3>
+                                <p className="text-[10px] text-amber-500 font-semibold mt-1">Paused Projects</p>
+                            </div>
+                            <div className="size-11 rounded-2xl bg-amber-50 dark:bg-amber-950 text-amber-600 dark:text-amber-400 flex items-center justify-center shrink-0">
+                                <PauseCircle className="size-5" />
+                            </div>
+                        </div>
+
+                        <div className="p-4 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 shadow-xs flex items-center justify-between">
+                            <div>
+                                <p className="text-[11px] font-bold uppercase tracking-wider text-emerald-600 dark:text-emerald-400">Completed</p>
+                                <h3 className="text-xl font-extrabold text-emerald-600 dark:text-emerald-400 mt-0.5">{stats.completed}</h3>
+                                <p className="text-[10px] text-emerald-500 font-semibold mt-1">Fully Finished</p>
+                            </div>
+                            <div className="size-11 rounded-2xl bg-emerald-50 dark:bg-emerald-950 text-emerald-600 dark:text-emerald-400 flex items-center justify-center shrink-0">
+                                <CheckCircle2 className="size-5" />
+                            </div>
+                        </div>
+                    </div>
+                )}
 
                 {/* Filters Toolbar & View Switcher */}
                 <div className="flex flex-col md:flex-row items-center justify-between gap-4 p-4 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 shadow-xs">
@@ -253,10 +334,10 @@ export default function ClientPortalProjectsIndex({
                             onChange={(e) => setSelectedStatus(e.target.value)}
                             className="h-10 px-3 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-xs font-semibold text-slate-700 dark:text-slate-300 focus:outline-none focus:border-blue-600"
                         >
-                            <option value="">All Statuses</option>
-                            <option value="in_progress">In Progress</option>
-                            <option value="on_hold">On Hold</option>
-                            <option value="completed">Completed</option>
+                            <option value="">All Statuses ({stats.total})</option>
+                            <option value="in_progress">In Progress ({stats.in_progress})</option>
+                            <option value="on_hold">On Hold ({stats.on_hold})</option>
+                            <option value="completed">Completed ({stats.completed})</option>
                             <option value="cancelled">Cancelled</option>
                         </select>
 
@@ -296,7 +377,7 @@ export default function ClientPortalProjectsIndex({
                             </div>
                         ) : (
                             projects.data.map((proj) => {
-                                const { total, collected, remaining } = getProjectFinancials(proj);
+                                const { total, collected, pending } = getProjectFinancials(proj);
                                 return (
                                     <div
                                         key={proj.id}
@@ -342,35 +423,37 @@ export default function ClientPortalProjectsIndex({
                                                 )}
                                             </div>
 
-                                            {/* FINANCIAL METRICS GRID (Total, Collected, Remaining) */}
-                                            <div className="grid grid-cols-3 gap-2 pt-1">
-                                                <div className="p-2.5 rounded-2xl bg-slate-50 dark:bg-slate-950 border border-slate-100 dark:border-slate-800/80">
-                                                    <span className="text-[9px] font-extrabold uppercase tracking-wider text-slate-400 block">
-                                                        Total Budget
-                                                    </span>
-                                                    <span className="font-extrabold text-slate-900 dark:text-white text-xs mt-0.5 block truncate">
-                                                        {proj.currency} {total.toLocaleString()}
-                                                    </span>
-                                                </div>
+                                            {/* FINANCIAL METRICS GRID (Total, Collected, Pending) */}
+                                            {canViewBudget && (
+                                                <div className="grid grid-cols-3 gap-2 pt-1">
+                                                    <div className="p-2.5 rounded-2xl bg-slate-50 dark:bg-slate-950 border border-slate-100 dark:border-slate-800/80">
+                                                        <span className="text-[9px] font-extrabold uppercase tracking-wider text-slate-400 block">
+                                                            Total Budget
+                                                        </span>
+                                                        <span className="font-extrabold text-slate-900 dark:text-white text-xs mt-0.5 block truncate">
+                                                            {formatCurrency(total, proj.currency)}
+                                                        </span>
+                                                    </div>
 
-                                                <div className="p-2.5 rounded-2xl bg-emerald-50/50 dark:bg-emerald-950/30 border border-emerald-100 dark:border-emerald-900/40">
-                                                    <span className="text-[9px] font-extrabold uppercase tracking-wider text-emerald-600 dark:text-emerald-400 block">
-                                                        Collected
-                                                    </span>
-                                                    <span className="font-extrabold text-emerald-700 dark:text-emerald-300 text-xs mt-0.5 block truncate">
-                                                        {proj.currency} {collected.toLocaleString()}
-                                                    </span>
-                                                </div>
+                                                    <div className="p-2.5 rounded-2xl bg-emerald-50/50 dark:bg-emerald-950/30 border border-emerald-100 dark:border-emerald-900/40">
+                                                        <span className="text-[9px] font-extrabold uppercase tracking-wider text-emerald-600 dark:text-emerald-400 block">
+                                                            Collected
+                                                        </span>
+                                                        <span className="font-extrabold text-emerald-700 dark:text-emerald-300 text-xs mt-0.5 block truncate">
+                                                            {formatCurrency(collected, proj.currency)}
+                                                        </span>
+                                                    </div>
 
-                                                <div className="p-2.5 rounded-2xl bg-amber-50/50 dark:bg-amber-950/30 border border-amber-100 dark:border-amber-900/40">
-                                                    <span className="text-[9px] font-extrabold uppercase tracking-wider text-amber-600 dark:text-amber-400 block">
-                                                        Remaining
-                                                    </span>
-                                                    <span className="font-extrabold text-amber-700 dark:text-amber-300 text-xs mt-0.5 block truncate">
-                                                        {proj.currency} {remaining.toLocaleString()}
-                                                    </span>
+                                                    <div className="p-2.5 rounded-2xl bg-amber-50/50 dark:bg-amber-950/30 border border-amber-100 dark:border-amber-900/40">
+                                                        <span className="text-[9px] font-extrabold uppercase tracking-wider text-amber-600 dark:text-amber-400 block">
+                                                            Pending
+                                                        </span>
+                                                        <span className="font-extrabold text-amber-700 dark:text-amber-300 text-xs mt-0.5 block truncate">
+                                                            {formatCurrency(pending, proj.currency)}
+                                                        </span>
+                                                    </div>
                                                 </div>
-                                            </div>
+                                            )}
 
                                             {/* Progress Bar */}
                                             <div className="space-y-1.5 pt-1">
@@ -436,9 +519,13 @@ export default function ClientPortalProjectsIndex({
                                 <thead>
                                     <tr className="bg-slate-50 dark:bg-slate-800/60 border-b border-slate-200/80 dark:border-slate-800 text-[11px] font-extrabold uppercase text-slate-400 tracking-wider">
                                         <th className="px-6 py-4 whitespace-nowrap">Project Title</th>
-                                        <th className="px-6 py-4 whitespace-nowrap">Total Budget</th>
-                                        <th className="px-6 py-4 whitespace-nowrap">Collected</th>
-                                        <th className="px-6 py-4 whitespace-nowrap">Remaining</th>
+                                        {canViewBudget && (
+                                            <>
+                                                <th className="px-6 py-4 whitespace-nowrap">Total Budget</th>
+                                                <th className="px-6 py-4 whitespace-nowrap">Collected</th>
+                                                <th className="px-6 py-4 whitespace-nowrap">Pending</th>
+                                            </>
+                                        )}
                                         <th className="px-6 py-4 whitespace-nowrap">Deadline</th>
                                         <th className="px-6 py-4 whitespace-nowrap">Progress</th>
                                         <th className="px-6 py-4 whitespace-nowrap">Status</th>
@@ -448,7 +535,7 @@ export default function ClientPortalProjectsIndex({
                                 <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60 text-xs">
                                     {projects.data.length > 0 ? (
                                         projects.data.map((proj) => {
-                                            const { total, collected, remaining } = getProjectFinancials(proj);
+                                            const { total, collected, pending } = getProjectFinancials(proj);
                                             return (
                                                 <tr key={proj.id} className="hover:bg-slate-50/70 dark:hover:bg-slate-800/40 transition-colors">
                                                     <td className="px-6 py-4 whitespace-nowrap max-w-xs">
@@ -462,17 +549,21 @@ export default function ClientPortalProjectsIndex({
                                                         </Link>
                                                     </td>
 
-                                                    <td className="px-6 py-4 font-extrabold text-slate-900 dark:text-white whitespace-nowrap">
-                                                        {proj.currency} {total.toLocaleString()}
-                                                    </td>
+                                                    {canViewBudget && (
+                                                        <>
+                                                            <td className="px-6 py-4 font-extrabold text-slate-900 dark:text-white whitespace-nowrap">
+                                                                {formatCurrency(total, proj.currency)}
+                                                            </td>
 
-                                                    <td className="px-6 py-4 font-extrabold text-emerald-600 dark:text-emerald-400 whitespace-nowrap">
-                                                        {proj.currency} {collected.toLocaleString()}
-                                                    </td>
+                                                            <td className="px-6 py-4 font-extrabold text-emerald-600 dark:text-emerald-400 whitespace-nowrap">
+                                                                {formatCurrency(collected, proj.currency)}
+                                                            </td>
 
-                                                    <td className="px-6 py-4 font-extrabold text-amber-600 dark:text-amber-400 whitespace-nowrap">
-                                                        {proj.currency} {remaining.toLocaleString()}
-                                                    </td>
+                                                            <td className="px-6 py-4 font-extrabold text-amber-600 dark:text-amber-400 whitespace-nowrap">
+                                                                {formatCurrency(pending, proj.currency)}
+                                                            </td>
+                                                        </>
+                                                    )}
 
                                                     <td className="px-6 py-4 text-slate-600 dark:text-slate-300 font-medium whitespace-nowrap">
                                                         <span className="flex items-center gap-1.5 font-semibold">
@@ -583,7 +674,7 @@ export default function ClientPortalProjectsIndex({
                                 </button>
                                 <button
                                     type="button"
-                                    onClick={handleDelete}
+                                    onClick={handleDeleteProject}
                                     disabled={isDeleting}
                                     className="h-10 px-3 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold shadow-md shadow-rose-600/20 active:scale-[0.99] transition-all inline-flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none"
                                 >

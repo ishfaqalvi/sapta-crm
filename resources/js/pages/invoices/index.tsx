@@ -48,6 +48,10 @@ export interface InvoiceData {
         name: string;
         company_name?: string;
         client_code: string;
+        currency?: string;
+        email?: string;
+        phone?: string;
+        address?: string;
     };
     items?: InvoiceItemData[];
 }

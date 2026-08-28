@@ -342,9 +342,15 @@ class DomainController extends Controller
             'created_by' => Auth::id(),
         ]);
 
+        $startDate = $payment->due_date ?? $domain?->registration_date ?? now();
+        $endDate = $domain?->expiry_date ?? ($startDate ? Carbon::parse($startDate)->addYear() : null);
+        $durationText = ($startDate && $endDate)
+            ? ' (Duration: ' . Carbon::parse($startDate)->format('d M Y') . ' to ' . Carbon::parse($endDate)->format('d M Y') . ')'
+            : '';
+
         InvoiceItem::create([
             'invoice_id' => $invoice->id,
-            'description' => 'Domain: ' . ($domain->domain_name ?? 'Domain') . ' - ' . $payment->title,
+            'description' => 'Domain: ' . ($domain->domain_name ?? 'Domain') . ' - ' . $payment->title . $durationText,
             'quantity' => 1.00,
             'unit_price' => $amount,
             'amount' => $amount,
@@ -353,6 +359,43 @@ class DomainController extends Controller
         ]);
 
         return redirect()->back()->with('success', "Invoice {$invoiceNumber} generated successfully.");
+    }
+
+    public function markPaymentAsPaid(DomainPayment $payment): RedirectResponse
+    {
+        $this->authorizePermission('edit-client-portal-domain-payments');
+
+        $clientId = $this->getClientId();
+
+        if ((int) $payment->client_id !== $clientId) {
+            abort(403, 'Unauthorized access to payment record');
+        }
+
+        if (!$payment->invoice()->exists()) {
+            return redirect()->back()->with('error', 'Please generate an invoice before marking this payment as paid.');
+        }
+
+        $payment->update([
+            'status' => 'paid',
+            'paid_at' => $payment->paid_at ?? now()->toDateString(),
+        ]);
+
+        // Update parent domain status & advance expiry if renewal
+        if ($payment->domain) {
+            $domain = $payment->domain;
+            $newExpiry = $domain->expiry_date
+                ? Carbon::parse($domain->expiry_date)->addYear()
+                : now()->addYear();
+
+            $domain->update([
+                'status' => 'active',
+                'expiry_date' => $newExpiry->format('Y-m-d'),
+            ]);
+        }
+
+        Invoice::syncItemAndCheckInvoicePaid($payment);
+
+        return redirect()->back()->with('success', "Domain payment '{$payment->title}' marked as Paid successfully.");
     }
 
     /**

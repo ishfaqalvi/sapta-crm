@@ -154,6 +154,7 @@ class PermissionRegistry
                 'create-client-portal-projects',
                 'edit-client-portal-projects',
                 'delete-client-portal-projects',
+                'view-client-portal-project-budget',
             ],
             'Project Milestones & Billing' => [
                 'view-client-portal-project-milestones',
@@ -185,6 +186,7 @@ class PermissionRegistry
                 'create-client-portal-services',
                 'edit-client-portal-services',
                 'delete-client-portal-services',
+                'view-client-portal-service-budget',
             ],
             'Service Credentials' => [
                 'view-client-portal-service-credentials',

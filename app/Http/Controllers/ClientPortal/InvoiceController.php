@@ -15,6 +15,7 @@ use App\Models\SystemSetting;
 use App\Services\CurrencyService;
 use App\Traits\AuthorizesClientPortalAccess;
 use Barryvdh\DomPDF\Facade\Pdf;
+use Carbon\Carbon;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -112,10 +113,10 @@ class InvoiceController extends Controller
         $pendingProjects = ProjectPayment::where('client_id', $clientId)
             ->where('status', '!=', 'paid')
             ->whereDoesntHave('invoiceItems')
-            ->with('websiteProject:id,project_title')
+            ->with('websiteProject:id,project_name')
             ->get()
             ->map(function ($item) {
-                $projName = $item->websiteProject?->project_title ?? 'Website Project';
+                $projName = $item->websiteProject?->project_name ?? 'Website Project';
                 return [
                     'id' => $item->id,
                     'title' => "Project: {$projName} - {$item->milestone_title}",
@@ -155,14 +156,20 @@ class InvoiceController extends Controller
         $pendingDomains = DomainPayment::where('client_id', $clientId)
             ->where('status', '!=', 'paid')
             ->whereDoesntHave('invoiceItems')
-            ->with('domain:id,domain_name')
+            ->with('domain:id,domain_name,registration_date,expiry_date')
             ->get()
             ->map(function ($item) {
                 $domainName = $item->domain?->domain_name ?? 'Domain';
                 $type = ucfirst(str_replace('_', ' ', $item->payment_type ?: 'renewal'));
+                $startDate = $item->due_date ?? $item->domain?->registration_date ?? now();
+                $endDate = $item->domain?->expiry_date ?? ($startDate ? Carbon::parse($startDate)->addYear() : null);
+                $durationText = ($startDate && $endDate)
+                    ? ' (Duration: ' . Carbon::parse($startDate)->format('d M Y') . ' to ' . Carbon::parse($endDate)->format('d M Y') . ')'
+                    : '';
+
                 return [
                     'id' => $item->id,
-                    'title' => "Domain {$type}: {$domainName}",
+                    'title' => "Domain {$type}: {$domainName}{$durationText}",
                     'subtitle' => $domainName,
                     'amount' => (float) $item->amount,
                     'amount_pkr' => (float) $item->amount_pkr,
@@ -177,7 +184,7 @@ class InvoiceController extends Controller
         $pendingHostings = HostingPayment::where('client_id', $clientId)
             ->where('status', '!=', 'paid')
             ->whereDoesntHave('invoiceItems')
-            ->with(['hosting:id,hosting_title,billing_cycle,primary_domain_id', 'hosting.primaryDomain:id,domain_name'])
+            ->with(['hosting:id,hosting_title,billing_cycle,primary_domain_id,setup_date,expiry_date', 'hosting.primaryDomain:id,domain_name'])
             ->get()
             ->map(function ($item) {
                 $hostingTitle = $item->hosting?->hosting_title ?? 'Web Hosting';
@@ -185,9 +192,27 @@ class InvoiceController extends Controller
                 $type = ucfirst(str_replace('_', ' ', $item->payment_type ?: 'subscription'));
                 $cycle = $item->hosting?->billing_cycle ? ' (' . ucfirst(str_replace('_', ' ', $item->hosting->billing_cycle)) . ')' : '';
                 $domainSuffix = $domainName ? " - {$domainName}" : '';
+
+                $startDate = $item->due_date ?? $item->hosting?->setup_date ?? now();
+                $endDate = $item->hosting?->expiry_date;
+                if (!$endDate && $startDate) {
+                    $cycleType = strtolower($item->hosting?->billing_cycle ?? 'annual');
+                    $endDate = match ($cycleType) {
+                        'monthly' => Carbon::parse($startDate)->addMonth(),
+                        'quarterly' => Carbon::parse($startDate)->addMonths(3),
+                        'semi_annual' => Carbon::parse($startDate)->addMonths(6),
+                        'biennial' => Carbon::parse($startDate)->addYears(2),
+                        'triennial' => Carbon::parse($startDate)->addYears(3),
+                        default => Carbon::parse($startDate)->addYear(),
+                    };
+                }
+                $durationText = ($startDate && $endDate)
+                    ? ' (Duration: ' . Carbon::parse($startDate)->format('d M Y') . ' to ' . Carbon::parse($endDate)->format('d M Y') . ')'
+                    : '';
+
                 return [
                     'id' => $item->id,
-                    'title' => "Hosting: {$hostingTitle}{$cycle}{$domainSuffix} - {$type}",
+                    'title' => "Hosting: {$hostingTitle}{$cycle}{$domainSuffix} - {$type}{$durationText}",
                     'subtitle' => $hostingTitle,
                     'amount' => (float) $item->amount,
                     'amount_pkr' => (float) $item->amount_pkr,
@@ -301,10 +326,10 @@ class InvoiceController extends Controller
                 $q->whereDoesntHave('invoiceItems')
                     ->orWhereHas('invoiceItems', fn($iq) => $iq->where('invoice_id', $invoice->id));
             })
-            ->with('websiteProject:id,project_title')
+            ->with('websiteProject:id,project_name')
             ->get()
             ->map(function ($item) {
-                $projName = $item->websiteProject?->project_title ?? 'Website Project';
+                $projName = $item->websiteProject?->project_name ?? 'Website Project';
                 return [
                     'id' => $item->id,
                     'title' => "Project: {$projName} - {$item->milestone_title}",
@@ -350,14 +375,20 @@ class InvoiceController extends Controller
                 $q->whereDoesntHave('invoiceItems')
                     ->orWhereHas('invoiceItems', fn($iq) => $iq->where('invoice_id', $invoice->id));
             })
-            ->with('domain:id,domain_name')
+            ->with('domain:id,domain_name,registration_date,expiry_date')
             ->get()
             ->map(function ($item) {
                 $domainName = $item->domain?->domain_name ?? 'Domain';
                 $type = ucfirst(str_replace('_', ' ', $item->payment_type ?: 'renewal'));
+                $startDate = $item->due_date ?? $item->domain?->registration_date ?? now();
+                $endDate = $item->domain?->expiry_date ?? ($startDate ? Carbon::parse($startDate)->addYear() : null);
+                $durationText = ($startDate && $endDate)
+                    ? ' (Duration: ' . Carbon::parse($startDate)->format('d M Y') . ' to ' . Carbon::parse($endDate)->format('d M Y') . ')'
+                    : '';
+
                 return [
                     'id' => $item->id,
-                    'title' => "Domain {$type}: {$domainName}",
+                    'title' => "Domain {$type}: {$domainName}{$durationText}",
                     'subtitle' => $domainName,
                     'amount' => (float) $item->amount,
                     'amount_pkr' => (float) $item->amount_pkr,
@@ -375,7 +406,7 @@ class InvoiceController extends Controller
                 $q->whereDoesntHave('invoiceItems')
                     ->orWhereHas('invoiceItems', fn($iq) => $iq->where('invoice_id', $invoice->id));
             })
-            ->with(['hosting:id,hosting_title,billing_cycle,primary_domain_id', 'hosting.primaryDomain:id,domain_name'])
+            ->with(['hosting:id,hosting_title,billing_cycle,primary_domain_id,setup_date,expiry_date', 'hosting.primaryDomain:id,domain_name'])
             ->get()
             ->map(function ($item) {
                 $hostingTitle = $item->hosting?->hosting_title ?? 'Web Hosting';
@@ -383,9 +414,27 @@ class InvoiceController extends Controller
                 $type = ucfirst(str_replace('_', ' ', $item->payment_type ?: 'subscription'));
                 $cycle = $item->hosting?->billing_cycle ? ' (' . ucfirst(str_replace('_', ' ', $item->hosting->billing_cycle)) . ')' : '';
                 $domainSuffix = $domainName ? " - {$domainName}" : '';
+
+                $startDate = $item->due_date ?? $item->hosting?->setup_date ?? now();
+                $endDate = $item->hosting?->expiry_date;
+                if (!$endDate && $startDate) {
+                    $cycleType = strtolower($item->hosting?->billing_cycle ?? 'annual');
+                    $endDate = match ($cycleType) {
+                        'monthly' => Carbon::parse($startDate)->addMonth(),
+                        'quarterly' => Carbon::parse($startDate)->addMonths(3),
+                        'semi_annual' => Carbon::parse($startDate)->addMonths(6),
+                        'biennial' => Carbon::parse($startDate)->addYears(2),
+                        'triennial' => Carbon::parse($startDate)->addYears(3),
+                        default => Carbon::parse($startDate)->addYear(),
+                    };
+                }
+                $durationText = ($startDate && $endDate)
+                    ? ' (Duration: ' . Carbon::parse($startDate)->format('d M Y') . ' to ' . Carbon::parse($endDate)->format('d M Y') . ')'
+                    : '';
+
                 return [
                     'id' => $item->id,
-                    'title' => "Hosting: {$hostingTitle}{$cycle}{$domainSuffix} - {$type}",
+                    'title' => "Hosting: {$hostingTitle}{$cycle}{$domainSuffix} - {$type}{$durationText}",
                     'subtitle' => $hostingTitle,
                     'amount' => (float) $item->amount,
                     'amount_pkr' => (float) $item->amount_pkr,

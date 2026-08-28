@@ -41,7 +41,7 @@ export interface ClientServiceItem {
     } | null;
     service_name: string;
     monthly_fee: number | string;
-    contract_months: number;
+    contract_months: number | null;
     currency: string;
     start_date: string | null;
     billing_day: number;
@@ -68,6 +68,8 @@ interface ClientPortalServicesIndexProps {
         paused: number;
         stopped: number;
         monthly_recurring_total: number;
+        total_collected: number;
+        total_pending: number;
     };
     currencies?: { code: string; name: string; symbol: string }[];
     categories?: { id: number; name: string }[];
@@ -88,6 +90,7 @@ export default function ClientPortalServicesIndex({
 }: ClientPortalServicesIndexProps) {
     const { auth } = usePage().props as unknown as SharedData;
     const user = auth?.user;
+    const canViewBudget = hasPermission(user, 'view-client-portal-service-budget');
 
     const breadcrumbs: BreadcrumbItem[] = [
         { title: 'Client Portal', href: '/client-portal/overview' },
@@ -101,6 +104,7 @@ export default function ClientPortalServicesIndex({
     // Modal state for Create / Edit
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [editingService, setEditingService] = useState<ClientServiceItem | null>(null);
+    const [contractType, setContractType] = useState<'ongoing' | 'fixed'>('ongoing');
 
     // Delete modal state
     const [deletingService, setDeletingService] = useState<ClientServiceItem | null>(null);
@@ -108,14 +112,9 @@ export default function ClientPortalServicesIndex({
 
     const isFirstRender = useRef(true);
 
-    const formatForInput = (dateStr: string | null | undefined) => {
-        if (!dateStr) return '';
-        return dateStr.split('T')[0].split(' ')[0];
-    };
-
-    const formatDateOnly = (dateStr: string | null | undefined) => {
-        if (!dateStr) return 'N/A';
-        const cleanDate = dateStr.split('T')[0].split(' ')[0];
+    const formatDateOnly = (dateString?: string | null) => {
+        if (!dateString) return 'N/A';
+        const cleanDate = dateString.includes('T') ? dateString.split('T')[0] : dateString.split(' ')[0];
         const parts = cleanDate.split('-');
         if (parts.length === 3) {
             const year = parseInt(parts[0], 10);
@@ -123,8 +122,7 @@ export default function ClientPortalServicesIndex({
             const day = parseInt(parts[2], 10);
             if (!isNaN(year) && !isNaN(month) && !isNaN(day) && month >= 0 && month < 12) {
                 const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-                const formattedDay = day < 10 ? `0${day}` : `${day}`;
-                return `${formattedDay} ${months[month]} ${year}`;
+                return `${day < 10 ? `0${day}` : `${day}`} ${months[month]} ${year}`;
             }
         }
         return cleanDate;
@@ -149,11 +147,11 @@ export default function ClientPortalServicesIndex({
     };
 
     // Form Hook
-    const { data, setData, post, put, processing, errors, reset, clearErrors } = useForm({
+    const { data, setData, post, put, processing, errors, reset, clearErrors, transform } = useForm({
         service_name: '',
         category_id: '' as string | number,
         monthly_fee: '',
-        contract_months: 12 as string | number,
+        contract_months: '' as string | number,
         currency: client.currency || 'AED',
         start_date: new Date().toISOString().split('T')[0],
         billing_day: 1,
@@ -187,14 +185,15 @@ export default function ClientPortalServicesIndex({
     }, [searchQuery, selectedStatus, selectedCurrency]);
 
     const openCreateModal = () => {
-        setEditingService(null);
         clearErrors();
         reset();
+        setEditingService(null);
+        setContractType('ongoing');
         setData({
             service_name: '',
             category_id: '',
             monthly_fee: '',
-            contract_months: 12,
+            contract_months: '',
             currency: client.currency || 'AED',
             start_date: new Date().toISOString().split('T')[0],
             billing_day: 1,
@@ -204,19 +203,21 @@ export default function ClientPortalServicesIndex({
         setIsModalOpen(true);
     };
 
-    const openEditModal = (item: ClientServiceItem) => {
-        setEditingService(item);
+    const openEditModal = (service: ClientServiceItem) => {
         clearErrors();
+        setEditingService(service);
+        const hasMonths = service.contract_months && Number(service.contract_months) > 0;
+        setContractType(hasMonths ? 'fixed' : 'ongoing');
         setData({
-            service_name: item.service_name || '',
-            category_id: item.category_id || '',
-            monthly_fee: item.monthly_fee ? item.monthly_fee.toString() : '',
-            contract_months: item.contract_months || 12,
-            currency: item.currency || client.currency || 'AED',
-            start_date: formatForInput(item.start_date),
-            billing_day: item.billing_day || 1,
-            status: item.status || 'active',
-            notes: item.notes || '',
+            service_name: service.service_name,
+            category_id: service.category_id || '',
+            monthly_fee: String(service.monthly_fee),
+            contract_months: hasMonths ? String(service.contract_months) : '',
+            currency: service.currency || client.currency || 'AED',
+            start_date: service.start_date ? service.start_date.split('T')[0] : new Date().toISOString().split('T')[0],
+            billing_day: service.billing_day || 1,
+            status: service.status,
+            notes: service.notes || '',
         });
         setIsModalOpen(true);
     };
@@ -230,13 +231,25 @@ export default function ClientPortalServicesIndex({
 
     const handleSubmit = (e: FormEvent) => {
         e.preventDefault();
+
+        transform((currentData) => ({
+            ...currentData,
+            contract_months: contractType === 'fixed' ? currentData.contract_months : '',
+        }));
+
         if (editingService) {
             put(`/client-portal/services/update/${editingService.id}`, {
-                onSuccess: () => closeModal(),
+                preserveScroll: true,
+                onSuccess: () => {
+                    closeModal();
+                },
             });
         } else {
             post('/client-portal/services/store', {
-                onSuccess: () => closeModal(),
+                preserveScroll: true,
+                onSuccess: () => {
+                    closeModal();
+                },
             });
         }
     };
@@ -250,9 +263,6 @@ export default function ClientPortalServicesIndex({
                 setIsDeleting(false);
             },
             onError: () => {
-                setIsDeleting(false);
-            },
-            onFinish: () => {
                 setIsDeleting(false);
             },
         });
@@ -285,52 +295,114 @@ export default function ClientPortalServicesIndex({
                     )}
                 </div>
 
-                {/* KPI Stat Cards */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                    <div className="p-4 rounded-xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 shadow-xs flex items-center justify-between">
-                        <div>
-                            <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400">Total Services</p>
-                            <h3 className="text-xl font-extrabold text-slate-900 dark:text-white mt-0.5">{stats.total}</h3>
+                {/* KPI Stat Cards (Total Services, Monthly Retainer, Collected, Pending) */}
+                {canViewBudget ? (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                        <div className="p-4 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 shadow-xs flex items-center justify-between">
+                            <div>
+                                <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400">Total Services</p>
+                                <h3 className="text-xl font-extrabold text-slate-900 dark:text-white mt-0.5">{stats.total}</h3>
+                                <p className="text-[10px] text-slate-500 dark:text-slate-400 font-semibold mt-1">
+                                    {stats.active} Active • {stats.paused + stats.stopped} Inactive
+                                </p>
+                            </div>
+                            <div className="size-11 rounded-2xl bg-indigo-50 dark:bg-indigo-950 text-indigo-600 dark:text-indigo-400 flex items-center justify-center shrink-0">
+                                <Package className="size-5" />
+                            </div>
                         </div>
-                        <div className="size-10 rounded-xl bg-indigo-50 dark:bg-indigo-950 text-indigo-600 dark:text-indigo-400 flex items-center justify-center">
-                            <Package className="size-5" />
-                        </div>
-                    </div>
 
-                    <div className="p-4 rounded-xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 shadow-xs flex items-center justify-between">
-                        <div>
-                            <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400">Active Subscriptions</p>
-                            <h3 className="text-xl font-extrabold text-emerald-600 dark:text-emerald-400 mt-0.5">{stats.active}</h3>
+                        <div className="p-4 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 shadow-xs flex items-center justify-between">
+                            <div>
+                                <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400">Monthly Retainer</p>
+                                <h3 className="text-xl font-extrabold text-blue-600 dark:text-blue-400 mt-0.5">
+                                    {formatCurrency(stats.monthly_recurring_total || 0, client.currency || 'AED')}
+                                </h3>
+                                <p className="text-[10px] text-blue-600 dark:text-blue-400 font-bold mt-1">
+                                    Active Monthly Billing
+                                </p>
+                            </div>
+                            <div className="size-11 rounded-2xl bg-blue-50 dark:bg-blue-950 text-blue-600 dark:text-blue-400 flex items-center justify-center shrink-0">
+                                <RefreshCw className="size-5" />
+                            </div>
                         </div>
-                        <div className="size-10 rounded-xl bg-emerald-50 dark:bg-emerald-950 text-emerald-600 dark:text-emerald-400 flex items-center justify-center">
-                            <CheckCircle2 className="size-5" />
-                        </div>
-                    </div>
 
-                    <div className="p-4 rounded-xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 shadow-xs flex items-center justify-between">
-                        <div>
-                            <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400">Monthly Dues Total</p>
-                            <h3 className="text-xl font-extrabold text-purple-600 dark:text-purple-400 mt-0.5">
-                                {formatCurrency(stats.monthly_recurring_total, client.currency || 'AED')}
-                            </h3>
+                        <div className="p-4 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 shadow-xs flex items-center justify-between">
+                            <div>
+                                <p className="text-[11px] font-bold uppercase tracking-wider text-emerald-600 dark:text-emerald-400">Collected</p>
+                                <h3 className="text-xl font-extrabold text-emerald-600 dark:text-emerald-400 mt-0.5">
+                                    {formatCurrency(stats.total_collected || 0, client.currency || 'AED')}
+                                </h3>
+                                <p className="text-[10px] text-emerald-600/80 font-bold mt-1">
+                                    Paid to date
+                                </p>
+                            </div>
+                            <div className="size-11 rounded-2xl bg-emerald-50 dark:bg-emerald-950 text-emerald-600 dark:text-emerald-400 flex items-center justify-center shrink-0">
+                                <CheckCircle2 className="size-5" />
+                            </div>
                         </div>
-                        <div className="size-10 rounded-xl bg-purple-50 dark:bg-purple-950 text-purple-600 dark:text-purple-400 flex items-center justify-center">
-                            <RefreshCw className="size-5" />
-                        </div>
-                    </div>
 
-                    <div className="p-4 rounded-xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 shadow-xs flex items-center justify-between">
-                        <div>
-                            <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400">Paused / Stopped</p>
-                            <h3 className="text-xl font-extrabold text-amber-600 dark:text-amber-400 mt-0.5">
-                                {stats.paused + stats.stopped}
-                            </h3>
-                        </div>
-                        <div className="size-10 rounded-xl bg-amber-50 dark:bg-amber-950 text-amber-600 dark:text-amber-400 flex items-center justify-center">
-                            <Clock className="size-5" />
+                        <div className="p-4 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 shadow-xs flex items-center justify-between">
+                            <div>
+                                <p className="text-[11px] font-bold uppercase tracking-wider text-amber-600 dark:text-amber-400">Pending</p>
+                                <h3 className="text-xl font-extrabold text-amber-600 dark:text-amber-400 mt-0.5">
+                                    {formatCurrency(stats.total_pending || 0, client.currency || 'AED')}
+                                </h3>
+                                <p className="text-[10px] text-amber-600/80 font-bold mt-1">
+                                    Remaining dues
+                                </p>
+                            </div>
+                            <div className="size-11 rounded-2xl bg-amber-50 dark:bg-amber-950 text-amber-600 dark:text-amber-400 flex items-center justify-center shrink-0">
+                                <Clock className="size-5" />
+                            </div>
                         </div>
                     </div>
-                </div>
+                ) : (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                        <div className="p-4 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 shadow-xs flex items-center justify-between">
+                            <div>
+                                <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400">Total Services</p>
+                                <h3 className="text-xl font-extrabold text-slate-900 dark:text-white mt-0.5">{stats.total}</h3>
+                                <p className="text-[10px] text-slate-500 font-semibold mt-1">All Subscriptions</p>
+                            </div>
+                            <div className="size-11 rounded-2xl bg-indigo-50 dark:bg-indigo-950 text-indigo-600 dark:text-indigo-400 flex items-center justify-center shrink-0">
+                                <Package className="size-5" />
+                            </div>
+                        </div>
+
+                        <div className="p-4 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 shadow-xs flex items-center justify-between">
+                            <div>
+                                <p className="text-[11px] font-bold uppercase tracking-wider text-emerald-600 dark:text-emerald-400">Active</p>
+                                <h3 className="text-xl font-extrabold text-emerald-600 dark:text-emerald-400 mt-0.5">{stats.active}</h3>
+                                <p className="text-[10px] text-emerald-500 font-semibold mt-1">Currently Running</p>
+                            </div>
+                            <div className="size-11 rounded-2xl bg-emerald-50 dark:bg-emerald-950 text-emerald-600 dark:text-emerald-400 flex items-center justify-center shrink-0">
+                                <CheckCircle2 className="size-5" />
+                            </div>
+                        </div>
+
+                        <div className="p-4 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 shadow-xs flex items-center justify-between">
+                            <div>
+                                <p className="text-[11px] font-bold uppercase tracking-wider text-amber-600 dark:text-amber-400">Paused</p>
+                                <h3 className="text-xl font-extrabold text-amber-600 dark:text-amber-400 mt-0.5">{stats.paused}</h3>
+                                <p className="text-[10px] text-amber-500 font-semibold mt-1">Temporarily On Hold</p>
+                            </div>
+                            <div className="size-11 rounded-2xl bg-amber-50 dark:bg-amber-950 text-amber-600 dark:text-amber-400 flex items-center justify-center shrink-0">
+                                <Clock className="size-5" />
+                            </div>
+                        </div>
+
+                        <div className="p-4 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 shadow-xs flex items-center justify-between">
+                            <div>
+                                <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400">Stopped</p>
+                                <h3 className="text-xl font-extrabold text-slate-900 dark:text-white mt-0.5">{stats.stopped}</h3>
+                                <p className="text-[10px] text-slate-500 font-semibold mt-1">Terminated Contracts</p>
+                            </div>
+                            <div className="size-11 rounded-2xl bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 flex items-center justify-center shrink-0">
+                                <RefreshCw className="size-5" />
+                            </div>
+                        </div>
+                    </div>
+                )}
 
                 {/* Filters Toolbar */}
                 <div className="flex flex-col lg:flex-row items-center justify-between gap-4 p-2 rounded-xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 shadow-xs">
@@ -366,9 +438,13 @@ export default function ClientPortalServicesIndex({
                             <thead className="bg-slate-50 dark:bg-slate-800/60 text-slate-500 dark:text-slate-400 font-extrabold uppercase text-[10px] tracking-wider border-b border-slate-200 dark:border-slate-800">
                                 <tr>
                                     <th className="px-4 py-4 whitespace-nowrap">Service & Category</th>
-                                    <th className="px-4 py-4 whitespace-nowrap">Monthly Fee & Duration</th>
-                                    <th className="px-4 py-4 whitespace-nowrap">Collected</th>
-                                    <th className="px-4 py-4 whitespace-nowrap">Due Amount</th>
+                                    {canViewBudget && (
+                                        <>
+                                            <th className="px-4 py-4 whitespace-nowrap">Monthly Fee & Duration</th>
+                                            <th className="px-4 py-4 whitespace-nowrap">Collected</th>
+                                            <th className="px-4 py-4 whitespace-nowrap">Due Amount</th>
+                                        </>
+                                    )}
                                     <th className="px-4 py-4 whitespace-nowrap">Due Day</th>
                                     <th className="px-4 py-4 whitespace-nowrap">Start Date</th>
                                     <th className="px-4 py-4 whitespace-nowrap">Status</th>
@@ -400,30 +476,41 @@ export default function ClientPortalServicesIndex({
                                                 </div>
                                             </td>
 
-                                            <td className="px-4 py-4 whitespace-nowrap">
-                                                <span className="font-extrabold text-slate-900 dark:text-white text-sm">
-                                                    {formatCurrency(item.monthly_fee, item.currency || client.currency || '$')}
-                                                </span>
-                                                <span className="text-[10px] text-slate-400 font-medium block">
-                                                    {item.contract_months || 12} Months Duration
-                                                </span>
-                                            </td>
+                                            {canViewBudget && (
+                                                <>
+                                                    <td className="px-4 py-4 whitespace-nowrap">
+                                                        <span className="font-extrabold text-slate-900 dark:text-white text-sm">
+                                                            {formatCurrency(item.monthly_fee, item.currency || client.currency || '$')}
+                                                        </span>
+                                                        {item.contract_months && Number(item.contract_months) > 0 ? (
+                                                            <span className="text-[10px] text-slate-400 font-medium block">
+                                                                {item.contract_months} Months Contract
+                                                            </span>
+                                                        ) : (
+                                                            <span className="inline-flex items-center gap-1 mt-0.5 px-2 py-0.5 rounded-md text-[9px] font-bold bg-blue-50 dark:bg-blue-950/60 text-blue-700 dark:text-blue-300 border border-blue-200/60 dark:border-blue-800">
+                                                                <RefreshCw className="size-2.5" />
+                                                                Ongoing / Month-to-Month
+                                                            </span>
+                                                        )}
+                                                    </td>
 
-                                            <td className="px-4 py-4 whitespace-nowrap">
-                                                <span className="font-extrabold text-emerald-600 dark:text-emerald-400 text-sm block">
-                                                    {formatCurrency(item.collected_amount || 0, item.currency || client.currency || '$')}
-                                                </span>
-                                                <span className="text-[10px] text-slate-400 font-medium block">Total Paid</span>
-                                            </td>
+                                                    <td className="px-4 py-4 whitespace-nowrap">
+                                                        <span className="font-extrabold text-emerald-600 dark:text-emerald-400 text-sm block">
+                                                            {formatCurrency(item.collected_amount || 0, item.currency || client.currency || '$')}
+                                                        </span>
+                                                        <span className="text-[10px] text-slate-400 font-medium block">Total Paid</span>
+                                                    </td>
 
-                                            <td className="px-4 py-4 whitespace-nowrap">
-                                                <span className={`font-extrabold text-sm block ${Number(item.due_amount || 0) > 0 ? 'text-amber-600 dark:text-amber-400' : 'text-slate-500 dark:text-slate-400'}`}>
-                                                    {formatCurrency(item.due_amount || 0, item.currency || client.currency || '$')}
-                                                </span>
-                                                <span className="text-[10px] text-slate-400 font-medium block">
-                                                    {Number(item.due_amount || 0) > 0 ? 'Due' : 'No Due'}
-                                                </span>
-                                            </td>
+                                                    <td className="px-4 py-4 whitespace-nowrap">
+                                                        <span className={`font-extrabold text-sm block ${Number(item.due_amount || 0) > 0 ? 'text-amber-600 dark:text-amber-400' : 'text-slate-500 dark:text-slate-400'}`}>
+                                                            {formatCurrency(item.due_amount || 0, item.currency || client.currency || '$')}
+                                                        </span>
+                                                        <span className="text-[10px] text-slate-400 font-medium block">
+                                                            {Number(item.due_amount || 0) > 0 ? 'Due' : 'No Due'}
+                                                        </span>
+                                                    </td>
+                                                </>
+                                            )}
 
                                             <td className="px-4 py-4 whitespace-nowrap">
                                                 <span className="px-2.5 py-1 rounded-md bg-slate-100 dark:bg-slate-800 font-mono font-bold text-slate-800 dark:text-slate-200">
@@ -509,7 +596,7 @@ export default function ClientPortalServicesIndex({
                             <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800">
                                 <div className="flex items-center gap-3">
                                     <div className="p-2 rounded-xl bg-purple-50 dark:bg-purple-950/60 text-purple-600 dark:text-purple-400">
-                                        <LineChart className="size-5" />
+                                        <Layers className="size-5" />
                                     </div>
                                     <div>
                                         <h3 className="font-extrabold text-slate-900 dark:text-white text-base">
@@ -566,7 +653,7 @@ export default function ClientPortalServicesIndex({
                                         {errors.service_name && <p className="text-rose-500 text-xs font-medium mt-1">{errors.service_name}</p>}
                                     </div>
 
-                                    {/* Monthly Fee & Contract Duration */}
+                                    {/* Monthly Fee */}
                                     <div>
                                         <label className="block text-xs font-extrabold text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-1.5">
                                             Monthly Fee <span className="text-rose-500">*</span>
@@ -585,20 +672,60 @@ export default function ClientPortalServicesIndex({
                                         {errors.monthly_fee && <p className="text-rose-500 text-xs font-medium mt-1">{errors.monthly_fee}</p>}
                                     </div>
 
+                                    {/* Contract Type (Ongoing vs Fixed) */}
                                     <div>
                                         <label className="block text-xs font-extrabold text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-1.5">
-                                            Contract Duration (Months) <span className="text-rose-500">*</span>
+                                            Contract Type <span className="text-rose-500">*</span>
                                         </label>
-                                        <input
-                                            type="number"
-                                            min={1}
-                                            max={120}
-                                            value={data.contract_months}
-                                            onChange={(e) => setData('contract_months', parseInt(e.target.value, 10) || 12)}
-                                            placeholder="12"
-                                            className="w-full h-10 px-4 rounded-xl bg-slate-50/50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-xs font-medium text-slate-900 dark:text-white focus:outline-none focus:border-blue-600"
-                                        />
+                                        <div className="grid grid-cols-2 gap-2">
+                                            <button
+                                                type="button"
+                                                onClick={() => {
+                                                    setContractType('ongoing');
+                                                    setData('contract_months', '');
+                                                }}
+                                                className={`h-10 px-2.5 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 border cursor-pointer ${contractType === 'ongoing'
+                                                    ? 'bg-blue-50 border-blue-500 text-blue-700 dark:bg-blue-950/60 dark:border-blue-500 dark:text-blue-300 shadow-xs'
+                                                    : 'bg-slate-50/50 dark:bg-slate-950 border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-900'
+                                                    }`}
+                                            >
+                                                <RefreshCw className="size-3.5" />
+                                                <span className="truncate">Ongoing / Open</span>
+                                            </button>
+                                            <button
+                                                type="button"
+                                                onClick={() => {
+                                                    setContractType('fixed');
+                                                    setData('contract_months', 12);
+                                                }}
+                                                className={`h-10 px-2.5 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 border cursor-pointer ${contractType === 'fixed'
+                                                    ? 'bg-blue-50 border-blue-500 text-blue-700 dark:bg-blue-950/60 dark:border-blue-500 dark:text-blue-300 shadow-xs'
+                                                    : 'bg-slate-50/50 dark:bg-slate-950 border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-900'
+                                                    }`}
+                                            >
+                                                <Calendar className="size-3.5" />
+                                                <span className="truncate">Fixed Months</span>
+                                            </button>
+                                        </div>
                                     </div>
+
+                                    {/* Fixed Contract Duration Input */}
+                                    {contractType === 'fixed' && (
+                                        <div className="md:col-span-2">
+                                            <label className="block text-xs font-extrabold text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-1.5">
+                                                Contract Duration (Months) <span className="text-rose-500">*</span>
+                                            </label>
+                                            <input
+                                                type="number"
+                                                min={1}
+                                                max={120}
+                                                value={data.contract_months}
+                                                onChange={(e) => setData('contract_months', e.target.value ? parseInt(e.target.value, 10) : '')}
+                                                placeholder="e.g. 12"
+                                                className="w-full h-10 px-4 rounded-xl bg-slate-50/50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-xs font-medium text-slate-900 dark:text-white focus:outline-none focus:border-blue-600"
+                                            />
+                                        </div>
+                                    )}
 
                                     {/* Start Date, Billing Day & Status (Single Row) */}
                                     <div className="grid grid-cols-1 md:grid-cols-3 gap-3 md:col-span-2">

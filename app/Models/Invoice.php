@@ -180,6 +180,93 @@ class Invoice extends Model
         }
     }
 
+    /**
+     * Check if all linked items for this invoice are in a paid/active state.
+     * If all items are paid, automatically mark the whole invoice as 'paid'.
+     */
+    public function checkIfFullyPaidAndSync(): bool
+    {
+        $items = $this->items()->get();
+        if ($items->isEmpty()) {
+            return false;
+        }
+
+        $allPaid = true;
+        $hasPayableItems = false;
+
+        foreach ($items as $item) {
+            if (!$item->invoiceable_type || !$item->invoiceable_id) {
+                continue;
+            }
+
+            $hasPayableItems = true;
+            $isItemPaid = false;
+            $type = $item->invoiceable_type;
+            $id = $item->invoiceable_id;
+
+            // Resolve class if short name was used
+            if (!class_exists($type)) {
+                $namespaced = 'App\\Models\\' . class_basename($type);
+                if (class_exists($namespaced)) {
+                    $type = $namespaced;
+                }
+            }
+
+            if (class_exists($type)) {
+                $payable = $type::find($id);
+                if ($payable) {
+                    if (isset($payable->status)) {
+                        $isItemPaid = in_array(strtolower((string) $payable->status), ['paid', 'active', 'completed']);
+                    } else {
+                        $isItemPaid = true;
+                    }
+                }
+            } else {
+                $isItemPaid = true;
+            }
+
+            if (!$isItemPaid) {
+                $allPaid = false;
+                break;
+            }
+        }
+
+        if ($hasPayableItems && $allPaid && $this->status !== 'paid') {
+            $this->update(['status' => 'paid']);
+            return true;
+        }
+
+        return false;
+    }
+
+    /**
+     * Static helper: When any payable child record is marked as paid,
+     * find its linked invoices and verify if all items are fully paid.
+     */
+    public static function syncItemAndCheckInvoicePaid(Model $record): void
+    {
+        $recordClass = get_class($record);
+        $recordBasename = class_basename($record);
+        $morphAlias = $record->getMorphClass();
+
+        $types = array_unique([$recordClass, $recordBasename, $morphAlias, '\\' . $recordClass]);
+
+        $invoiceItems = InvoiceItem::whereIn('invoiceable_type', $types)
+            ->where('invoiceable_id', $record->id)
+            ->with('invoice')
+            ->get();
+
+        foreach ($invoiceItems as $item) {
+            if ($item->invoice) {
+                $item->invoice->checkIfFullyPaidAndSync();
+            }
+        }
+
+        if (method_exists($record, 'invoice') && $record->invoice) {
+            $record->invoice->checkIfFullyPaidAndSync();
+        }
+    }
+
     protected static function booted(): void
     {
         static::saved(function (Invoice $invoice) {

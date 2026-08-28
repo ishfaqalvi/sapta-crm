@@ -18,6 +18,7 @@ import {
     EyeOff,
     FileText,
     Key,
+    KeyRound,
     Layers,
     LoaderCircle,
     Lock,
@@ -75,7 +76,7 @@ export interface ClientServiceDetailItem {
     } | null;
     service_name: string;
     monthly_fee: number | string;
-    contract_months: number;
+    contract_months: number | null;
     currency: string;
     start_date: string | null;
     billing_day: number;
@@ -110,6 +111,7 @@ interface ClientPortalServiceShowProps {
 export default function ClientPortalServiceShow({ client, service }: ClientPortalServiceShowProps) {
     const { auth } = usePage().props as unknown as SharedData;
     const user = auth?.user;
+    const canViewBudget = hasPermission(user, 'view-client-portal-service-budget');
 
     const breadcrumbs: BreadcrumbItem[] = [
         { title: 'Client Portal', href: '/client-portal/overview' },
@@ -122,7 +124,8 @@ export default function ClientPortalServiceShow({ client, service }: ClientPorta
         if (typeof window !== 'undefined') {
             const params = new URLSearchParams(window.location.search);
             const tab = params.get('tab');
-            if (tab === 'payments' || tab === 'credentials' || tab === 'details' || tab === 'documents') {
+            if (tab === 'payments' && canViewBudget) return 'payments';
+            if (tab === 'credentials' || tab === 'details' || tab === 'documents') {
                 return tab;
             }
         }
@@ -265,6 +268,28 @@ export default function ClientPortalServiceShow({ client, service }: ClientPorta
     const [confirmingInvoicePayment, setConfirmingInvoicePayment] = useState<ServicePaymentItem | null>(null);
     const [isGeneratingInvoice, setIsGeneratingInvoice] = useState(false);
 
+    // Mark as Paid Confirmation State
+    const [confirmingPaidPayment, setConfirmingPaidPayment] = useState<ServicePaymentItem | null>(null);
+    const [isMarkingPaidPayment, setIsMarkingPaidPayment] = useState(false);
+
+    const handleMarkPaymentPaidSubmit = () => {
+        if (!confirmingPaidPayment) return;
+        setIsMarkingPaidPayment(true);
+        router.post(
+            `/client-portal/services/payments/${confirmingPaidPayment.id}/mark-as-paid`,
+            {},
+            {
+                preserveScroll: true,
+                onSuccess: () => {
+                    setConfirmingPaidPayment(null);
+                    setIsMarkingPaidPayment(false);
+                },
+                onError: () => setIsMarkingPaidPayment(false),
+                onFinish: () => setIsMarkingPaidPayment(false),
+            }
+        );
+    };
+
     const handleGenerateInvoiceSubmit = () => {
         if (!confirmingInvoicePayment) return;
         setIsGeneratingInvoice(true);
@@ -309,14 +334,16 @@ export default function ClientPortalServiceShow({ client, service }: ClientPorta
         return `${currencySymbol} ${num.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
     };
 
-    const totalContractMonths = service.contract_months || 12;
-    const totalContractValue = Number(service.monthly_fee) * totalContractMonths;
+    const isOngoing = !service.contract_months || Number(service.contract_months) === 0;
+    const totalContractMonths = service.contract_months ? Number(service.contract_months) : null;
+    const totalContractValue = totalContractMonths ? Number(service.monthly_fee) * totalContractMonths : null;
     const paymentsList = service.payments || [];
     const totalPaid = paymentsList
         .filter((p) => p.status === 'paid')
         .reduce((sum, p) => sum + Number(p.amount_paid || 0), 0);
+    const paidMonthsCount = paymentsList.filter((p) => p.status === 'paid').length;
 
-    const paidPercentage = totalContractValue > 0 ? Math.min(100, Math.round((totalPaid / totalContractValue) * 100)) : 0;
+    const paidPercentage = totalContractValue && totalContractValue > 0 ? Math.min(100, Math.round((totalPaid / totalContractValue) * 100)) : 0;
 
     // Handle Generation (Asking ONLY for Month)
     const openGenerateModal = () => {
@@ -373,11 +400,9 @@ export default function ClientPortalServiceShow({ client, service }: ClientPorta
             <Head title={`${service.service_name} | ${client.name}`} />
 
             <div className="p-2 sm:p-6 w-full space-y-6 bg-slate-50/50 dark:bg-slate-950">
-                {/* 1. TOP HEADER CARD: TABS ON LEFT, BACK BUTTON ON RIGHT */}
+                {/* Navigation Header Tabs */}
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-2.5 rounded-xl bg-white dark:bg-slate-900 border border-slate-200/90 dark:border-slate-800 shadow-xs">
-                    {/* Left: Navigation Tabs */}
                     <div className="flex flex-wrap items-center gap-1.5">
-                        {/* TAB 1: Details */}
                         <button
                             type="button"
                             onClick={() => setActiveTab('details')}
@@ -391,7 +416,7 @@ export default function ClientPortalServiceShow({ client, service }: ClientPorta
                         </button>
 
                         {/* TAB 2: Payments */}
-                        {hasPermission(user, 'view-client-portal-service-payments') && (
+                        {canViewBudget && (
                             <button
                                 type="button"
                                 onClick={() => setActiveTab('payments')}
@@ -405,7 +430,6 @@ export default function ClientPortalServiceShow({ client, service }: ClientPorta
                             </button>
                         )}
 
-                        {/* TAB 3: Credentials */}
                         {hasPermission(user, 'view-client-portal-service-credentials') && (
                             <button
                                 type="button"
@@ -415,12 +439,11 @@ export default function ClientPortalServiceShow({ client, service }: ClientPorta
                                     : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'
                                     }`}
                             >
-                                <Key className="size-4" />
+                                <KeyRound className="size-4" />
                                 <span>3. Credentials ({service.credentials?.length || 0})</span>
                             </button>
                         )}
 
-                        {/* TAB 4: Documents */}
                         {hasPermission(user, 'view-client-portal-service-documents') && (
                             <button
                                 type="button"
@@ -436,7 +459,6 @@ export default function ClientPortalServiceShow({ client, service }: ClientPorta
                         )}
                     </div>
 
-                    {/* Right: Back Button */}
                     <Link
                         href="/client-portal/services"
                         className="h-10 px-4 rounded-xl bg-slate-200 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 text-xs font-bold transition-all flex items-center justify-center gap-2 cursor-pointer shrink-0"
@@ -446,35 +468,33 @@ export default function ClientPortalServiceShow({ client, service }: ClientPorta
                     </Link>
                 </div>
 
-                {/* 2. TAB 1 CONTENT: DETAILS */}
+                {/* TAB 1: DETAILS & EXECUTIVE OVERVIEW */}
                 {activeTab === 'details' && (
                     <div className="space-y-6">
-                        {/* Service Title & Status Banner */}
+                        {/* Service Title & Master Overview */}
                         <div className="p-6 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-6">
                             <div className="space-y-2">
                                 <div className="flex flex-wrap items-center gap-2">
                                     <h1 className="text-xl sm:text-2xl font-extrabold text-slate-900 dark:text-white tracking-tight">
                                         {service.service_name}
                                     </h1>
-
                                     {service.category && (
                                         <span className="px-2.5 py-1 rounded-full text-xs font-black uppercase tracking-wider bg-indigo-50 text-indigo-700 dark:bg-indigo-950/60 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800">
                                             {service.category.name}
                                         </span>
                                     )}
-
                                     <span
-                                        className={`px-3 py-1 rounded-full text-xs font-extrabold capitalize inline-flex items-center gap-1 ${service.status === 'active'
-                                            ? 'bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800'
+                                        className={`px-3 py-1 rounded-full text-xs font-black uppercase tracking-wider inline-flex items-center gap-1.5 border ${service.status === 'active'
+                                            ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300 border-emerald-200/60'
                                             : service.status === 'paused'
-                                                ? 'bg-amber-50 dark:bg-amber-950/60 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-800'
-                                                : 'bg-rose-50 dark:bg-rose-950/60 text-rose-700 dark:text-rose-300 border border-rose-200 dark:border-rose-800'
+                                                ? 'bg-amber-50 text-amber-700 dark:bg-amber-950/60 dark:text-amber-300 border-amber-200/60'
+                                                : 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300 border-slate-200'
                                             }`}
                                     >
                                         {service.status === 'active' ? (
                                             <>
                                                 <CheckCircle2 className="size-3.5" />
-                                                <span>Active</span>
+                                                <span>Active Subscription</span>
                                             </>
                                         ) : service.status === 'paused' ? (
                                             <>
@@ -500,74 +520,146 @@ export default function ClientPortalServiceShow({ client, service }: ClientPorta
                         </div>
 
                         {/* Top Executive KPI Cards Grid (4 Cards) */}
-                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                            {/* Monthly Fee */}
-                            <div className="p-5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 shadow-2xs space-y-2">
-                                <div className="flex items-center justify-between">
-                                    <span className="text-xs font-bold uppercase tracking-wider text-slate-400">Monthly Fee</span>
-                                    <div className="p-2 rounded-xl bg-blue-50 dark:bg-blue-950 text-blue-600 dark:text-blue-400">
-                                        <DollarSign className="size-4" />
+                        {canViewBudget ? (
+                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                                {/* Monthly Fee */}
+                                <div className="p-5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 shadow-2xs space-y-2">
+                                    <div className="flex items-center justify-between">
+                                        <span className="text-xs font-bold uppercase tracking-wider text-slate-400">Monthly Fee</span>
+                                        <div className="p-2 rounded-xl bg-blue-50 dark:bg-blue-950 text-blue-600 dark:text-blue-400">
+                                            <DollarSign className="size-4" />
+                                        </div>
                                     </div>
+                                    <p className="text-xl font-extrabold text-slate-900 dark:text-white">
+                                        {formatCurrency(service.monthly_fee)} <span className="text-xs text-slate-400 font-semibold">/ mo</span>
+                                    </p>
+                                    <p className="text-xs text-slate-400 font-medium pt-2 border-t border-slate-100 dark:border-slate-800">
+                                        Billing Currency: <strong className="text-slate-700 dark:text-slate-300 font-mono">{service.currency || client.currency}</strong>
+                                    </p>
                                 </div>
-                                <p className="text-xl font-extrabold text-slate-900 dark:text-white">
-                                    {formatCurrency(service.monthly_fee)} <span className="text-xs text-slate-400 font-semibold">/ mo</span>
-                                </p>
-                                <p className="text-xs text-slate-400 font-medium pt-2 border-t border-slate-100 dark:border-slate-800">
-                                    Billing Currency: <strong className="text-slate-700 dark:text-slate-300 font-mono">{service.currency || client.currency}</strong>
-                                </p>
-                            </div>
 
-                            {/* Contract Value & Duration */}
-                            <div className="p-5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 shadow-2xs space-y-2">
-                                <div className="flex items-center justify-between">
-                                    <span className="text-xs font-bold uppercase tracking-wider text-slate-400">Contract Value</span>
-                                    <div className="p-2 rounded-xl bg-purple-50 dark:bg-purple-950 text-purple-600 dark:text-purple-400">
-                                        <Package className="size-4" />
+                                {/* Contract Value & Duration */}
+                                <div className="p-5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 shadow-2xs space-y-2">
+                                    <div className="flex items-center justify-between">
+                                        <span className="text-xs font-bold uppercase tracking-wider text-slate-400">Contract Value</span>
+                                        <div className="p-2 rounded-xl bg-purple-50 dark:bg-purple-950 text-purple-600 dark:text-purple-400">
+                                            <Package className="size-4" />
+                                        </div>
                                     </div>
+                                    <p className="text-xl font-extrabold text-slate-900 dark:text-white">
+                                        {isOngoing ? 'Ongoing Retainer' : formatCurrency(totalContractValue || 0)}
+                                    </p>
+                                    <p className="text-xs text-slate-400 font-medium pt-2 border-t border-slate-100 dark:border-slate-800">
+                                        Duration: <strong className="text-slate-700 dark:text-slate-300">
+                                            {isOngoing ? 'Ongoing (Month-to-Month)' : `${totalContractMonths} Months`}
+                                        </strong>
+                                    </p>
                                 </div>
-                                <p className="text-xl font-extrabold text-slate-900 dark:text-white">
-                                    {formatCurrency(totalContractValue)}
-                                </p>
-                                <p className="text-xs text-slate-400 font-medium pt-2 border-t border-slate-100 dark:border-slate-800">
-                                    Duration: <strong className="text-slate-700 dark:text-slate-300">{totalContractMonths} Months</strong>
-                                </p>
-                            </div>
 
-                            {/* Billing Cycle & Start Date */}
-                            <div className="p-5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 shadow-2xs space-y-2">
-                                <div className="flex items-center justify-between">
-                                    <span className="text-xs font-bold uppercase tracking-wider text-slate-400">Billing Cycle</span>
-                                    <div className="p-2 rounded-xl bg-amber-50 dark:bg-amber-950 text-amber-600 dark:text-amber-400">
-                                        <Calendar className="size-4" />
+                                {/* Billing Cycle & Start Date */}
+                                <div className="p-5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 shadow-2xs space-y-2">
+                                    <div className="flex items-center justify-between">
+                                        <span className="text-xs font-bold uppercase tracking-wider text-slate-400">Billing Cycle</span>
+                                        <div className="p-2 rounded-xl bg-amber-50 dark:bg-amber-950 text-amber-600 dark:text-amber-400">
+                                            <Calendar className="size-4" />
+                                        </div>
                                     </div>
+                                    <p className="text-base font-extrabold text-slate-900 dark:text-white">
+                                        Day {service.billing_day} of month
+                                    </p>
+                                    <p className="text-xs text-slate-400 font-medium pt-2 border-t border-slate-100 dark:border-slate-800">
+                                        Started: {formatDateOnly(service.start_date)}
+                                    </p>
                                 </div>
-                                <p className="text-base font-extrabold text-slate-900 dark:text-white">
-                                    Day {service.billing_day} of month
-                                </p>
-                                <p className="text-xs text-slate-400 font-medium pt-2 border-t border-slate-100 dark:border-slate-800">
-                                    Started: {formatDateOnly(service.start_date)}
-                                </p>
-                            </div>
 
-                            {/* Total Paid & Settle % */}
-                            <div className="p-5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 shadow-2xs space-y-2">
-                                <div className="flex items-center justify-between">
-                                    <span className="text-xs font-bold uppercase tracking-wider text-slate-400">Total Paid</span>
-                                    <div className="p-2 rounded-xl bg-emerald-50 dark:bg-emerald-950 text-emerald-600 dark:text-emerald-400">
-                                        <RefreshCw className="size-4" />
+                                {/* Total Paid & Settle % */}
+                                <div className="p-5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 shadow-2xs space-y-2">
+                                    <div className="flex items-center justify-between">
+                                        <span className="text-xs font-bold uppercase tracking-wider text-slate-400">Total Paid</span>
+                                        <div className="p-2 rounded-xl bg-emerald-50 dark:bg-emerald-950 text-emerald-600 dark:text-emerald-400">
+                                            <RefreshCw className="size-4" />
+                                        </div>
                                     </div>
-                                </div>
-                                <p className="text-xl font-extrabold text-emerald-600 dark:text-emerald-400">
-                                    {formatCurrency(totalPaid)}
-                                </p>
-                                <div className="w-full bg-slate-100 dark:bg-slate-800 rounded-full h-1.5 overflow-hidden">
-                                    <div
-                                        className="bg-emerald-500 h-1.5 rounded-full transition-all duration-500"
-                                        style={{ width: `${paidPercentage}%` }}
-                                    />
+                                    <p className="text-xl font-extrabold text-emerald-600 dark:text-emerald-400">
+                                        {formatCurrency(totalPaid)}
+                                    </p>
+                                    {isOngoing ? (
+                                        <p className="text-xs text-emerald-600 dark:text-emerald-400 font-bold pt-2 border-t border-slate-100 dark:border-slate-800">
+                                            {paidMonthsCount} Month{paidMonthsCount === 1 ? '' : 's'} Paid
+                                        </p>
+                                    ) : (
+                                        <div className="w-full bg-slate-100 dark:bg-slate-800 rounded-full h-1.5 overflow-hidden">
+                                            <div
+                                                className="bg-emerald-500 h-1.5 rounded-full transition-all duration-500"
+                                                style={{ width: `${paidPercentage}%` }}
+                                            />
+                                        </div>
+                                    )}
                                 </div>
                             </div>
-                        </div>
+                        ) : (
+                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                                <div className="p-5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 shadow-2xs space-y-2">
+                                    <div className="flex items-center justify-between">
+                                        <span className="text-xs font-bold uppercase tracking-wider text-slate-400">Category</span>
+                                        <div className="p-2 rounded-xl bg-indigo-50 dark:bg-indigo-950 text-indigo-600 dark:text-indigo-400">
+                                            <Package className="size-4" />
+                                        </div>
+                                    </div>
+                                    <p className="text-lg font-extrabold text-slate-900 dark:text-white">
+                                        {service.category?.name || 'General Service'}
+                                    </p>
+                                    <p className="text-xs text-slate-400 font-medium pt-2 border-t border-slate-100 dark:border-slate-800">
+                                        Service Department
+                                    </p>
+                                </div>
+
+                                <div className="p-5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 shadow-2xs space-y-2">
+                                    <div className="flex items-center justify-between">
+                                        <span className="text-xs font-bold uppercase tracking-wider text-slate-400">Contract Duration</span>
+                                        <div className="p-2 rounded-xl bg-purple-50 dark:bg-purple-950 text-purple-600 dark:text-purple-400">
+                                            <Calendar className="size-4" />
+                                        </div>
+                                    </div>
+                                    <p className="text-lg font-extrabold text-slate-900 dark:text-white">
+                                        {isOngoing ? 'Ongoing Retainer' : `${totalContractMonths} Months`}
+                                    </p>
+                                    <p className="text-xs text-slate-400 font-medium pt-2 border-t border-slate-100 dark:border-slate-800">
+                                        {isOngoing ? 'Month-to-Month Contract' : 'Fixed Duration'}
+                                    </p>
+                                </div>
+
+                                <div className="p-5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 shadow-2xs space-y-2">
+                                    <div className="flex items-center justify-between">
+                                        <span className="text-xs font-bold uppercase tracking-wider text-slate-400">Billing Cycle</span>
+                                        <div className="p-2 rounded-xl bg-amber-50 dark:bg-amber-950 text-amber-600 dark:text-amber-400">
+                                            <Calendar className="size-4" />
+                                        </div>
+                                    </div>
+                                    <p className="text-base font-extrabold text-slate-900 dark:text-white">
+                                        Day {service.billing_day} of month
+                                    </p>
+                                    <p className="text-xs text-slate-400 font-medium pt-2 border-t border-slate-100 dark:border-slate-800">
+                                        Started: {formatDateOnly(service.start_date)}
+                                    </p>
+                                </div>
+
+                                <div className="p-5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 shadow-2xs space-y-2">
+                                    <div className="flex items-center justify-between">
+                                        <span className="text-xs font-bold uppercase tracking-wider text-slate-400">Status</span>
+                                        <div className="p-2 rounded-xl bg-emerald-50 dark:bg-emerald-950 text-emerald-600 dark:text-emerald-400">
+                                            <CheckCircle2 className="size-4" />
+                                        </div>
+                                    </div>
+                                    <p className="text-lg font-extrabold text-emerald-600 dark:text-emerald-400 capitalize">
+                                        {service.status}
+                                    </p>
+                                    <p className="text-xs text-slate-400 font-medium pt-2 border-t border-slate-100 dark:border-slate-800">
+                                        Subscription State
+                                    </p>
+                                </div>
+                            </div>
+                        )}
 
                         {/* Detail Cards: Scope Notes & Account Overview */}
                         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -596,7 +688,7 @@ export default function ClientPortalServiceShow({ client, service }: ClientPorta
                                     <div className="p-4 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200/80 dark:border-slate-800 space-y-1">
                                         <span className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400">Contract Duration</span>
                                         <p className="text-sm font-extrabold text-slate-900 dark:text-white">
-                                            {totalContractMonths} Months
+                                            {isOngoing ? 'Ongoing / Month-to-Month' : `${totalContractMonths} Months`}
                                         </p>
                                     </div>
                                 </div>
@@ -647,7 +739,7 @@ export default function ClientPortalServiceShow({ client, service }: ClientPorta
                 )}
 
                 {/* 3. TAB 2 CONTENT: PAYMENTS */}
-                {activeTab === 'payments' && (
+                {activeTab === 'payments' && canViewBudget && (
                     <div className="space-y-4">
                         <div className="flex items-center justify-between">
                             <h3 className="text-base font-extrabold text-slate-900 dark:text-white flex items-center gap-2">
@@ -677,6 +769,7 @@ export default function ClientPortalServiceShow({ client, service }: ClientPorta
                                             <th className="px-2 py-4">Amount Paid</th>
                                             <th className="px-2 py-4">Status</th>
                                             <th className="px-2 py-4">Payment Date</th>
+                                            <th className="px-2 py-4">Invoice Ref</th>
                                             <th className="px-2 py-4 text-right">Actions</th>
                                         </tr>
                                     </thead>
@@ -708,8 +801,42 @@ export default function ClientPortalServiceShow({ client, service }: ClientPorta
                                                     <td className="px-2 py-4 text-slate-500 font-medium">
                                                         {formatDateOnly(pay.payment_date)}
                                                     </td>
+                                                    <td className="px-2 py-4 whitespace-nowrap">
+                                                        {pay.invoice ? (
+                                                            <Link
+                                                                href={`/client-portal/invoices/${pay.invoice.id}`}
+                                                                className="font-mono font-bold text-blue-600 dark:text-blue-400 hover:underline inline-flex items-center gap-1.5"
+                                                            >
+                                                                <span>{pay.invoice.invoice_number}</span>
+                                                                <span
+                                                                    className={`text-[9px] uppercase px-1.5 py-0.5 rounded font-black ${pay.invoice.status === 'paid'
+                                                                        ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300 border border-emerald-200/50'
+                                                                        : 'bg-amber-50 text-amber-700 dark:bg-amber-950/60 dark:text-amber-300 border border-amber-200/50'
+                                                                        }`}
+                                                                >
+                                                                    {pay.invoice.status}
+                                                                </span>
+                                                            </Link>
+                                                        ) : (
+                                                            <span className="text-slate-400 italic text-[11px]">No Invoice</span>
+                                                        )}
+                                                    </td>
                                                     <td className="px-2 py-4 text-right">
                                                         <div className="flex items-center justify-end gap-1.5">
+                                                            {/* MARK AS PAID BUTTON (Only if invoice exists & payment is unpaid) */}
+                                                            {pay.invoice && pay.status !== 'paid' && hasPermission(user, 'edit-client-portal-service-payments') && (
+                                                                <button
+                                                                    type="button"
+                                                                    disabled={isMarkingPaidPayment}
+                                                                    onClick={() => setConfirmingPaidPayment(pay)}
+                                                                    className="h-8 px-2.5 rounded-lg bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-600 hover:text-white dark:hover:bg-emerald-600 dark:hover:text-white font-bold text-xs inline-flex items-center gap-1.5 cursor-pointer shadow-2xs transition-all border border-emerald-200/50"
+                                                                    title="Mark Service Payment as Paid"
+                                                                >
+                                                                    <CheckCircle2 className="size-3.5" />
+                                                                    <span>Mark as Paid</span>
+                                                                </button>
+                                                            )}
+
                                                             {/* GENERATE OR PRINT INVOICE BUTTON */}
                                                             {pay.invoice ? (
                                                                 hasPermission(user, 'print-client-portal-invoices') && (
@@ -1062,6 +1189,52 @@ export default function ClientPortalServiceShow({ client, service }: ClientPorta
                             >
                                 {isGeneratingInvoice && <LoaderCircle className="size-4 animate-spin" />}
                                 <span>Yes, Generate Invoice</span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* MARK SERVICE PAYMENT AS PAID CONFIRMATION MODAL */}
+            {confirmingPaidPayment && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-900/60 backdrop-blur-xs overflow-y-auto">
+                    <div className="w-full max-w-md max-h-[90vh] my-auto overflow-y-auto rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-4 sm:p-6 shadow-2xl space-y-4 text-center animate-in fade-in zoom-in-95 duration-200 relative">
+                        <button
+                            type="button"
+                            onClick={() => setConfirmingPaidPayment(null)}
+                            className="absolute top-4 right-4 size-8 rounded-xl text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-all flex items-center justify-center cursor-pointer"
+                        >
+                            <X className="size-4" />
+                        </button>
+
+                        <div className="size-12 rounded-2xl bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400 mx-auto flex items-center justify-center">
+                            <CheckCircle2 className="size-6" />
+                        </div>
+
+                        <div className="space-y-1">
+                            <h3 className="text-base font-extrabold text-slate-900 dark:text-white">Mark Service Payment as Paid</h3>
+                            <p className="text-xs text-slate-500 dark:text-slate-400">
+                                Confirm payment receipt for month <strong>{confirmingPaidPayment.billing_month}</strong> ({formatCurrency(confirmingPaidPayment.amount_due)}). This will also mark its linked invoice as Paid if all items are settled.
+                            </p>
+                        </div>
+
+                        <div className="flex items-center justify-center gap-3 pt-2 border-t border-slate-100 dark:border-slate-800">
+                            <button
+                                type="button"
+                                onClick={() => setConfirmingPaidPayment(null)}
+                                disabled={isMarkingPaidPayment}
+                                className="h-10 px-3 rounded-xl border border-slate-200 dark:border-slate-800 text-xs font-bold text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                type="button"
+                                onClick={handleMarkPaymentPaidSubmit}
+                                disabled={isMarkingPaidPayment}
+                                className="h-10 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold inline-flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed shadow-md shadow-emerald-600/20 cursor-pointer transition-all"
+                            >
+                                {isMarkingPaidPayment && <LoaderCircle className="size-4 animate-spin" />}
+                                <span>Confirm & Mark as Paid</span>
                             </button>
                         </div>
                     </div>

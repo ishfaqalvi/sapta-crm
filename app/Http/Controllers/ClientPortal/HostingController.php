@@ -352,9 +352,26 @@ class HostingController extends Controller
             'created_by' => Auth::id(),
         ]);
 
+        $startDate = $payment->due_date ?? $hosting?->setup_date ?? now();
+        $endDate = $hosting?->expiry_date;
+        if (!$endDate && $startDate) {
+            $cycle = strtolower($hosting?->billing_cycle ?? 'annual');
+            $endDate = match ($cycle) {
+                'monthly' => Carbon::parse($startDate)->addMonth(),
+                'quarterly' => Carbon::parse($startDate)->addMonths(3),
+                'semi_annual' => Carbon::parse($startDate)->addMonths(6),
+                'biennial' => Carbon::parse($startDate)->addYears(2),
+                'triennial' => Carbon::parse($startDate)->addYears(3),
+                default => Carbon::parse($startDate)->addYear(),
+            };
+        }
+        $durationText = ($startDate && $endDate)
+            ? ' (Duration: ' . Carbon::parse($startDate)->format('d M Y') . ' to ' . Carbon::parse($endDate)->format('d M Y') . ')'
+            : '';
+
         InvoiceItem::create([
             'invoice_id' => $invoice->id,
-            'description' => 'Hosting: ' . ($hosting->hosting_title ?? 'Hosting') . ' - ' . $payment->title,
+            'description' => 'Hosting: ' . ($hosting->hosting_title ?? 'Hosting') . ' - ' . $payment->title . $durationText,
             'quantity' => 1.00,
             'unit_price' => $amount,
             'amount' => $amount,
@@ -363,6 +380,48 @@ class HostingController extends Controller
         ]);
 
         return redirect()->back()->with('success', "Invoice {$invoiceNumber} generated successfully.");
+    }
+
+    public function markPaymentAsPaid(HostingPayment $payment): RedirectResponse
+    {
+        $this->authorizePermission('edit-client-portal-hosting-payments');
+
+        $clientId = $this->getClientId();
+
+        if ((int) $payment->client_id !== $clientId) {
+            abort(403, 'Unauthorized access to payment record');
+        }
+
+        if (!$payment->invoice()->exists()) {
+            return redirect()->back()->with('error', 'Please generate an invoice before marking this payment as paid.');
+        }
+
+        $payment->update([
+            'status' => 'paid',
+            'paid_at' => $payment->paid_at ?? now()->toDateString(),
+        ]);
+
+        // Update parent hosting status & advance expiry
+        if ($payment->hosting) {
+            $hosting = $payment->hosting;
+            $currentExpiry = $hosting->expiry_date ? Carbon::parse($hosting->expiry_date) : now();
+            $newExpiry = match ($hosting->billing_cycle) {
+                'monthly' => $currentExpiry->addMonth(),
+                'quarterly' => $currentExpiry->addMonths(3),
+                'semi_annual' => $currentExpiry->addMonths(6),
+                'biennial' => $currentExpiry->addYears(2),
+                default => $currentExpiry->addYear(),
+            };
+
+            $hosting->update([
+                'status' => 'active',
+                'expiry_date' => $newExpiry->format('Y-m-d'),
+            ]);
+        }
+
+        Invoice::syncItemAndCheckInvoicePaid($payment);
+
+        return redirect()->back()->with('success', "Hosting payment '{$payment->title}' marked as Paid successfully.");
     }
 
     /**

@@ -603,7 +603,7 @@ export default function EmployeeShow({ employee }: EmployeeShowProps) {
                                                         </span>
                                                         {p.payment_date && (
                                                             <span className="text-[10px] text-slate-400 block mt-0.5">
-                                                                {p.payment_date}
+                                                                {formatDateOnly(p.payment_date)}
                                                             </span>
                                                         )}
                                                     </td>
