@@ -180,14 +180,14 @@ export default function TaskConversationModal({
 
     const displayTask = fullTask || task;
 
-    const getCsrfToken = () => {
-        const metaTag = document.querySelector('meta[name="csrf-token"]') as HTMLMetaElement;
-        if (metaTag && metaTag.content) {
-            return metaTag.content;
-        }
+    const getXsrfToken = () => {
         const match = document.cookie.match(/(?:^|;\s*)XSRF-TOKEN=([^;]+)/);
         if (match) {
             return decodeURIComponent(match[1]);
+        }
+        const metaTag = document.querySelector('meta[name="csrf-token"]') as HTMLMetaElement;
+        if (metaTag && metaTag.content) {
+            return metaTag.content;
         }
         return '';
     };
@@ -200,14 +200,11 @@ export default function TaskConversationModal({
         setIsSending(true);
         setErrorMessage(null);
 
-        const csrfToken = getCsrfToken();
+        const xsrfToken = getXsrfToken();
         const formData = new FormData();
         formData.append('task_type', displayTask.source_type || 'project');
         formData.append('task_id', String(displayTask.id));
         formData.append('message', inputText.trim() || '(Attachment uploaded)');
-        if (csrfToken) {
-            formData.append('_token', csrfToken);
-        }
         if (selectedFile) {
             formData.append('attachment', selectedFile);
         }
@@ -217,9 +214,8 @@ export default function TaskConversationModal({
                 'Accept': 'application/json',
                 'X-Requested-With': 'XMLHttpRequest',
             };
-            if (csrfToken) {
-                headers['X-CSRF-TOKEN'] = csrfToken;
-                headers['X-XSRF-TOKEN'] = csrfToken;
+            if (xsrfToken) {
+                headers['X-XSRF-TOKEN'] = xsrfToken;
             }
 
             const response = await fetch('/task-messages/store', {
@@ -264,14 +260,13 @@ export default function TaskConversationModal({
 
         setIsDeletingMessage(true);
         const messageId = messageToDelete.id;
-        const csrfToken = getCsrfToken();
+        const xsrfToken = getXsrfToken();
         const headers: Record<string, string> = {
             'Accept': 'application/json',
             'X-Requested-With': 'XMLHttpRequest',
         };
-        if (csrfToken) {
-            headers['X-CSRF-TOKEN'] = csrfToken;
-            headers['X-XSRF-TOKEN'] = csrfToken;
+        if (xsrfToken) {
+            headers['X-XSRF-TOKEN'] = xsrfToken;
         }
 
         try {
