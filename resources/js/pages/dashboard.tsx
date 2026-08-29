@@ -58,6 +58,7 @@ const breadcrumbs: BreadcrumbItem[] = [
 
 interface DashboardProps {
     canViewDashboard?: boolean;
+    canViewBudget?: boolean;
     kpis: {
         total_revenue_pkr: number;
         mrr_pkr: number;
@@ -121,7 +122,7 @@ interface DashboardProps {
         project_name: string;
         progress_percentage: number;
         deadline: string;
-        total_budget: number;
+        total_budget?: number | null;
         currency: string;
         status: string;
         client?: { id: number; name: string; company_name?: string; client_code: string };
@@ -155,6 +156,7 @@ interface DashboardProps {
 
 export default function Dashboard({
     canViewDashboard,
+    canViewBudget: canViewBudgetProp,
     kpis = {
         total_revenue_pkr: 0,
         mrr_pkr: 0,
@@ -191,6 +193,18 @@ export default function Dashboard({
         canViewDashboard !== undefined
             ? Boolean(canViewDashboard)
             : hasPermission(user, 'view-dashboard');
+
+    const canViewBudget =
+        canViewBudgetProp !== undefined
+            ? Boolean(canViewBudgetProp)
+            : hasPermission(user, 'view-dashboard-budget');
+
+    const canCreateClient = hasPermission(user, 'create-clients');
+    const canCreateTask = hasPermission(user, 'create-tasks');
+    const canViewIncomes = hasPermission(user, 'view-incomes');
+    const canViewExpenses = hasPermission(user, 'view-expenses');
+    const canViewReports = hasPermission(user, 'view-reports');
+    const canViewInvoices = hasPermission(user, 'view-invoices');
 
     if (!isPermitted) {
         return (
@@ -238,6 +252,15 @@ export default function Dashboard({
     const validRevenueStreams = revenueStreams.filter((item) => item.value > 0);
     const totalStreamSum = validRevenueStreams.reduce((acc, curr) => acc + curr.value, 0);
 
+    // Task distribution data for donut chart when budget is hidden
+    const taskDistributionData = [
+        { name: 'Completed', value: taskStatus.completed, color: '#10b981' },
+        { name: 'In Progress', value: taskStatus.in_progress, color: '#3b82f6' },
+        { name: 'In Review', value: taskStatus.in_review, color: '#8b5cf6' },
+        { name: 'Pending / To Do', value: taskStatus.pending, color: '#64748b' },
+    ].filter((t) => t.value > 0);
+    const totalTaskDistribution = taskDistributionData.reduce((acc, curr) => acc + curr.value, 0);
+
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="Executive Dashboard" />
@@ -251,387 +274,479 @@ export default function Dashboard({
                                 EXECUTIVE OVERVIEW
                             </span>
                             <h1 className="text-xl sm:text-2xl font-black text-slate-900 dark:text-white tracking-tight">
-                                Operations & Financial Control
+                                {canViewBudget ? 'Operations & Financial Control' : 'Operations & Workload Workspace'}
                             </h1>
                         </div>
                         <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 mt-1">
-                            Real-time agency revenue, client assets, project pipelines, cash flow & retainers.
+                            {canViewBudget
+                                ? 'Real-time agency revenue, client assets, project pipelines, cash flow & retainers.'
+                                : 'Real-time agency operations, client assets, project workloads, deliverables & pipeline tracking.'}
                         </p>
                     </div>
 
                     {/* Quick Action Buttons */}
                     <div className="flex flex-wrap items-center gap-2">
-                        <Link
-                            href="/clients/create"
-                            className="h-9 px-3 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-200 text-xs font-bold hover:bg-slate-50 dark:hover:bg-slate-800 inline-flex items-center gap-1.5 shadow-2xs transition-all cursor-pointer"
-                        >
-                            <Plus className="size-3.5 text-blue-600" />
-                            <span>New Client</span>
-                        </Link>
-                        <Link
-                            href="/tasks/create"
-                            className="h-9 px-3 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-200 text-xs font-bold hover:bg-slate-50 dark:hover:bg-slate-800 inline-flex items-center gap-1.5 shadow-2xs transition-all cursor-pointer"
-                        >
-                            <Plus className="size-3.5 text-purple-600" />
-                            <span>New Task</span>
-                        </Link>
-                        <Link
-                            href="/incomes"
-                            className="h-9 px-3 rounded-xl bg-emerald-50 dark:bg-emerald-950/60 border border-emerald-200/80 dark:border-emerald-800/80 text-emerald-700 dark:text-emerald-300 text-xs font-bold hover:bg-emerald-100 dark:hover:bg-emerald-900/60 inline-flex items-center gap-1.5 transition-all cursor-pointer"
-                        >
-                            <TrendingUp className="size-3.5 text-emerald-600" />
-                            <span>Income</span>
-                        </Link>
-                        <Link
-                            href="/expenses"
-                            className="h-9 px-3 rounded-xl bg-rose-50 dark:bg-rose-950/60 border border-rose-200/80 dark:border-rose-800/80 text-rose-700 dark:text-rose-300 text-xs font-bold hover:bg-rose-100 dark:hover:bg-rose-900/60 inline-flex items-center gap-1.5 transition-all cursor-pointer"
-                        >
-                            <TrendingDown className="size-3.5 text-rose-600" />
-                            <span>Expense</span>
-                        </Link>
-                        <Link
-                            href="/reports"
-                            className="h-9 px-3.5 rounded-xl bg-gradient-to-r from-[#003796] via-[#0052D4] to-[#1d4ed8] hover:from-[#002a75] hover:to-[#0040b8] text-white text-xs font-bold inline-flex items-center gap-1.5 shadow-md shadow-blue-600/20 transition-all cursor-pointer"
-                        >
-                            <LineChart className="size-3.5" />
-                            <span>Reports</span>
-                        </Link>
+                        {canCreateClient && (
+                            <Link
+                                href="/clients/create"
+                                className="h-9 px-3 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-200 text-xs font-bold hover:bg-slate-50 dark:hover:bg-slate-800 inline-flex items-center gap-1.5 shadow-2xs transition-all cursor-pointer"
+                            >
+                                <Plus className="size-3.5 text-blue-600" />
+                                <span>New Client</span>
+                            </Link>
+                        )}
+                        {canCreateTask && (
+                            <Link
+                                href="/tasks/create"
+                                className="h-9 px-3 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-200 text-xs font-bold hover:bg-slate-50 dark:hover:bg-slate-800 inline-flex items-center gap-1.5 shadow-2xs transition-all cursor-pointer"
+                            >
+                                <Plus className="size-3.5 text-purple-600" />
+                                <span>New Task</span>
+                            </Link>
+                        )}
+                        {canViewIncomes && (
+                            <Link
+                                href="/incomes"
+                                className="h-9 px-3 rounded-xl bg-emerald-50 dark:bg-emerald-950/60 border border-emerald-200/80 dark:border-emerald-800/80 text-emerald-700 dark:text-emerald-300 text-xs font-bold hover:bg-emerald-100 dark:hover:bg-emerald-900/60 inline-flex items-center gap-1.5 transition-all cursor-pointer"
+                            >
+                                <TrendingUp className="size-3.5 text-emerald-600" />
+                                <span>Income</span>
+                            </Link>
+                        )}
+                        {canViewExpenses && (
+                            <Link
+                                href="/expenses"
+                                className="h-9 px-3 rounded-xl bg-rose-50 dark:bg-rose-950/60 border border-rose-200/80 dark:border-rose-800/80 text-rose-700 dark:text-rose-300 text-xs font-bold hover:bg-rose-100 dark:hover:bg-rose-900/60 inline-flex items-center gap-1.5 transition-all cursor-pointer"
+                            >
+                                <TrendingDown className="size-3.5 text-rose-600" />
+                                <span>Expense</span>
+                            </Link>
+                        )}
+                        {canViewReports && (
+                            <Link
+                                href="/reports"
+                                className="h-9 px-3.5 rounded-xl bg-gradient-to-r from-[#003796] via-[#0052D4] to-[#1d4ed8] hover:from-[#002a75] hover:to-[#0040b8] text-white text-xs font-bold inline-flex items-center gap-1.5 shadow-md shadow-blue-600/20 transition-all cursor-pointer"
+                            >
+                                <LineChart className="size-3.5" />
+                                <span>Reports</span>
+                            </Link>
+                        )}
                     </div>
                 </div>
 
                 {/* 4 Main Executive KPI Cards (Row of 4 with Vibrant Colors) */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                    {/* Card 1: Total Collected Revenue (Vibrant Emerald Card) */}
-                    <div className="p-4 sm:p-5 rounded-xl bg-gradient-to-br from-emerald-500/10 via-emerald-500/5 to-transparent dark:from-emerald-950/40 dark:via-emerald-950/20 bg-white dark:bg-slate-900 border border-emerald-200/90 dark:border-emerald-800/80 shadow-xs flex items-center justify-between hover:border-emerald-300 transition-all">
-                        <div className="space-y-1">
-                            <span className="text-[11px] font-extrabold uppercase tracking-wider text-emerald-700 dark:text-emerald-400">
-                                Total Revenue
-                            </span>
-                            <h3 className="text-xl sm:text-2xl font-black text-slate-900 dark:text-white font-mono tracking-tight">
-                                PKR {Number(kpis.total_revenue_pkr || 0).toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
-                            </h3>
-                            <p className="text-[10px] text-emerald-700 dark:text-emerald-400 font-bold flex items-center gap-1">
-                                <ArrowUpRight className="size-3" /> All-time collected inflow
-                            </p>
+                {canViewBudget ? (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                        {/* Card 1: Total Collected Revenue (Vibrant Emerald Card) */}
+                        <div className="p-4 sm:p-5 rounded-xl bg-gradient-to-br from-emerald-500/10 via-emerald-500/5 to-transparent dark:from-emerald-950/40 dark:via-emerald-950/20 bg-white dark:bg-slate-900 border border-emerald-200/90 dark:border-emerald-800/80 shadow-xs flex items-center justify-between hover:border-emerald-300 transition-all">
+                            <div className="space-y-1">
+                                <span className="text-[11px] font-extrabold uppercase tracking-wider text-emerald-700 dark:text-emerald-400">
+                                    Total Revenue
+                                </span>
+                                <h3 className="text-xl sm:text-2xl font-black text-slate-900 dark:text-white font-mono tracking-tight">
+                                    PKR {Number(kpis.total_revenue_pkr || 0).toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
+                                </h3>
+                                <p className="text-[10px] text-emerald-700 dark:text-emerald-400 font-bold flex items-center gap-1">
+                                    <ArrowUpRight className="size-3" /> All-time collected inflow
+                                </p>
+                            </div>
+                            <div className="size-11 rounded-xl bg-emerald-500 text-white flex items-center justify-center shadow-md shadow-emerald-500/30 shrink-0">
+                                <TrendingUp className="size-5" />
+                            </div>
                         </div>
-                        <div className="size-11 rounded-xl bg-emerald-500 text-white flex items-center justify-center shadow-md shadow-emerald-500/30 shrink-0">
-                            <TrendingUp className="size-5" />
-                        </div>
-                    </div>
 
-                    {/* Card 2: Monthly Retainers Yield (Vibrant Electric Blue Card) */}
-                    <div className="p-4 sm:p-5 rounded-xl bg-gradient-to-br from-blue-500/10 via-blue-500/5 to-transparent dark:from-blue-950/40 dark:via-blue-950/20 bg-white dark:bg-slate-900 border border-blue-200/90 dark:border-blue-800/80 shadow-xs flex items-center justify-between hover:border-blue-300 transition-all">
-                        <div className="space-y-1">
-                            <span className="text-[11px] font-extrabold uppercase tracking-wider text-blue-700 dark:text-blue-400">
-                                Monthly Retainers (MRR)
-                            </span>
-                            <h3 className="text-xl sm:text-2xl font-black text-slate-900 dark:text-white font-mono tracking-tight">
-                                PKR {Number(kpis.mrr_pkr || 0).toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
-                            </h3>
-                            <p className="text-[10px] text-blue-700 dark:text-blue-400 font-bold">
-                                Active recurring service yield
-                            </p>
+                        {/* Card 2: Monthly Retainers Yield (Vibrant Electric Blue Card) */}
+                        <div className="p-4 sm:p-5 rounded-xl bg-gradient-to-br from-blue-500/10 via-blue-500/5 to-transparent dark:from-blue-950/40 dark:via-blue-950/20 bg-white dark:bg-slate-900 border border-blue-200/90 dark:border-blue-800/80 shadow-xs flex items-center justify-between hover:border-blue-300 transition-all">
+                            <div className="space-y-1">
+                                <span className="text-[11px] font-extrabold uppercase tracking-wider text-blue-700 dark:text-blue-400">
+                                    Monthly Retainers (MRR)
+                                </span>
+                                <h3 className="text-xl sm:text-2xl font-black text-slate-900 dark:text-white font-mono tracking-tight">
+                                    PKR {Number(kpis.mrr_pkr || 0).toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
+                                </h3>
+                                <p className="text-[10px] text-blue-700 dark:text-blue-400 font-bold">
+                                    Active recurring service yield
+                                </p>
+                            </div>
+                            <div className="size-11 rounded-xl bg-blue-600 text-white flex items-center justify-center shadow-md shadow-blue-600/30 shrink-0">
+                                <Receipt className="size-5" />
+                            </div>
                         </div>
-                        <div className="size-11 rounded-xl bg-blue-600 text-white flex items-center justify-center shadow-md shadow-blue-600/30 shrink-0">
-                            <Receipt className="size-5" />
-                        </div>
-                    </div>
 
-                    {/* Card 3: Net Cash Flow / Profit (Vibrant Teal / Violet Card) */}
-                    <div className="p-4 sm:p-5 rounded-xl bg-gradient-to-br from-teal-500/10 via-teal-500/5 to-transparent dark:from-teal-950/40 dark:via-teal-950/20 bg-white dark:bg-slate-900 border border-teal-200/90 dark:border-teal-800/80 shadow-xs flex items-center justify-between hover:border-teal-300 transition-all">
-                        <div className="space-y-1">
-                            <span className="text-[11px] font-extrabold uppercase tracking-wider text-teal-700 dark:text-teal-400">
-                                Net Cash Flow
-                            </span>
-                            <h3 className={`text-xl sm:text-2xl font-black font-mono tracking-tight ${kpis.net_profit_pkr >= 0 ? 'text-teal-600 dark:text-teal-400' : 'text-rose-600 dark:text-rose-400'
-                                }`}>
-                                PKR {Number(kpis.net_profit_pkr || 0).toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
-                            </h3>
-                            <p className="text-[10px] text-slate-500 dark:text-slate-400 font-bold">
-                                Revenue vs (Expenses + Payroll)
-                            </p>
+                        {/* Card 3: Net Cash Flow / Profit (Vibrant Teal / Violet Card) */}
+                        <div className="p-4 sm:p-5 rounded-xl bg-gradient-to-br from-teal-500/10 via-teal-500/5 to-transparent dark:from-teal-950/40 dark:via-teal-950/20 bg-white dark:bg-slate-900 border border-teal-200/90 dark:border-teal-800/80 shadow-xs flex items-center justify-between hover:border-teal-300 transition-all">
+                            <div className="space-y-1">
+                                <span className="text-[11px] font-extrabold uppercase tracking-wider text-teal-700 dark:text-teal-400">
+                                    Net Cash Flow
+                                </span>
+                                <h3 className={`text-xl sm:text-2xl font-black font-mono tracking-tight ${kpis.net_profit_pkr >= 0 ? 'text-teal-600 dark:text-teal-400' : 'text-rose-600 dark:text-rose-400'
+                                    }`}>
+                                    PKR {Number(kpis.net_profit_pkr || 0).toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
+                                </h3>
+                                <p className="text-[10px] text-slate-500 dark:text-slate-400 font-bold">
+                                    Revenue vs (Expenses + Payroll)
+                                </p>
+                            </div>
+                            <div className="size-11 rounded-xl bg-teal-600 text-white flex items-center justify-center shadow-md shadow-teal-600/30 shrink-0">
+                                <Coins className="size-5" />
+                            </div>
                         </div>
-                        <div className="size-11 rounded-xl bg-teal-600 text-white flex items-center justify-center shadow-md shadow-teal-600/30 shrink-0">
-                            <Coins className="size-5" />
-                        </div>
-                    </div>
 
-                    {/* Card 4: Receivables Due & Overdue (Vibrant Amber / Rose Card) */}
-                    <div className="p-4 sm:p-5 rounded-xl bg-gradient-to-br from-amber-500/10 via-amber-500/5 to-transparent dark:from-amber-950/40 dark:via-amber-950/20 bg-white dark:bg-slate-900 border border-amber-200/90 dark:border-amber-800/80 shadow-xs flex items-center justify-between hover:border-amber-300 transition-all">
-                        <div className="space-y-1">
-                            <span className="text-[11px] font-extrabold uppercase tracking-wider text-amber-700 dark:text-amber-400">
-                                Receivables Due
-                            </span>
-                            <h3 className="text-xl sm:text-2xl font-black text-amber-600 dark:text-amber-400 font-mono tracking-tight">
-                                PKR {Number(kpis.pending_receivables_pkr || 0).toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
-                            </h3>
-                            <p className="text-[10px] text-amber-700 dark:text-amber-400 font-bold">
-                                Pending milestones & invoices
-                            </p>
-                        </div>
-                        <div className="size-11 rounded-xl bg-amber-500 text-white flex items-center justify-center shadow-md shadow-amber-500/30 shrink-0">
-                            <Clock className="size-5" />
+                        {/* Card 4: Receivables Due & Overdue (Vibrant Amber / Rose Card) */}
+                        <div className="p-4 sm:p-5 rounded-xl bg-gradient-to-br from-amber-500/10 via-amber-500/5 to-transparent dark:from-amber-950/40 dark:via-amber-950/20 bg-white dark:bg-slate-900 border border-amber-200/90 dark:border-amber-800/80 shadow-xs flex items-center justify-between hover:border-amber-300 transition-all">
+                            <div className="space-y-1">
+                                <span className="text-[11px] font-extrabold uppercase tracking-wider text-amber-700 dark:text-amber-400">
+                                    Receivables Due
+                                </span>
+                                <h3 className="text-xl sm:text-2xl font-black text-amber-600 dark:text-amber-400 font-mono tracking-tight">
+                                    PKR {Number(kpis.pending_receivables_pkr || 0).toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
+                                </h3>
+                                <p className="text-[10px] text-amber-700 dark:text-amber-400 font-bold">
+                                    Pending milestones & invoices
+                                </p>
+                            </div>
+                            <div className="size-11 rounded-xl bg-amber-500 text-white flex items-center justify-center shadow-md shadow-amber-500/30 shrink-0">
+                                <Clock className="size-5" />
+                            </div>
                         </div>
                     </div>
-                </div>
+                ) : (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                        {/* Operational Card 1: Projects Pipeline */}
+                        <div className="p-4 sm:p-5 rounded-xl bg-gradient-to-br from-purple-500/10 via-purple-500/5 to-transparent dark:from-purple-950/40 dark:via-purple-950/20 bg-white dark:bg-slate-900 border border-purple-200/90 dark:border-purple-800/80 shadow-xs flex items-center justify-between hover:border-purple-300 transition-all">
+                            <div className="space-y-1">
+                                <span className="text-[11px] font-extrabold uppercase tracking-wider text-purple-700 dark:text-purple-400">
+                                    Projects Pipeline
+                                </span>
+                                <h3 className="text-xl sm:text-2xl font-black text-slate-900 dark:text-white font-mono tracking-tight">
+                                    {kpis.active_projects_count} <span className="text-sm font-bold text-slate-400">Active</span>
+                                </h3>
+                                <p className="text-[10px] text-purple-700 dark:text-purple-400 font-bold">
+                                    {kpis.total_projects_count} Total Projects Assigned
+                                </p>
+                            </div>
+                            <div className="size-11 rounded-xl bg-purple-600 text-white flex items-center justify-center shadow-md shadow-purple-600/30 shrink-0">
+                                <Briefcase className="size-5" />
+                            </div>
+                        </div>
+
+                        {/* Operational Card 2: Workload Tasks */}
+                        <div className="p-4 sm:p-5 rounded-xl bg-gradient-to-br from-blue-500/10 via-blue-500/5 to-transparent dark:from-blue-950/40 dark:via-blue-950/20 bg-white dark:bg-slate-900 border border-blue-200/90 dark:border-blue-800/80 shadow-xs flex items-center justify-between hover:border-blue-300 transition-all">
+                            <div className="space-y-1">
+                                <span className="text-[11px] font-extrabold uppercase tracking-wider text-blue-700 dark:text-blue-400">
+                                    Workload Tasks
+                                </span>
+                                <h3 className="text-xl sm:text-2xl font-black text-blue-600 dark:text-blue-400 font-mono tracking-tight">
+                                    {kpis.pending_tasks_count} <span className="text-sm font-bold text-slate-400">Pending</span>
+                                </h3>
+                                <p className="text-[10px] text-blue-700 dark:text-blue-400 font-bold flex items-center gap-1">
+                                    <AlertCircle className="size-3 text-rose-500" /> {kpis.urgent_tasks_count} Urgent Priority
+                                </p>
+                            </div>
+                            <div className="size-11 rounded-xl bg-blue-600 text-white flex items-center justify-center shadow-md shadow-blue-600/30 shrink-0">
+                                <CheckCircle2 className="size-5" />
+                            </div>
+                        </div>
+
+                        {/* Operational Card 3: Web Infrastructure */}
+                        <div className="p-4 sm:p-5 rounded-xl bg-gradient-to-br from-amber-500/10 via-amber-500/5 to-transparent dark:from-amber-950/40 dark:via-amber-950/20 bg-white dark:bg-slate-900 border border-amber-200/90 dark:border-amber-800/80 shadow-xs flex items-center justify-between hover:border-amber-300 transition-all">
+                            <div className="space-y-1">
+                                <span className="text-[11px] font-extrabold uppercase tracking-wider text-amber-700 dark:text-amber-400">
+                                    Web Infrastructure
+                                </span>
+                                <h3 className="text-xl sm:text-2xl font-black text-slate-900 dark:text-white font-mono tracking-tight">
+                                    {kpis.total_domains_count + kpis.total_hostings_count} <span className="text-sm font-bold text-slate-400">Assets</span>
+                                </h3>
+                                <p className="text-[10px] text-amber-700 dark:text-amber-400 font-bold">
+                                    {kpis.total_domains_count} Domains • {kpis.total_hostings_count} Hostings
+                                </p>
+                            </div>
+                            <div className="size-11 rounded-xl bg-amber-500 text-white flex items-center justify-center shadow-md shadow-amber-500/30 shrink-0">
+                                <Globe className="size-5" />
+                            </div>
+                        </div>
+
+                        {/* Operational Card 4: Clients & Workforce */}
+                        <div className="p-4 sm:p-5 rounded-xl bg-gradient-to-br from-emerald-500/10 via-emerald-500/5 to-transparent dark:from-emerald-950/40 dark:via-emerald-950/20 bg-white dark:bg-slate-900 border border-emerald-200/90 dark:border-emerald-800/80 shadow-xs flex items-center justify-between hover:border-emerald-300 transition-all">
+                            <div className="space-y-1">
+                                <span className="text-[11px] font-extrabold uppercase tracking-wider text-emerald-700 dark:text-emerald-400">
+                                    Clients & Workforce
+                                </span>
+                                <h3 className="text-xl sm:text-2xl font-black text-slate-900 dark:text-white font-mono tracking-tight">
+                                    {kpis.total_clients_count} <span className="text-sm font-bold text-slate-400">Clients</span>
+                                </h3>
+                                <p className="text-[10px] text-emerald-700 dark:text-emerald-400 font-bold">
+                                    {kpis.active_clients_count} Active Clients • {kpis.total_employees_count} Employees
+                                </p>
+                            </div>
+                            <div className="size-11 rounded-xl bg-emerald-600 text-white flex items-center justify-center shadow-md shadow-emerald-600/30 shrink-0">
+                                <Users className="size-5" />
+                            </div>
+                        </div>
+                    </div>
+                )}
 
                 {/* Secondary Operational Summary Strip (4 Compact Metric Cards) */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
-                    {/* Item 1: Projects */}
-                    <Link
-                        href="/clients"
-                        className="p-3 rounded-xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 shadow-2xs flex items-center justify-between hover:border-purple-300 transition-all group"
-                    >
-                        <div className="flex items-center gap-3">
-                            <div className="size-9 rounded-lg bg-purple-50 dark:bg-purple-950 text-purple-600 flex items-center justify-center">
-                                <Briefcase className="size-4" />
-                            </div>
-                            <div>
-                                <span className="text-[10px] font-bold text-slate-400 uppercase">Projects Pipeline</span>
-                                <div className="text-xs font-black text-slate-900 dark:text-white">
-                                    {kpis.active_projects_count} Active / {kpis.total_projects_count} Total
+                {canViewBudget && (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
+                        {/* Item 1: Projects */}
+                        <Link
+                            href="/clients"
+                            className="p-3 rounded-xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 shadow-2xs flex items-center justify-between hover:border-purple-300 transition-all group"
+                        >
+                            <div className="flex items-center gap-3">
+                                <div className="size-9 rounded-lg bg-purple-50 dark:bg-purple-950 text-purple-600 flex items-center justify-center">
+                                    <Briefcase className="size-4" />
+                                </div>
+                                <div>
+                                    <span className="text-[10px] font-bold text-slate-400 uppercase">Projects Pipeline</span>
+                                    <div className="text-xs font-black text-slate-900 dark:text-white">
+                                        {kpis.active_projects_count} Active / {kpis.total_projects_count} Total
+                                    </div>
                                 </div>
                             </div>
-                        </div>
-                        <ArrowUpRight className="size-4 text-slate-300 group-hover:text-purple-600 transition-colors" />
-                    </Link>
+                            <ArrowUpRight className="size-4 text-slate-300 group-hover:text-purple-600 transition-colors" />
+                        </Link>
 
-                    {/* Item 2: Tasks Workload */}
-                    <Link
-                        href="/tasks"
-                        className="p-3 rounded-xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 shadow-2xs flex items-center justify-between hover:border-blue-300 transition-all group"
-                    >
-                        <div className="flex items-center gap-3">
-                            <div className="size-9 rounded-lg bg-blue-50 dark:bg-blue-950 text-blue-600 flex items-center justify-center">
-                                <CheckCircle2 className="size-4" />
-                            </div>
-                            <div>
-                                <span className="text-[10px] font-bold text-slate-400 uppercase">Workload Tasks</span>
-                                <div className="text-xs font-black text-slate-900 dark:text-white">
-                                    {kpis.pending_tasks_count} Active ({kpis.urgent_tasks_count} Urgent)
+                        {/* Item 2: Tasks Workload */}
+                        <Link
+                            href="/tasks"
+                            className="p-3 rounded-xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 shadow-2xs flex items-center justify-between hover:border-blue-300 transition-all group"
+                        >
+                            <div className="flex items-center gap-3">
+                                <div className="size-9 rounded-lg bg-blue-50 dark:bg-blue-950 text-blue-600 flex items-center justify-center">
+                                    <CheckCircle2 className="size-4" />
+                                </div>
+                                <div>
+                                    <span className="text-[10px] font-bold text-slate-400 uppercase">Workload Tasks</span>
+                                    <div className="text-xs font-black text-slate-900 dark:text-white">
+                                        {kpis.pending_tasks_count} Active ({kpis.urgent_tasks_count} Urgent)
+                                    </div>
                                 </div>
                             </div>
-                        </div>
-                        <ArrowUpRight className="size-4 text-slate-300 group-hover:text-blue-600 transition-colors" />
-                    </Link>
+                            <ArrowUpRight className="size-4 text-slate-300 group-hover:text-blue-600 transition-colors" />
+                        </Link>
 
-                    {/* Item 3: Managed Domains & Hostings */}
-                    <Link
-                        href="/reports"
-                        className="p-3 rounded-xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 shadow-2xs flex items-center justify-between hover:border-amber-300 transition-all group"
-                    >
-                        <div className="flex items-center gap-3">
-                            <div className="size-9 rounded-lg bg-amber-50 dark:bg-amber-950 text-amber-600 flex items-center justify-center">
-                                <Globe className="size-4" />
-                            </div>
-                            <div>
-                                <span className="text-[10px] font-bold text-slate-400 uppercase">Web Infrastructure</span>
-                                <div className="text-xs font-black text-slate-900 dark:text-white">
-                                    {kpis.total_domains_count} Domains • {kpis.total_hostings_count} Hostings
+                        {/* Item 3: Managed Domains & Hostings */}
+                        <Link
+                            href="/reports"
+                            className="p-3 rounded-xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 shadow-2xs flex items-center justify-between hover:border-amber-300 transition-all group"
+                        >
+                            <div className="flex items-center gap-3">
+                                <div className="size-9 rounded-lg bg-amber-50 dark:bg-amber-950 text-amber-600 flex items-center justify-center">
+                                    <Globe className="size-4" />
+                                </div>
+                                <div>
+                                    <span className="text-[10px] font-bold text-slate-400 uppercase">Web Infrastructure</span>
+                                    <div className="text-xs font-black text-slate-900 dark:text-white">
+                                        {kpis.total_domains_count} Domains • {kpis.total_hostings_count} Hostings
+                                    </div>
                                 </div>
                             </div>
-                        </div>
-                        <ArrowUpRight className="size-4 text-slate-300 group-hover:text-amber-600 transition-colors" />
-                    </Link>
+                            <ArrowUpRight className="size-4 text-slate-300 group-hover:text-amber-600 transition-colors" />
+                        </Link>
 
-                    {/* Item 4: Clients & Workforce */}
-                    <Link
-                        href="/employees"
-                        className="p-3 rounded-xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 shadow-2xs flex items-center justify-between hover:border-indigo-300 transition-all group"
-                    >
-                        <div className="flex items-center gap-3">
-                            <div className="size-9 rounded-lg bg-indigo-50 dark:bg-indigo-950 text-indigo-600 flex items-center justify-center">
-                                <Users className="size-4" />
-                            </div>
-                            <div>
-                                <span className="text-[10px] font-bold text-slate-400 uppercase">Clients & Team</span>
-                                <div className="text-xs font-black text-slate-900 dark:text-white">
-                                    {kpis.total_clients_count} Clients • {kpis.total_employees_count} Employees
+                        {/* Item 4: Clients & Workforce */}
+                        <Link
+                            href="/employees"
+                            className="p-3 rounded-xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 shadow-2xs flex items-center justify-between hover:border-indigo-300 transition-all group"
+                        >
+                            <div className="flex items-center gap-3">
+                                <div className="size-9 rounded-lg bg-indigo-50 dark:bg-indigo-950 text-indigo-600 flex items-center justify-center">
+                                    <Users className="size-4" />
+                                </div>
+                                <div>
+                                    <span className="text-[10px] font-bold text-slate-400 uppercase">Clients & Team</span>
+                                    <div className="text-xs font-black text-slate-900 dark:text-white">
+                                        {kpis.total_clients_count} Clients • {kpis.total_employees_count} Employees
+                                    </div>
                                 </div>
                             </div>
-                        </div>
-                        <ArrowUpRight className="size-4 text-slate-300 group-hover:text-indigo-600 transition-colors" />
-                    </Link>
-                </div>
+                            <ArrowUpRight className="size-4 text-slate-300 group-hover:text-indigo-600 transition-colors" />
+                        </Link>
+                    </div>
+                )}
 
                 {/* Primary Analytics Charts Row */}
-                <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-                    {/* Cash Flow & Revenue Inflow Trajectory (8 cols) */}
-                    <div className="lg:col-span-8 p-5 sm:p-6 rounded-xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 shadow-xs space-y-4">
-                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-100 dark:border-slate-800">
-                            <div>
+                {canViewBudget ? (
+                    <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+                        {/* Cash Flow & Revenue Inflow Trajectory (8 cols) */}
+                        <div className="lg:col-span-8 p-5 sm:p-6 rounded-xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 shadow-xs space-y-4">
+                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-100 dark:border-slate-800">
+                                <div>
+                                    <h3 className="text-base font-extrabold text-slate-900 dark:text-white">
+                                        Cash Flow & Revenue Inflow Trajectory
+                                    </h3>
+                                    <p className="text-xs text-slate-400">
+                                        Monthly comparison of collections, agency expenditures & net yield (PKR).
+                                    </p>
+                                </div>
+
+                                <div className="flex items-center gap-1.5 p-1 rounded-xl bg-slate-100 dark:bg-slate-800 self-start sm:self-auto">
+                                    <button
+                                        type="button"
+                                        onClick={() => setActiveChartTab('revenue')}
+                                        className={`px-3 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${activeChartTab === 'revenue'
+                                            ? 'bg-white dark:bg-slate-900 text-blue-600 dark:text-blue-400 shadow-xs'
+                                            : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'
+                                            }`}
+                                    >
+                                        Inflow vs Outflow
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={() => setActiveChartTab('net')}
+                                        className={`px-3 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${activeChartTab === 'net'
+                                            ? 'bg-white dark:bg-slate-900 text-teal-600 dark:text-teal-400 shadow-xs'
+                                            : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'
+                                            }`}
+                                    >
+                                        Net Margin
+                                    </button>
+                                </div>
+                            </div>
+
+                            <div className="h-72 w-full pt-2">
+                                <ResponsiveContainer width="100%" height="100%">
+                                    {activeChartTab === 'revenue' ? (
+                                        <AreaChart data={revenueTrend} margin={{ top: 10, right: 10, left: -15, bottom: 0 }}>
+                                            <defs>
+                                                <linearGradient id="gradRevenue" x1="0" y1="0" x2="0" y2="1">
+                                                    <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.4} />
+                                                    <stop offset="95%" stopColor="#3b82f6" stopOpacity={0.0} />
+                                                </linearGradient>
+                                                <linearGradient id="gradExpense" x1="0" y1="0" x2="0" y2="1">
+                                                    <stop offset="5%" stopColor="#f43f5e" stopOpacity={0.3} />
+                                                    <stop offset="95%" stopColor="#f43f5e" stopOpacity={0.0} />
+                                                </linearGradient>
+                                            </defs>
+                                            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" opacity={0.5} />
+                                            <XAxis dataKey="month" tick={{ fontSize: 11, fill: '#64748b' }} axisLine={false} tickLine={false} />
+                                            <YAxis tick={{ fontSize: 11, fill: '#64748b' }} axisLine={false} tickLine={false} />
+                                            <Tooltip
+                                                formatter={(val: any, name?: any) => [
+                                                    `PKR ${Number(val).toLocaleString()}`,
+                                                    String(name) === 'revenue' ? 'Inflow' : 'Expenditure',
+                                                ]}
+                                                contentStyle={{
+                                                    borderRadius: '12px',
+                                                    border: 'none',
+                                                    boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.15)',
+                                                    background: '#0f172a',
+                                                    color: '#ffffff',
+                                                    fontSize: '12px',
+                                                }}
+                                            />
+                                            <Legend verticalAlign="top" height={36} iconType="circle" />
+                                            <Area type="monotone" dataKey="revenue" name="Inflow Revenue" stroke="#3b82f6" strokeWidth={3} fillOpacity={1} fill="url(#gradRevenue)" />
+                                            <Area type="monotone" dataKey="expenses" name="Expenditures" stroke="#f43f5e" strokeWidth={2.5} fillOpacity={1} fill="url(#gradExpense)" />
+                                        </AreaChart>
+                                    ) : (
+                                        <BarChart data={revenueTrend} margin={{ top: 10, right: 10, left: -15, bottom: 0 }}>
+                                            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" opacity={0.5} />
+                                            <XAxis dataKey="month" tick={{ fontSize: 11, fill: '#64748b' }} axisLine={false} tickLine={false} />
+                                            <YAxis tick={{ fontSize: 11, fill: '#64748b' }} axisLine={false} tickLine={false} />
+                                            <Tooltip
+                                                formatter={(val: any) => [`PKR ${Number(val).toLocaleString()}`, 'Net Margin']}
+                                                contentStyle={{
+                                                    borderRadius: '12px',
+                                                    border: 'none',
+                                                    boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.15)',
+                                                    background: '#0f172a',
+                                                    color: '#ffffff',
+                                                    fontSize: '12px',
+                                                }}
+                                            />
+                                            <Bar dataKey="net" name="Net Profit Margin" fill="#0d9488" radius={[6, 6, 0, 0]} />
+                                        </BarChart>
+                                    )}
+                                </ResponsiveContainer>
+                            </div>
+                        </div>
+
+                        {/* Revenue Stream Breakdown Donut (4 cols) */}
+                        <div className="lg:col-span-4 p-5 sm:p-6 rounded-xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 shadow-xs flex flex-col justify-between space-y-4">
+                            <div className="pb-3 border-b border-slate-100 dark:border-slate-800">
                                 <h3 className="text-base font-extrabold text-slate-900 dark:text-white">
-                                    Cash Flow & Revenue Inflow Trajectory
+                                    Revenue Stream Breakdown
                                 </h3>
                                 <p className="text-xs text-slate-400">
-                                    Monthly comparison of collections, agency expenditures & net yield (PKR).
+                                    Distribution of earnings across agency services.
                                 </p>
                             </div>
 
-                            <div className="flex items-center gap-1.5 p-1 rounded-xl bg-slate-100 dark:bg-slate-800 self-start sm:self-auto">
-                                <button
-                                    type="button"
-                                    onClick={() => setActiveChartTab('revenue')}
-                                    className={`px-3 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${activeChartTab === 'revenue'
-                                        ? 'bg-white dark:bg-slate-900 text-blue-600 dark:text-blue-400 shadow-xs'
-                                        : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'
-                                        }`}
-                                >
-                                    Inflow vs Outflow
-                                </button>
-                                <button
-                                    type="button"
-                                    onClick={() => setActiveChartTab('net')}
-                                    className={`px-3 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${activeChartTab === 'net'
-                                        ? 'bg-white dark:bg-slate-900 text-teal-600 dark:text-teal-400 shadow-xs'
-                                        : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'
-                                        }`}
-                                >
-                                    Net Margin
-                                </button>
+                            <div className="h-52 w-full relative flex items-center justify-center">
+                                {validRevenueStreams.length > 0 ? (
+                                    <ResponsiveContainer width="100%" height="100%">
+                                        <PieChart>
+                                            <Pie
+                                                data={validRevenueStreams}
+                                                innerRadius={55}
+                                                outerRadius={80}
+                                                paddingAngle={4}
+                                                dataKey="value"
+                                            >
+                                                {validRevenueStreams.map((entry, index) => (
+                                                    <Cell key={`cell-${index}`} fill={entry.color} />
+                                                ))}
+                                            </Pie>
+                                            <Tooltip
+                                                formatter={(val: any) => [`PKR ${Number(val).toLocaleString()}`, 'Yield']}
+                                                contentStyle={{
+                                                    borderRadius: '10px',
+                                                    border: 'none',
+                                                    background: '#0f172a',
+                                                    color: '#fff',
+                                                    fontSize: '11px',
+                                                }}
+                                            />
+                                        </PieChart>
+                                    </ResponsiveContainer>
+                                ) : (
+                                    <div className="text-center text-slate-400 text-xs">
+                                        <PieIcon className="size-8 mx-auto mb-1 opacity-50" />
+                                        No transaction distribution yet
+                                    </div>
+                                )}
+
+                                {totalStreamSum > 0 && (
+                                    <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+                                        <span className="text-[10px] font-bold uppercase text-slate-400">Total</span>
+                                        <span className="text-xs font-black text-slate-900 dark:text-white">
+                                            {(totalStreamSum / 1000).toFixed(0)}k
+                                        </span>
+                                    </div>
+                                )}
+                            </div>
+
+                            {/* Stream Legends */}
+                            <div className="space-y-1.5 pt-1">
+                                {revenueStreams.map((stream) => {
+                                    const percentage = totalStreamSum > 0 ? ((stream.value / totalStreamSum) * 100).toFixed(1) : '0';
+                                    return (
+                                        <div key={stream.name} className="flex items-center justify-between text-xs">
+                                            <div className="flex items-center gap-2">
+                                                <span className="size-2.5 rounded-full" style={{ backgroundColor: stream.color }}></span>
+                                                <span className="text-slate-600 dark:text-slate-300 font-medium truncate max-w-[140px]">
+                                                    {stream.name}
+                                                </span>
+                                            </div>
+                                            <div className="flex items-center gap-2 font-bold font-mono text-slate-900 dark:text-white">
+                                                <span>PKR {stream.value.toLocaleString()}</span>
+                                                <span className="text-[10px] text-slate-400 font-normal">({percentage}%)</span>
+                                            </div>
+                                        </div>
+                                    );
+                                })}
                             </div>
                         </div>
-
-                        <div className="h-72 w-full pt-2">
-                            <ResponsiveContainer width="100%" height="100%">
-                                {activeChartTab === 'revenue' ? (
-                                    <AreaChart data={revenueTrend} margin={{ top: 10, right: 10, left: -15, bottom: 0 }}>
-                                        <defs>
-                                            <linearGradient id="gradRevenue" x1="0" y1="0" x2="0" y2="1">
-                                                <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.4} />
-                                                <stop offset="95%" stopColor="#3b82f6" stopOpacity={0.0} />
-                                            </linearGradient>
-                                            <linearGradient id="gradExpense" x1="0" y1="0" x2="0" y2="1">
-                                                <stop offset="5%" stopColor="#f43f5e" stopOpacity={0.3} />
-                                                <stop offset="95%" stopColor="#f43f5e" stopOpacity={0.0} />
-                                            </linearGradient>
-                                        </defs>
-                                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" opacity={0.5} />
-                                        <XAxis dataKey="month" tick={{ fontSize: 11, fill: '#64748b' }} axisLine={false} tickLine={false} />
-                                        <YAxis tick={{ fontSize: 11, fill: '#64748b' }} axisLine={false} tickLine={false} />
-                                        <Tooltip
-                                            formatter={(val: any, name?: any) => [
-                                                `PKR ${Number(val).toLocaleString()}`,
-                                                String(name) === 'revenue' ? 'Inflow' : 'Expenditure',
-                                            ]}
-                                            contentStyle={{
-                                                borderRadius: '12px',
-                                                border: 'none',
-                                                boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.15)',
-                                                background: '#0f172a',
-                                                color: '#ffffff',
-                                                fontSize: '12px',
-                                            }}
-                                        />
-                                        <Legend verticalAlign="top" height={36} iconType="circle" />
-                                        <Area type="monotone" dataKey="revenue" name="Inflow Revenue" stroke="#3b82f6" strokeWidth={3} fillOpacity={1} fill="url(#gradRevenue)" />
-                                        <Area type="monotone" dataKey="expenses" name="Expenditures" stroke="#f43f5e" strokeWidth={2.5} fillOpacity={1} fill="url(#gradExpense)" />
-                                    </AreaChart>
-                                ) : (
-                                    <BarChart data={revenueTrend} margin={{ top: 10, right: 10, left: -15, bottom: 0 }}>
-                                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" opacity={0.5} />
-                                        <XAxis dataKey="month" tick={{ fontSize: 11, fill: '#64748b' }} axisLine={false} tickLine={false} />
-                                        <YAxis tick={{ fontSize: 11, fill: '#64748b' }} axisLine={false} tickLine={false} />
-                                        <Tooltip
-                                            formatter={(val: any) => [`PKR ${Number(val).toLocaleString()}`, 'Net Margin']}
-                                            contentStyle={{
-                                                borderRadius: '12px',
-                                                border: 'none',
-                                                boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.15)',
-                                                background: '#0f172a',
-                                                color: '#ffffff',
-                                                fontSize: '12px',
-                                            }}
-                                        />
-                                        <Bar dataKey="net" name="Net Profit Margin" fill="#0d9488" radius={[6, 6, 0, 0]} />
-                                    </BarChart>
-                                )}
-                            </ResponsiveContainer>
-                        </div>
                     </div>
+                ) : null}
 
-                    {/* Revenue Stream Breakdown Donut (4 cols) */}
-                    <div className="lg:col-span-4 p-5 sm:p-6 rounded-xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 shadow-xs flex flex-col justify-between space-y-4">
-                        <div className="pb-3 border-b border-slate-100 dark:border-slate-800">
-                            <h3 className="text-base font-extrabold text-slate-900 dark:text-white">
-                                Revenue Stream Breakdown
-                            </h3>
-                            <p className="text-xs text-slate-400">
-                                Distribution of earnings across agency services.
-                            </p>
-                        </div>
-
-                        <div className="h-52 w-full relative flex items-center justify-center">
-                            {validRevenueStreams.length > 0 ? (
-                                <ResponsiveContainer width="100%" height="100%">
-                                    <PieChart>
-                                        <Pie
-                                            data={validRevenueStreams}
-                                            innerRadius={55}
-                                            outerRadius={80}
-                                            paddingAngle={4}
-                                            dataKey="value"
-                                        >
-                                            {validRevenueStreams.map((entry, index) => (
-                                                <Cell key={`cell-${index}`} fill={entry.color} />
-                                            ))}
-                                        </Pie>
-                                        <Tooltip
-                                            formatter={(val: any) => [`PKR ${Number(val).toLocaleString()}`, 'Yield']}
-                                            contentStyle={{
-                                                borderRadius: '10px',
-                                                border: 'none',
-                                                background: '#0f172a',
-                                                color: '#fff',
-                                                fontSize: '11px',
-                                            }}
-                                        />
-                                    </PieChart>
-                                </ResponsiveContainer>
-                            ) : (
-                                <div className="text-center text-slate-400 text-xs">
-                                    <PieIcon className="size-8 mx-auto mb-1 opacity-50" />
-                                    No transaction distribution yet
-                                </div>
-                            )}
-
-                            {totalStreamSum > 0 && (
-                                <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-                                    <span className="text-[10px] font-bold uppercase text-slate-400">Total</span>
-                                    <span className="text-xs font-black text-slate-900 dark:text-white">
-                                        {(totalStreamSum / 1000).toFixed(0)}k
-                                    </span>
-                                </div>
-                            )}
-                        </div>
-
-                        {/* Stream Legends */}
-                        <div className="space-y-1.5 pt-1">
-                            {revenueStreams.map((stream) => {
-                                const percentage = totalStreamSum > 0 ? ((stream.value / totalStreamSum) * 100).toFixed(1) : '0';
-                                return (
-                                    <div key={stream.name} className="flex items-center justify-between text-xs">
-                                        <div className="flex items-center gap-2">
-                                            <span className="size-2.5 rounded-full" style={{ backgroundColor: stream.color }}></span>
-                                            <span className="text-slate-600 dark:text-slate-300 font-medium truncate max-w-[140px]">
-                                                {stream.name}
-                                            </span>
-                                        </div>
-                                        <div className="flex items-center gap-2 font-bold font-mono text-slate-900 dark:text-white">
-                                            <span>PKR {stream.value.toLocaleString()}</span>
-                                            <span className="text-[10px] text-slate-400 font-normal">({percentage}%)</span>
-                                        </div>
-                                    </div>
-                                );
-                            })}
-                        </div>
-                    </div>
-                </div>
-
-                {/* Secondary Analytics: Pipeline Health & Multi-Currency Treasury */}
+                {/* Secondary Analytics: Pipeline Health & Multi-Currency Treasury (or Task Distribution if no budget permission) */}
                 <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-                    {/* Pipeline Health (7 cols) */}
-                    <div className="lg:col-span-7 p-5 sm:p-6 rounded-xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 shadow-xs space-y-4">
+                    {/* Pipeline Health (7 or 8 cols) */}
+                    <div className={`${canViewBudget ? 'lg:col-span-7' : 'lg:col-span-8'} p-5 sm:p-6 rounded-xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 shadow-xs space-y-4`}>
                         <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800">
                             <div>
                                 <h3 className="text-base font-extrabold text-slate-900 dark:text-white">
@@ -669,54 +784,131 @@ export default function Dashboard({
                         </div>
                     </div>
 
-                    {/* Multi-Currency Treasury Exposure (5 cols) */}
-                    <div className="lg:col-span-5 p-5 sm:p-6 rounded-xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 shadow-xs space-y-4 flex flex-col justify-between">
-                        <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800">
-                            <div>
+                    {/* Right Card: Multi-Currency Treasury (if canViewBudget) OR Task Status Breakdown Donut (if !canViewBudget) */}
+                    {canViewBudget ? (
+                        <div className="lg:col-span-5 p-5 sm:p-6 rounded-xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 shadow-xs space-y-4 flex flex-col justify-between">
+                            <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800">
+                                <div>
+                                    <h3 className="text-base font-extrabold text-slate-900 dark:text-white">
+                                        Multi-Currency Treasury
+                                    </h3>
+                                    <p className="text-xs text-slate-400">
+                                        Client billing weights & forex exchange benchmarks.
+                                    </p>
+                                </div>
+                                <Link href="/currencies" className="text-xs font-bold text-blue-600 dark:text-blue-400 hover:underline">
+                                    Manage Rates
+                                </Link>
+                            </div>
+
+                            <div className="space-y-2.5">
+                                {currencyBreakdown.map((curr) => (
+                                    <div
+                                        key={curr.code}
+                                        className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-100 dark:border-slate-800 flex items-center justify-between"
+                                    >
+                                        <div className="flex items-center gap-3">
+                                            <div className="size-9 rounded-lg bg-white dark:bg-slate-900 border border-slate-200/60 dark:border-slate-700 flex items-center justify-center font-bold text-xs text-slate-700 dark:text-slate-200 shadow-2xs font-mono">
+                                                {curr.symbol || curr.code}
+                                            </div>
+                                            <div>
+                                                <div className="text-xs font-bold text-slate-900 dark:text-white flex items-center gap-1.5">
+                                                    <span>{curr.code}</span>
+                                                    <span className="text-[10px] text-slate-400 font-normal">({curr.name})</span>
+                                                </div>
+                                                <div className="text-[10px] text-slate-400 font-medium">
+                                                    Rate: 1 {curr.code} = PKR {Number(curr.rate).toFixed(2)}
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div className="text-right">
+                                            <div className="text-xs font-extrabold text-slate-900 dark:text-white font-mono">
+                                                {curr.symbol} {curr.total_amount.toLocaleString()}
+                                            </div>
+                                            <div className="text-[10px] text-slate-400 font-bold">
+                                                ≈ PKR {curr.pkr_equivalent.toLocaleString()}
+                                            </div>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    ) : (
+                        <div className="lg:col-span-4 p-5 sm:p-6 rounded-xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 shadow-xs flex flex-col justify-between space-y-4">
+                            <div className="pb-3 border-b border-slate-100 dark:border-slate-800">
                                 <h3 className="text-base font-extrabold text-slate-900 dark:text-white">
-                                    Multi-Currency Treasury
+                                    Deliverables Breakdown
                                 </h3>
                                 <p className="text-xs text-slate-400">
-                                    Client billing weights & forex exchange benchmarks.
+                                    Task allocation across completion lifecycle.
                                 </p>
                             </div>
-                            <Link href="/currencies" className="text-xs font-bold text-blue-600 dark:text-blue-400 hover:underline">
-                                Manage Rates
-                            </Link>
-                        </div>
 
-                        <div className="space-y-2.5">
-                            {currencyBreakdown.map((curr) => (
-                                <div
-                                    key={curr.code}
-                                    className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-100 dark:border-slate-800 flex items-center justify-between"
-                                >
-                                    <div className="flex items-center gap-3">
-                                        <div className="size-9 rounded-lg bg-white dark:bg-slate-900 border border-slate-200/60 dark:border-slate-700 flex items-center justify-center font-bold text-xs text-slate-700 dark:text-slate-200 shadow-2xs font-mono">
-                                            {curr.symbol || curr.code}
-                                        </div>
-                                        <div>
-                                            <div className="text-xs font-bold text-slate-900 dark:text-white flex items-center gap-1.5">
-                                                <span>{curr.code}</span>
-                                                <span className="text-[10px] text-slate-400 font-normal">({curr.name})</span>
-                                            </div>
-                                            <div className="text-[10px] text-slate-400 font-medium">
-                                                Rate: 1 {curr.code} = PKR {Number(curr.rate).toFixed(2)}
-                                            </div>
-                                        </div>
+                            <div className="h-52 w-full relative flex items-center justify-center">
+                                {taskDistributionData.length > 0 ? (
+                                    <ResponsiveContainer width="100%" height="100%">
+                                        <PieChart>
+                                            <Pie
+                                                data={taskDistributionData}
+                                                innerRadius={55}
+                                                outerRadius={80}
+                                                paddingAngle={4}
+                                                dataKey="value"
+                                            >
+                                                {taskDistributionData.map((entry, index) => (
+                                                    <Cell key={`task-cell-${index}`} fill={entry.color} />
+                                                ))}
+                                            </Pie>
+                                            <Tooltip
+                                                formatter={(val: any) => [`${val} Tasks`, 'Count']}
+                                                contentStyle={{
+                                                    borderRadius: '10px',
+                                                    border: 'none',
+                                                    background: '#0f172a',
+                                                    color: '#fff',
+                                                    fontSize: '11px',
+                                                }}
+                                            />
+                                        </PieChart>
+                                    </ResponsiveContainer>
+                                ) : (
+                                    <div className="text-center text-slate-400 text-xs">
+                                        <CheckCircle2 className="size-8 mx-auto mb-1 opacity-50" />
+                                        No tasks assigned yet
                                     </div>
-                                    <div className="text-right">
-                                        <div className="text-xs font-extrabold text-slate-900 dark:text-white font-mono">
-                                            {curr.symbol} {curr.total_amount.toLocaleString()}
-                                        </div>
-                                        <div className="text-[10px] text-slate-400 font-bold">
-                                            ≈ PKR {curr.pkr_equivalent.toLocaleString()}
-                                        </div>
+                                )}
+
+                                {totalTaskDistribution > 0 && (
+                                    <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+                                        <span className="text-[10px] font-bold uppercase text-slate-400">Total</span>
+                                        <span className="text-xs font-black text-slate-900 dark:text-white">
+                                            {totalTaskDistribution}
+                                        </span>
                                     </div>
-                                </div>
-                            ))}
+                                )}
+                            </div>
+
+                            <div className="space-y-1.5 pt-1">
+                                {taskDistributionData.map((item) => {
+                                    const percentage = totalTaskDistribution > 0 ? ((item.value / totalTaskDistribution) * 100).toFixed(1) : '0';
+                                    return (
+                                        <div key={item.name} className="flex items-center justify-between text-xs">
+                                            <div className="flex items-center gap-2">
+                                                <span className="size-2.5 rounded-full" style={{ backgroundColor: item.color }}></span>
+                                                <span className="text-slate-600 dark:text-slate-300 font-medium truncate max-w-[140px]">
+                                                    {item.name}
+                                                </span>
+                                            </div>
+                                            <div className="flex items-center gap-2 font-bold font-mono text-slate-900 dark:text-white">
+                                                <span>{item.value} Tasks</span>
+                                                <span className="text-[10px] text-slate-400 font-normal">({percentage}%)</span>
+                                            </div>
+                                        </div>
+                                    );
+                                })}
+                            </div>
                         </div>
-                    </div>
+                    )}
                 </div>
 
                 {/* Operational Activity Grid: 4 Actionable Intelligence Cards */}
@@ -770,71 +962,130 @@ export default function Dashboard({
                             </div>
                         </div>
 
-                        <Link
-                            href="/reports"
-                            className="text-[11px] font-bold text-blue-600 dark:text-blue-400 hover:underline inline-flex items-center gap-1 pt-1"
-                        >
-                            <span>View All Asset Renewals</span>
-                            <ExternalLink className="size-3" />
-                        </Link>
+                        {canViewReports && (
+                            <Link
+                                href="/reports"
+                                className="text-[11px] font-bold text-blue-600 dark:text-blue-400 hover:underline inline-flex items-center gap-1 pt-1"
+                            >
+                                <span>View All Asset Renewals</span>
+                                <ExternalLink className="size-3" />
+                            </Link>
+                        )}
                     </div>
 
-                    {/* Widget 2: Recent Invoices */}
-                    <div className="p-5 rounded-xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 shadow-xs space-y-3 flex flex-col justify-between">
-                        <div>
-                            <div className="flex items-center justify-between pb-2.5 border-b border-slate-100 dark:border-slate-800">
-                                <h4 className="text-xs font-extrabold uppercase tracking-wider text-slate-900 dark:text-white flex items-center gap-1.5">
-                                    <FileText className="size-4 text-blue-500" />
-                                    Recent Invoices
-                                </h4>
-                                <Link href="/invoices" className="text-[10px] font-bold text-blue-600 hover:underline">
-                                    View All
-                                </Link>
-                            </div>
+                    {/* Widget 2: Recent Invoices (if canViewInvoices) OR Urgent Deliverables */}
+                    {canViewInvoices ? (
+                        <div className="p-5 rounded-xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 shadow-xs space-y-3 flex flex-col justify-between">
+                            <div>
+                                <div className="flex items-center justify-between pb-2.5 border-b border-slate-100 dark:border-slate-800">
+                                    <h4 className="text-xs font-extrabold uppercase tracking-wider text-slate-900 dark:text-white flex items-center gap-1.5">
+                                        <FileText className="size-4 text-blue-500" />
+                                        Recent Invoices
+                                    </h4>
+                                    <Link href="/invoices" className="text-[10px] font-bold text-blue-600 hover:underline">
+                                        View All
+                                    </Link>
+                                </div>
 
-                            <div className="divide-y divide-slate-100 dark:divide-slate-800 mt-2">
-                                {recentInvoices.length > 0 ? (
-                                    recentInvoices.map((inv) => (
-                                        <div key={inv.id} className="py-2 flex items-center justify-between text-xs">
-                                            <div>
-                                                <Link href={`/invoices/${inv.id}`} className="font-bold text-slate-900 dark:text-white hover:text-blue-600 flex items-center gap-1">
-                                                    #{inv.invoice_number}
-                                                </Link>
-                                                <div className="text-[10px] text-slate-400 truncate max-w-[130px]">
-                                                    {inv.client?.name || 'Client'}
+                                <div className="divide-y divide-slate-100 dark:divide-slate-800 mt-2">
+                                    {recentInvoices.length > 0 ? (
+                                        recentInvoices.map((inv) => (
+                                            <div key={inv.id} className="py-2 flex items-center justify-between text-xs">
+                                                <div>
+                                                    <Link href={`/invoices/${inv.id}`} className="font-bold text-slate-900 dark:text-white hover:text-blue-600 flex items-center gap-1">
+                                                        #{inv.invoice_number}
+                                                    </Link>
+                                                    <div className="text-[10px] text-slate-400 truncate max-w-[130px]">
+                                                        {inv.client?.name || 'Client'}
+                                                    </div>
+                                                </div>
+                                                <div className="text-right">
+                                                    {canViewBudget ? (
+                                                        <div className="font-extrabold text-slate-900 dark:text-white font-mono text-[11px]">
+                                                            {inv.currency_code} {Number(inv.total_amount).toLocaleString()}
+                                                        </div>
+                                                    ) : null}
+                                                    <span className={`text-[9px] font-extrabold uppercase px-1.5 py-0.2 rounded-full ${inv.status === 'paid'
+                                                        ? 'bg-emerald-50 text-emerald-700'
+                                                        : inv.status === 'overdue'
+                                                            ? 'bg-rose-50 text-rose-700'
+                                                            : 'bg-amber-50 text-amber-700'
+                                                        }`}>
+                                                        {inv.status}
+                                                    </span>
                                                 </div>
                                             </div>
-                                            <div className="text-right">
-                                                <div className="font-extrabold text-slate-900 dark:text-white font-mono text-[11px]">
-                                                    {inv.currency_code} {Number(inv.total_amount).toLocaleString()}
-                                                </div>
-                                                <span className={`text-[9px] font-extrabold uppercase px-1.5 py-0.2 rounded-full ${inv.status === 'paid'
-                                                    ? 'bg-emerald-50 text-emerald-700'
-                                                    : inv.status === 'overdue'
-                                                        ? 'bg-rose-50 text-rose-700'
-                                                        : 'bg-amber-50 text-amber-700'
-                                                    }`}>
-                                                    {inv.status}
-                                                </span>
-                                            </div>
+                                        ))
+                                    ) : (
+                                        <div className="py-8 text-center text-xs text-slate-400">
+                                            No invoices recorded yet
                                         </div>
-                                    ))
-                                ) : (
-                                    <div className="py-8 text-center text-xs text-slate-400">
-                                        No invoices recorded yet
-                                    </div>
-                                )}
+                                    )}
+                                </div>
                             </div>
-                        </div>
 
-                        <Link
-                            href="/invoices"
-                            className="text-[11px] font-bold text-blue-600 dark:text-blue-400 hover:underline inline-flex items-center gap-1 pt-1"
-                        >
-                            <span>Open Invoicing Hub</span>
-                            <ExternalLink className="size-3" />
-                        </Link>
-                    </div>
+                            <Link
+                                href="/invoices"
+                                className="text-[11px] font-bold text-blue-600 dark:text-blue-400 hover:underline inline-flex items-center gap-1 pt-1"
+                            >
+                                <span>Open Invoicing Hub</span>
+                                <ExternalLink className="size-3" />
+                            </Link>
+                        </div>
+                    ) : (
+                        <div className="p-5 rounded-xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 shadow-xs space-y-3 flex flex-col justify-between">
+                            <div>
+                                <div className="flex items-center justify-between pb-2.5 border-b border-slate-100 dark:border-slate-800">
+                                    <h4 className="text-xs font-extrabold uppercase tracking-wider text-slate-900 dark:text-white flex items-center gap-1.5">
+                                        <CheckCircle2 className="size-4 text-blue-500" />
+                                        Priority Tasks
+                                    </h4>
+                                    <Link href="/my-tasks" className="text-[10px] font-bold text-blue-600 hover:underline">
+                                        My Tasks
+                                    </Link>
+                                </div>
+
+                                <div className="divide-y divide-slate-100 dark:divide-slate-800 mt-2">
+                                    {urgentTasks.length > 0 ? (
+                                        urgentTasks.map((t) => (
+                                            <div key={t.id} className="py-2 flex items-center justify-between text-xs">
+                                                <div>
+                                                    <span className="font-bold text-slate-900 dark:text-white block truncate max-w-[140px]">
+                                                        {t.task_title}
+                                                    </span>
+                                                    <div className="text-[10px] text-slate-400">
+                                                        {t.category_name}
+                                                    </div>
+                                                </div>
+                                                <div className="text-right">
+                                                    <span className={`text-[9px] font-extrabold uppercase px-1.5 py-0.5 rounded-full ${t.priority === 'urgent' ? 'bg-rose-50 text-rose-700' : 'bg-amber-50 text-amber-700'}`}>
+                                                        {t.priority}
+                                                    </span>
+                                                    {t.due_date && (
+                                                        <span className="text-[10px] font-mono text-slate-400 block mt-0.5">
+                                                            {t.due_date}
+                                                        </span>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        ))
+                                    ) : (
+                                        <div className="py-8 text-center text-xs text-slate-400">
+                                            No urgent tasks pending
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+
+                            <Link
+                                href="/my-tasks"
+                                className="text-[11px] font-bold text-blue-600 dark:text-blue-400 hover:underline inline-flex items-center gap-1 pt-1"
+                            >
+                                <span>Go to My Tasks Workspace</span>
+                                <ExternalLink className="size-3" />
+                            </Link>
+                        </div>
+                    )}
 
                     {/* Widget 3: Active Projects Progress */}
                     <div className="p-5 rounded-xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 shadow-xs space-y-3 flex flex-col justify-between">
@@ -869,9 +1120,15 @@ export default function Dashboard({
                                             </div>
                                             <div className="flex items-center justify-between text-[10px] text-slate-400">
                                                 <span>{p.client?.name || 'Client'}</span>
-                                                <span className="font-mono">
-                                                    {p.currency} {Number(p.total_budget || 0).toLocaleString()}
-                                                </span>
+                                                {canViewBudget && p.total_budget ? (
+                                                    <span className="font-mono">
+                                                        {p.currency} {Number(p.total_budget || 0).toLocaleString()}
+                                                    </span>
+                                                ) : (
+                                                    <span className="text-[9px] font-bold uppercase text-slate-500">
+                                                        {p.status?.replace('_', ' ')}
+                                                    </span>
+                                                )}
                                             </div>
                                         </div>
                                     ))
@@ -892,61 +1149,122 @@ export default function Dashboard({
                         </Link>
                     </div>
 
-                    {/* Widget 4: Real-time Cashflow Feed */}
-                    <div className="p-5 rounded-xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 shadow-xs space-y-3 flex flex-col justify-between">
-                        <div>
-                            <div className="flex items-center justify-between pb-2.5 border-b border-slate-100 dark:border-slate-800">
-                                <h4 className="text-xs font-extrabold uppercase tracking-wider text-slate-900 dark:text-white flex items-center gap-1.5">
-                                    <Activity className="size-4 text-teal-500" />
-                                    Recent Cashflow
-                                </h4>
-                                <span className="text-[10px] font-bold text-slate-400">
-                                    Real-time
-                                </span>
+                    {/* Widget 4: Real-time Cashflow Feed (if canViewBudget) OR Urgent Tasks Feed */}
+                    {canViewBudget ? (
+                        <div className="p-5 rounded-xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 shadow-xs space-y-3 flex flex-col justify-between">
+                            <div>
+                                <div className="flex items-center justify-between pb-2.5 border-b border-slate-100 dark:border-slate-800">
+                                    <h4 className="text-xs font-extrabold uppercase tracking-wider text-slate-900 dark:text-white flex items-center gap-1.5">
+                                        <Activity className="size-4 text-teal-500" />
+                                        Recent Cashflow
+                                    </h4>
+                                    <span className="text-[10px] font-bold text-slate-400">
+                                        Real-time
+                                    </span>
+                                </div>
+
+                                <div className="divide-y divide-slate-100 dark:divide-slate-800 mt-2">
+                                    {recentCashflow.length > 0 ? (
+                                        recentCashflow.map((flow, idx) => (
+                                            <div key={idx} className="py-2 flex items-center justify-between text-xs">
+                                                <div>
+                                                    <div className="font-bold text-slate-900 dark:text-white truncate max-w-[130px]">
+                                                        {flow.title}
+                                                    </div>
+                                                    <div className="text-[10px] text-slate-400">
+                                                        {flow.category} • {flow.date}
+                                                    </div>
+                                                </div>
+                                                <div className="text-right">
+                                                    <span className={`font-mono font-extrabold text-xs ${flow.type === 'income' ? 'text-emerald-600' : 'text-rose-600'
+                                                        }`}>
+                                                        {flow.type === 'income' ? '+' : '-'} {flow.currency} {Number(flow.amount).toLocaleString()}
+                                                    </span>
+                                                </div>
+                                            </div>
+                                        ))
+                                    ) : (
+                                        <div className="py-8 text-center text-xs text-slate-400">
+                                            No recent cash movements
+                                        </div>
+                                    )}
+                                </div>
                             </div>
 
-                            <div className="divide-y divide-slate-100 dark:divide-slate-800 mt-2">
-                                {recentCashflow.length > 0 ? (
-                                    recentCashflow.map((flow, idx) => (
-                                        <div key={idx} className="py-2 flex items-center justify-between text-xs">
-                                            <div>
-                                                <div className="font-bold text-slate-900 dark:text-white truncate max-w-[130px]">
-                                                    {flow.title}
-                                                </div>
-                                                <div className="text-[10px] text-slate-400">
-                                                    {flow.category} • {flow.date}
-                                                </div>
-                                            </div>
-                                            <div className="text-right">
-                                                <span className={`font-mono font-extrabold text-xs ${flow.type === 'income' ? 'text-emerald-600' : 'text-rose-600'
-                                                    }`}>
-                                                    {flow.type === 'income' ? '+' : '-'} {flow.currency} {Number(flow.amount).toLocaleString()}
-                                                </span>
-                                            </div>
-                                        </div>
-                                    ))
-                                ) : (
-                                    <div className="py-8 text-center text-xs text-slate-400">
-                                        No recent cash movements
-                                    </div>
+                            <div className="flex items-center justify-between pt-1">
+                                {canViewIncomes && (
+                                    <Link href="/incomes" className="text-[11px] font-bold text-emerald-600 hover:underline">
+                                        Incomes
+                                    </Link>
+                                )}
+                                {canViewIncomes && canViewExpenses && <span className="text-slate-300">•</span>}
+                                {canViewExpenses && (
+                                    <Link href="/expenses" className="text-[11px] font-bold text-rose-600 hover:underline">
+                                        Expenses
+                                    </Link>
+                                )}
+                                {hasPermission(user, 'view-payroll') && (
+                                    <>
+                                        <span className="text-slate-300">•</span>
+                                        <Link href="/payroll" className="text-[11px] font-bold text-indigo-600 hover:underline">
+                                            Payroll
+                                        </Link>
+                                    </>
                                 )}
                             </div>
                         </div>
+                    ) : (
+                        <div className="p-5 rounded-xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 shadow-xs space-y-3 flex flex-col justify-between">
+                            <div>
+                                <div className="flex items-center justify-between pb-2.5 border-b border-slate-100 dark:border-slate-800">
+                                    <h4 className="text-xs font-extrabold uppercase tracking-wider text-slate-900 dark:text-white flex items-center gap-1.5">
+                                        <Clock className="size-4 text-purple-500" />
+                                        Task Milestones
+                                    </h4>
+                                    <span className="text-[10px] font-bold text-slate-400">
+                                        Deliverables
+                                    </span>
+                                </div>
 
-                        <div className="flex items-center justify-between pt-1">
-                            <Link href="/incomes" className="text-[11px] font-bold text-emerald-600 hover:underline">
-                                Incomes
-                            </Link>
-                            <span className="text-slate-300">•</span>
-                            <Link href="/expenses" className="text-[11px] font-bold text-rose-600 hover:underline">
-                                Expenses
-                            </Link>
-                            <span className="text-slate-300">•</span>
-                            <Link href="/payroll" className="text-[11px] font-bold text-indigo-600 hover:underline">
-                                Payroll
+                                <div className="divide-y divide-slate-100 dark:divide-slate-800 mt-2">
+                                    {urgentTasks.length > 0 ? (
+                                        urgentTasks.map((t) => (
+                                            <div key={t.id} className="py-2 flex items-center justify-between text-xs">
+                                                <div>
+                                                    <div className="font-bold text-slate-900 dark:text-white truncate max-w-[130px]">
+                                                        {t.task_title}
+                                                    </div>
+                                                    <div className="text-[10px] text-slate-400">
+                                                        {t.assigned_employee?.name || 'Unassigned'}
+                                                    </div>
+                                                </div>
+                                                <div className="text-right">
+                                                    <span className="text-[10px] font-mono font-bold text-slate-600 dark:text-slate-300 block">
+                                                        {t.due_date || 'No Date'}
+                                                    </span>
+                                                    <span className="text-[9px] font-extrabold text-blue-600 uppercase">
+                                                        {t.status}
+                                                    </span>
+                                                </div>
+                                            </div>
+                                        ))
+                                    ) : (
+                                        <div className="py-8 text-center text-xs text-slate-400">
+                                            No active milestones
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+
+                            <Link
+                                href="/my-tasks"
+                                className="text-[11px] font-bold text-purple-600 dark:text-purple-400 hover:underline inline-flex items-center gap-1 pt-1"
+                            >
+                                <span>View All Assigned Tasks</span>
+                                <ExternalLink className="size-3" />
                             </Link>
                         </div>
-                    </div>
+                    )}
                 </div>
             </div>
         </AppLayout>

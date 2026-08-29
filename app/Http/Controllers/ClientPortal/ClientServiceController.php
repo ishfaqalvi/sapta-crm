@@ -7,9 +7,11 @@ use App\Models\Client;
 use App\Models\ClientService;
 use App\Models\ClientCredential;
 use App\Models\Currency;
+use App\Models\Employee;
 use App\Models\Invoice;
 use App\Models\InvoiceItem;
 use App\Models\ServicePayment;
+use App\Models\ServiceTask;
 use App\Models\SystemSetting;
 use App\Services\CurrencyService;
 use App\Traits\AuthorizesClientPortalAccess;
@@ -51,8 +53,23 @@ class ClientServiceController extends Controller
         $clientId = $this->getClientId();
         $client = $this->getClientModel();
 
+        $user = Auth::user();
+        $employee = null;
+        if ($user && ($user->type === 'employee' || $user->employee_id)) {
+            $employee = $user->employee ?: Employee::where('user_id', $user->id)->first();
+        }
+
         $query = ClientService::where('client_id', $clientId)
-            ->with(['category'])
+            ->with([
+                'category',
+                'tasks' => function ($q) use ($user, $employee) {
+                    if ($user && $user->type === 'employee') {
+                        $employeeId = $employee ? $employee->id : 0;
+                        $q->where('assigned_employee_id', $employeeId);
+                    }
+                    $q->with('assignedEmployee');
+                },
+            ])
             ->withSum([
                 'payments as collected_amount' => function ($q) {
                     $q->where('status', 'paid');
@@ -68,6 +85,13 @@ class ClientServiceController extends Controller
                     $q->where('status', 'paid');
                 },
             ]);
+
+        if ($user && $user->type === 'employee') {
+            $employeeId = $employee ? $employee->id : 0;
+            $query->whereHas('tasks', function ($q) use ($employeeId) {
+                $q->where('assigned_employee_id', $employeeId);
+            });
+        }
 
         if ($request->filled('search')) {
             $search = $request->search;
@@ -89,7 +113,14 @@ class ClientServiceController extends Controller
             ->paginate(10)
             ->withQueryString();
 
-        $allServices = ClientService::where('client_id', $clientId)->get();
+        $allServicesQuery = ClientService::where('client_id', $clientId);
+        if ($user && $user->type === 'employee') {
+            $employeeId = $employee ? $employee->id : 0;
+            $allServicesQuery->whereHas('tasks', function ($q) use ($employeeId) {
+                $q->where('assigned_employee_id', $employeeId);
+            });
+        }
+        $allServices = $allServicesQuery->get();
         $activeServices = $allServices->where('status', 'active');
 
         $totalCollected = (float) ServicePayment::where('client_id', $clientId)
@@ -124,7 +155,7 @@ class ClientServiceController extends Controller
     }
 
     /**
-     * Display detailed view of a Client Service in Client Portal.
+     * Display the specified Client Service detail page.
      */
     public function show(ClientService $service): Response
     {
@@ -138,10 +169,31 @@ class ClientServiceController extends Controller
 
         $client = $this->getClientModel();
 
+        $user = Auth::user();
+        $employee = null;
+        if ($user && ($user->type === 'employee' || $user->employee_id)) {
+            $employee = $user->employee ?: Employee::where('user_id', $user->id)->first();
+        }
+
+        if ($user && $user->type === 'employee') {
+            $employeeId = $employee ? $employee->id : 0;
+            $hasAssignedTask = $service->tasks()->where('assigned_employee_id', $employeeId)->exists();
+            if (!$hasAssignedTask) {
+                abort(403, 'Unauthorized access: No tasks assigned to you on this service.');
+            }
+        }
+
         $service->load([
             'category',
             'payments' => function ($q) {
-                $q->with('invoice')->orderBy('billing_month', 'desc');
+                $q->with(['invoice', 'children', 'parent'])->orderBy('billing_month', 'desc')->orderBy('id', 'asc');
+            },
+            'tasks' => function ($q) use ($user, $employee) {
+                if ($user && $user->type === 'employee') {
+                    $employeeId = $employee ? $employee->id : 0;
+                    $q->where('assigned_employee_id', $employeeId);
+                }
+                $q->with('assignedEmployee:id,name,employee_code,avatar')->orderBy('due_date', 'asc');
             },
             'credentials' => function ($q) {
                 $q->orderBy('created_at', 'desc');
@@ -160,10 +212,16 @@ class ClientServiceController extends Controller
             'logo' => SystemSetting::get('company_logo', '/app-logo-icon.png'),
         ];
 
+        $employees = Employee::select('id', 'name', 'employee_code', 'avatar')
+            ->where('status', 'active')
+            ->orderBy('name', 'asc')
+            ->get();
+
         return Inertia::render('client-portal/services/show', [
             'client' => $client,
             'service' => $service,
             'company' => $companySettings,
+            'employees' => $employees,
         ]);
     }
 
@@ -481,6 +539,128 @@ class ClientServiceController extends Controller
     }
 
     /**
+     * Split a parent Service Payment bill into multiple partial installments.
+     */
+    public function splitPayment(Request $request, ServicePayment $servicePayment): RedirectResponse
+    {
+        $this->authorizePermission('edit-client-portal-service-payments');
+
+        $clientId = $this->getClientId();
+
+        if ($servicePayment->client_id !== $clientId) {
+            abort(403, 'Unauthorized access to Service Payment record');
+        }
+
+        // Rule: Only parent records can be split
+        if (!is_null($servicePayment->parent_id)) {
+            return redirect()->back()->with('error', 'Only original parent billing records can be split. Child installments cannot be split further.');
+        }
+
+        // Rule: Cannot split if invoice is already generated or payment is paid
+        if ($servicePayment->invoice()->exists() || $servicePayment->status === 'paid') {
+            return redirect()->back()->with('error', 'Cannot split a billing record that already has an invoice generated or is marked as paid.');
+        }
+
+        $currentAmountDue = (float) $servicePayment->amount_due;
+
+        $validated = $request->validate([
+            'split_amount' => ['required', 'numeric', 'min:0.01', 'max:' . ($currentAmountDue - 0.01)],
+            'split_title' => ['nullable', 'string', 'max:255'],
+            'notes' => ['nullable', 'string', 'max:2000'],
+        ], [
+            'split_amount.max' => 'Split amount must be less than current bill amount (' . $currentAmountDue . ').',
+        ]);
+
+        $splitAmount = round((float) $validated['split_amount'], 2);
+        $remainingAmount = round($currentAmountDue - $splitAmount, 2);
+
+        $existingChildrenCount = $servicePayment->children()->count();
+        $childTitle = !empty($validated['split_title'])
+            ? $validated['split_title']
+            : 'Installment ' . ($existingChildrenCount + 2);
+
+        $parentTitle = $servicePayment->split_title ?: 'Installment 1 (Parent)';
+
+        // 1. Update Parent with remaining amount
+        $servicePayment->update([
+            'amount_due' => $remainingAmount,
+            'split_title' => $parentTitle,
+        ]);
+
+        // 2. Create Child record for the split amount
+        $service = $servicePayment->service;
+        $currency = $service ? ($service->currency ?? 'USD') : 'USD';
+        $rate = $servicePayment->exchange_rate ?: CurrencyService::getRate($currency);
+
+        ServicePayment::create([
+            'client_service_id' => $servicePayment->client_service_id,
+            'client_id' => $servicePayment->client_id,
+            'parent_id' => $servicePayment->id,
+            'billing_month' => $servicePayment->billing_month,
+            'split_title' => $childTitle,
+            'amount_due' => $splitAmount,
+            'amount_paid' => 0.00,
+            'exchange_rate' => $rate,
+            'amount_paid_pkr' => 0.00,
+            'status' => 'due',
+            'notes' => $validated['notes'] ?? 'Split installment from parent bill',
+        ]);
+
+        return redirect()->back()->with('success', "Service bill for {$servicePayment->billing_month} split successfully: {$childTitle} ({$splitAmount}) created, Parent updated to ({$remainingAmount}).");
+    }
+
+    /**
+     * Merge a child split Service Payment bill back into its parent.
+     */
+    public function mergePayment(ServicePayment $servicePayment): RedirectResponse
+    {
+        $this->authorizePermission('edit-client-portal-service-payments');
+
+        $clientId = $this->getClientId();
+
+        if ($servicePayment->client_id !== $clientId) {
+            abort(403, 'Unauthorized access to Service Payment record');
+        }
+
+        // Rule: Only child records can be merged
+        if (is_null($servicePayment->parent_id)) {
+            return redirect()->back()->with('error', 'Only split child billing records can be merged back into their parent.');
+        }
+
+        // Rule: Cannot merge if invoice is already generated or payment is paid
+        if ($servicePayment->invoice()->exists() || $servicePayment->status === 'paid') {
+            return redirect()->back()->with('error', 'Cannot merge an installment that already has an invoice generated or is marked as paid.');
+        }
+
+        $parent = ServicePayment::find($servicePayment->parent_id);
+
+        if (!$parent) {
+            return redirect()->back()->with('error', 'Parent billing record could not be found.');
+        }
+
+        $childAmount = (float) $servicePayment->amount_due;
+        $newParentAmount = round((float) $parent->amount_due + $childAmount, 2);
+
+        // Update parent with combined amount
+        $parent->update([
+            'amount_due' => $newParentAmount,
+        ]);
+
+        // If parent has no other children after this, clear parent's split_title
+        $remainingChildrenCount = ServicePayment::where('parent_id', $parent->id)->where('id', '!=', $servicePayment->id)->count();
+        if ($remainingChildrenCount === 0) {
+            $parent->update([
+                'split_title' => null,
+            ]);
+        }
+
+        // Delete the child record
+        $servicePayment->delete();
+
+        return redirect()->back()->with('success', "Installment of {$childAmount} merged back into Parent bill ({$newParentAmount}) successfully.");
+    }
+
+    /**
      * Generate an official system Invoice for a Service Payment record.
      */
     public function generatePaymentInvoice(ServicePayment $servicePayment): RedirectResponse
@@ -503,6 +683,9 @@ class ClientServiceController extends Controller
 
         $invoiceNumber = Invoice::generateNextInvoiceNumber();
 
+        $titleSuffix = $servicePayment->split_title ? ' (' . $servicePayment->split_title . ')' : '';
+        $itemDescription = 'Service Subscription: ' . ($service ? $service->service_name : 'Subscription') . ' - Billing Month: ' . $servicePayment->billing_month . $titleSuffix;
+
         $invoice = Invoice::create([
             'invoice_number' => $invoiceNumber,
             'client_id' => $servicePayment->client_id,
@@ -517,13 +700,13 @@ class ClientServiceController extends Controller
             'issue_date' => now()->toDateString(),
             'due_date' => now()->addDays(7)->toDateString(),
             'status' => 'due',
-            'notes' => 'Invoice generated for service: ' . ($service ? $service->service_name : 'Subscription') . ' (' . $servicePayment->billing_month . ')',
+            'notes' => 'Invoice generated for service: ' . ($service ? $service->service_name : 'Subscription') . ' (' . $servicePayment->billing_month . ')' . $titleSuffix,
             'created_by' => Auth::id(),
         ]);
 
         InvoiceItem::create([
             'invoice_id' => $invoice->id,
-            'description' => 'Service Subscription: ' . ($service ? $service->service_name : 'Subscription') . ' - Billing Month: ' . $servicePayment->billing_month,
+            'description' => $itemDescription,
             'quantity' => 1.00,
             'unit_price' => $servicePayment->amount_due,
             'amount' => $servicePayment->amount_due,
@@ -649,5 +832,127 @@ class ClientServiceController extends Controller
         $document->delete();
 
         return redirect()->back()->with('success', 'Document deleted successfully.');
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | Service Tasks Handlers
+    |--------------------------------------------------------------------------
+    */
+    public function storeTask(Request $request): RedirectResponse
+    {
+        $this->authorizePermission('create-client-portal-service-tasks');
+
+        $clientId = $this->getClientId();
+
+        $validated = $request->validate([
+            'client_service_id' => [
+                'required',
+                Rule::exists('client_services', 'id')->where(function ($query) use ($clientId) {
+                    return $query->where('client_id', $clientId);
+                }),
+            ],
+            'assigned_employee_id' => 'nullable|exists:employees,id',
+            'task_title' => 'required|string|max:255',
+            'priority' => 'required|in:low,medium,high,urgent',
+            'status' => 'required|in:todo,in_progress,in_review,completed,cancelled',
+            'start_date' => 'nullable|date',
+            'due_date' => 'nullable|date',
+            'description' => 'nullable|string|max:2000',
+        ]);
+
+        $validated['assigned_employee_id'] = $request->filled('assigned_employee_id') ? $request->assigned_employee_id : null;
+        $validated['start_date'] = $request->filled('start_date') ? $request->start_date : null;
+        $validated['due_date'] = $request->filled('due_date') ? $request->due_date : null;
+
+        if ($validated['status'] === 'completed') {
+            $validated['completed_at'] = now();
+        }
+
+        ServiceTask::create($validated);
+
+        return redirect()->back()->with('success', 'Service task created successfully.');
+    }
+
+    public function updateTask(Request $request, ServiceTask $task): RedirectResponse
+    {
+        $this->authorizePermission('edit-client-portal-service-tasks');
+
+        $clientId = $this->getClientId();
+
+        if (!$task->service || $task->service->client_id !== $clientId) {
+            abort(403, 'Unauthorized access to task');
+        }
+
+        $validated = $request->validate([
+            'client_service_id' => [
+                'required',
+                Rule::exists('client_services', 'id')->where(function ($query) use ($clientId) {
+                    return $query->where('client_id', $clientId);
+                }),
+            ],
+            'assigned_employee_id' => 'nullable|exists:employees,id',
+            'task_title' => 'required|string|max:255',
+            'priority' => 'required|in:low,medium,high,urgent',
+            'status' => 'required|in:todo,in_progress,in_review,completed,cancelled',
+            'start_date' => 'nullable|date',
+            'due_date' => 'nullable|date',
+            'description' => 'nullable|string|max:2000',
+        ]);
+
+        $validated['assigned_employee_id'] = $request->filled('assigned_employee_id') ? $request->assigned_employee_id : null;
+        $validated['start_date'] = $request->filled('start_date') ? $request->start_date : null;
+        $validated['due_date'] = $request->filled('due_date') ? $request->due_date : null;
+
+        if ($validated['status'] === 'completed' && $task->status !== 'completed') {
+            $validated['completed_at'] = now();
+        } elseif ($validated['status'] !== 'completed') {
+            $validated['completed_at'] = null;
+        }
+
+        $task->update($validated);
+
+        return redirect()->back()->with('success', 'Service task updated successfully.');
+    }
+
+    public function updateTaskStatus(Request $request, ServiceTask $task): RedirectResponse
+    {
+        $this->authorizePermission('edit-client-portal-service-tasks');
+
+        $clientId = $this->getClientId();
+
+        if (!$task->service || $task->service->client_id !== $clientId) {
+            abort(403, 'Unauthorized access to task');
+        }
+
+        $validated = $request->validate([
+            'status' => 'required|in:todo,in_progress,in_review,completed,cancelled',
+        ]);
+
+        $updateData = ['status' => $validated['status']];
+        if ($validated['status'] === 'completed') {
+            $updateData['completed_at'] = now();
+        } else {
+            $updateData['completed_at'] = null;
+        }
+
+        $task->update($updateData);
+
+        return redirect()->back()->with('success', 'Service task status updated.');
+    }
+
+    public function destroyTask(ServiceTask $task): RedirectResponse
+    {
+        $this->authorizePermission('delete-client-portal-service-tasks');
+
+        $clientId = $this->getClientId();
+
+        if (!$task->service || $task->service->client_id !== $clientId) {
+            abort(403, 'Unauthorized access to task');
+        }
+
+        $task->delete();
+
+        return redirect()->back()->with('success', 'Service task deleted successfully.');
     }
 }

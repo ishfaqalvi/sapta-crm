@@ -1,4 +1,5 @@
 import DocumentsTab, { type ClientDocumentItem } from '@/components/documents-tab';
+import SearchableSelect from '@/components/searchable-select';
 import ClientPortalLayout from '@/layouts/client-portal-layout';
 import { type BreadcrumbItem, type SharedData } from '@/types';
 import { hasPermission } from '@/utils/permissions';
@@ -17,9 +18,11 @@ import {
     Eye,
     EyeOff,
     FileText,
+    GitMerge,
     Key,
     KeyRound,
     Layers,
+    ListTodo,
     LoaderCircle,
     Lock,
     Package,
@@ -28,6 +31,7 @@ import {
     Printer,
     Receipt,
     RefreshCw,
+    Scissors,
     Shield,
     ShieldCheck,
     StopCircle,
@@ -41,17 +45,40 @@ export interface ServicePaymentItem {
     id: number;
     client_service_id: number;
     client_id: number;
+    parent_id?: number | null;
     billing_month: string;
+    split_title?: string | null;
     amount_due: number | string;
     amount_paid: number | string;
     payment_date: string | null;
     status: 'paid' | 'due' | 'due_pending' | 'overdue';
     payment_method: string | null;
     notes: string | null;
+    children?: ServicePaymentItem[];
     invoice?: {
         id: number;
         invoice_number: string;
         status: string;
+    } | null;
+}
+
+export interface ServiceTaskItem {
+    id: number;
+    client_service_id: number;
+    assigned_employee_id?: number | null;
+    task_title: string;
+    priority: 'low' | 'medium' | 'high' | 'urgent';
+    status: 'todo' | 'in_progress' | 'in_review' | 'completed' | 'cancelled';
+    start_date?: string | null;
+    due_date?: string | null;
+    description?: string | null;
+    completed_at?: string | null;
+    created_at?: string;
+    assigned_employee?: {
+        id: number;
+        name: string;
+        employee_code: string;
+        avatar?: string | null;
     } | null;
 }
 
@@ -84,6 +111,7 @@ export interface ClientServiceDetailItem {
     notes: string | null;
     created_at?: string;
     payments?: ServicePaymentItem[];
+    tasks?: ServiceTaskItem[];
     credentials?: ServiceCredentialItem[];
     documents?: ClientDocumentItem[];
 }
@@ -106,9 +134,15 @@ interface ClientPortalServiceShowProps {
         tax_id?: string;
         logo?: string;
     };
+    employees?: {
+        id: number;
+        name: string;
+        employee_code: string;
+        avatar?: string | null;
+    }[];
 }
 
-export default function ClientPortalServiceShow({ client, service }: ClientPortalServiceShowProps) {
+export default function ClientPortalServiceShow({ client, service, employees = [] }: ClientPortalServiceShowProps) {
     const { auth } = usePage().props as unknown as SharedData;
     const user = auth?.user;
     const canViewBudget = hasPermission(user, 'view-client-portal-service-budget');
@@ -119,22 +153,27 @@ export default function ClientPortalServiceShow({ client, service }: ClientPorta
         { title: service.service_name, href: `/client-portal/services/${service.id}` },
     ];
 
-    // URL Tab persistence support ('details' | 'payments' | 'credentials' | 'documents')
-    const getInitialTab = (): 'details' | 'payments' | 'credentials' | 'documents' => {
+    // URL Tab persistence support ('details' | 'payments' | 'tasks' | 'credentials' | 'documents')
+    const getInitialTab = (): 'details' | 'payments' | 'tasks' | 'credentials' | 'documents' => {
         if (typeof window !== 'undefined') {
             const params = new URLSearchParams(window.location.search);
             const tab = params.get('tab');
             if (tab === 'payments' && canViewBudget) return 'payments';
-            if (tab === 'credentials' || tab === 'details' || tab === 'documents') {
+            if (tab === 'tasks' || tab === 'credentials' || tab === 'details' || tab === 'documents') {
                 return tab;
             }
         }
         return 'details';
     };
 
-    const [activeTab, setActiveTabState] = useState<'details' | 'payments' | 'credentials' | 'documents'>(getInitialTab);
+    const [activeTab, setActiveTabState] = useState<'details' | 'payments' | 'tasks' | 'credentials' | 'documents'>(getInitialTab);
 
-    const setActiveTab = (tab: 'details' | 'payments' | 'credentials' | 'documents') => {
+    const employeeOptions = (employees || []).map((emp) => ({
+        value: emp.id,
+        label: `${emp.name} (${emp.employee_code})`,
+    }));
+
+    const setActiveTab = (tab: 'details' | 'payments' | 'tasks' | 'credentials' | 'documents') => {
         setActiveTabState(tab);
         if (typeof window !== 'undefined') {
             const url = new URL(window.location.href);
@@ -255,6 +294,120 @@ export default function ClientPortalServiceShow({ client, service }: ClientPorta
         });
     };
 
+    // TASK STATE & HANDLERS
+    const [isTaskModalOpen, setIsTaskModalOpen] = useState(false);
+    const [editingTask, setEditingTask] = useState<ServiceTaskItem | null>(null);
+    const [isTaskSubmitting, setIsTaskSubmitting] = useState(false);
+    const [taskFormData, setTaskFormData] = useState({
+        assigned_employee_id: '' as string | number,
+        task_title: '',
+        priority: 'medium' as 'low' | 'medium' | 'high' | 'urgent',
+        status: 'todo' as 'todo' | 'in_progress' | 'in_review' | 'completed' | 'cancelled',
+        start_date: '',
+        due_date: new Date().toISOString().split('T')[0],
+        description: '',
+    });
+    const [taskErrors, setTaskErrors] = useState<Record<string, string>>({});
+    const [deletingTask, setDeletingTask] = useState<ServiceTaskItem | null>(null);
+
+    const openCreateTaskModal = () => {
+        setEditingTask(null);
+        setTaskFormData({
+            assigned_employee_id: '',
+            task_title: '',
+            priority: 'medium',
+            status: 'todo',
+            start_date: '',
+            due_date: new Date().toISOString().split('T')[0],
+            description: '',
+        });
+        setTaskErrors({});
+        setIsTaskModalOpen(true);
+    };
+
+    const openEditTaskModal = (t: ServiceTaskItem) => {
+        setEditingTask(t);
+        setTaskFormData({
+            assigned_employee_id: t.assigned_employee_id || '',
+            task_title: t.task_title || '',
+            priority: t.priority || 'medium',
+            status: t.status || 'todo',
+            start_date: t.start_date ? t.start_date.split('T')[0].split(' ')[0] : '',
+            due_date: t.due_date ? t.due_date.split('T')[0].split(' ')[0] : '',
+            description: t.description || '',
+        });
+        setTaskErrors({});
+        setIsTaskModalOpen(true);
+    };
+
+    const handleTaskSubmit = (e: React.FormEvent) => {
+        e.preventDefault();
+        setIsTaskSubmitting(true);
+        setTaskErrors({});
+
+        const payload = {
+            client_service_id: service.id,
+            ...taskFormData,
+        };
+
+        if (editingTask) {
+            router.post(`/client-portal/services/tasks/update/${editingTask.id}`, payload, {
+                preserveScroll: true,
+                onSuccess: () => {
+                    setIsTaskModalOpen(false);
+                    setIsTaskSubmitting(false);
+                    setTaskErrors({});
+                },
+                onError: (errs) => {
+                    setIsTaskSubmitting(false);
+                    setTaskErrors(errs || {});
+                },
+            });
+        } else {
+            router.post('/client-portal/services/tasks/store', payload, {
+                preserveScroll: true,
+                onSuccess: () => {
+                    setIsTaskModalOpen(false);
+                    setIsTaskSubmitting(false);
+                    setTaskErrors({});
+                },
+                onError: (errs) => {
+                    setIsTaskSubmitting(false);
+                    setTaskErrors(errs || {});
+                },
+            });
+        }
+    };
+
+    const handleTaskStatusQuickChange = (task: ServiceTaskItem, newStatus: string) => {
+        router.post(
+            `/client-portal/services/tasks/update/${task.id}`,
+            {
+                client_service_id: service.id,
+                task_title: task.task_title,
+                priority: task.priority,
+                status: newStatus,
+                start_date: task.start_date,
+                due_date: task.due_date,
+                description: task.description,
+            },
+            { preserveScroll: true }
+        );
+    };
+
+    const handleDeleteTask = () => {
+        if (!deletingTask || isTaskSubmitting) return;
+        setIsTaskSubmitting(true);
+        router.delete(`/client-portal/services/tasks/destroy/${deletingTask.id}`, {
+            preserveScroll: true,
+            onFinish: () => setIsTaskSubmitting(false),
+            onSuccess: () => {
+                setDeletingTask(null);
+            },
+            onError: () => setIsTaskSubmitting(false),
+        });
+    };
+
     // Generate Payment Modal State (Asking ONLY for Billing Month)
     const [isGenerateModalOpen, setIsGenerateModalOpen] = useState(false);
     const [generateMonth, setGenerateMonth] = useState(new Date().toISOString().slice(0, 7));
@@ -271,6 +424,78 @@ export default function ClientPortalServiceShow({ client, service }: ClientPorta
     // Mark as Paid Confirmation State
     const [confirmingPaidPayment, setConfirmingPaidPayment] = useState<ServicePaymentItem | null>(null);
     const [isMarkingPaidPayment, setIsMarkingPaidPayment] = useState(false);
+
+    // Split Payment Modal State
+    const [splittingPayment, setSplittingPayment] = useState<ServicePaymentItem | null>(null);
+    const [splitAmount, setSplitAmount] = useState<string>('');
+    const [splitTitle, setSplitTitle] = useState<string>('');
+    const [splitNotes, setSplitNotes] = useState<string>('');
+    const [isSplitting, setIsSplitting] = useState(false);
+
+    // Merge Payment Confirmation State
+    const [mergingPayment, setMergingPayment] = useState<ServicePaymentItem | null>(null);
+    const [isMerging, setIsMerging] = useState(false);
+
+    const openSplitModal = (pay: ServicePaymentItem) => {
+        setSplittingPayment(pay);
+        const total = parseFloat(String(pay.amount_due || 0));
+        const defaultSplit = total > 0 ? (total / 2).toFixed(2) : '';
+        setSplitAmount(defaultSplit);
+        setSplitTitle('');
+        setSplitNotes('');
+    };
+
+    const handleSplitSubmit = (e: FormEvent) => {
+        e.preventDefault();
+        if (!splittingPayment || isSplitting) return;
+
+        const val = parseFloat(splitAmount);
+        const maxVal = parseFloat(String(splittingPayment.amount_due));
+        if (isNaN(val) || val <= 0 || val >= maxVal) {
+            return;
+        }
+
+        setIsSplitting(true);
+        router.post(
+            `/client-portal/services/payments/${splittingPayment.id}/split`,
+            {
+                split_amount: val,
+                split_title: splitTitle || undefined,
+                notes: splitNotes || undefined,
+            },
+            {
+                preserveScroll: true,
+                onSuccess: () => {
+                    setSplittingPayment(null);
+                    setSplitAmount('');
+                    setSplitTitle('');
+                    setSplitNotes('');
+                    setIsSplitting(false);
+                },
+                onError: () => setIsSplitting(false),
+                onFinish: () => setIsSplitting(false),
+            }
+        );
+    };
+
+    const handleMergeSubmit = () => {
+        if (!mergingPayment || isMerging) return;
+
+        setIsMerging(true);
+        router.post(
+            `/client-portal/services/payments/${mergingPayment.id}/merge`,
+            {},
+            {
+                preserveScroll: true,
+                onSuccess: () => {
+                    setMergingPayment(null);
+                    setIsMerging(false);
+                },
+                onError: () => setIsMerging(false),
+                onFinish: () => setIsMerging(false),
+            }
+        );
+    };
 
     const handleMarkPaymentPaidSubmit = () => {
         if (!confirmingPaidPayment) return;
@@ -426,7 +651,22 @@ export default function ClientPortalServiceShow({ client, service }: ClientPorta
                                     }`}
                             >
                                 <Receipt className="size-4" />
-                                <span>2. Payments ({paymentsList.length})</span>
+                                <span>2. Billing & Invoices ({paymentsList.length})</span>
+                            </button>
+                        )}
+
+                        {/* TAB 3: Tasks */}
+                        {hasPermission(user, 'view-client-portal-service-tasks') && (
+                            <button
+                                type="button"
+                                onClick={() => setActiveTab('tasks')}
+                                className={`flex items-center gap-2 h-10 px-3 rounded-xl text-xs font-bold transition-all cursor-pointer ${activeTab === 'tasks'
+                                    ? 'bg-gradient-to-r from-[#003796] via-[#0052D4] to-[#1d4ed8] text-white shadow-md shadow-blue-600/20'
+                                    : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'
+                                    }`}
+                            >
+                                <ListTodo className="size-4" />
+                                <span>3. Tasks ({service.tasks?.length || 0})</span>
                             </button>
                         )}
 
@@ -440,7 +680,7 @@ export default function ClientPortalServiceShow({ client, service }: ClientPorta
                                     }`}
                             >
                                 <KeyRound className="size-4" />
-                                <span>3. Credentials ({service.credentials?.length || 0})</span>
+                                <span>4. Credentials ({service.credentials?.length || 0})</span>
                             </button>
                         )}
 
@@ -454,7 +694,7 @@ export default function ClientPortalServiceShow({ client, service }: ClientPorta
                                     }`}
                             >
                                 <FileText className="size-4" />
-                                <span>4. Documents ({service.documents?.length || 0})</span>
+                                <span>5. Documents ({service.documents?.length || 0})</span>
                             </button>
                         )}
                     </div>
@@ -777,8 +1017,22 @@ export default function ClientPortalServiceShow({ client, service }: ClientPorta
                                         {paymentsList.length > 0 ? (
                                             paymentsList.map((pay) => (
                                                 <tr key={pay.id} className="hover:bg-slate-50/70 dark:hover:bg-slate-800/40 transition-colors">
-                                                    <td className="px-2 py-4 font-bold text-slate-900 dark:text-white font-mono">
-                                                        {pay.billing_month}
+                                                    <td className="px-2 py-4">
+                                                        <div className="flex flex-col gap-1">
+                                                            <span className="font-bold text-slate-900 dark:text-white font-mono">
+                                                                {pay.billing_month}
+                                                            </span>
+                                                            {pay.parent_id ? (
+                                                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold bg-amber-50 dark:bg-amber-950/60 text-amber-700 dark:text-amber-300 border border-amber-200/60 dark:border-amber-800/60 w-fit">
+                                                                    <Scissors className="size-2.5 rotate-90" />
+                                                                    <span>{pay.split_title || 'Split Installment'}</span>
+                                                                </span>
+                                                            ) : pay.split_title ? (
+                                                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold bg-blue-50 dark:bg-blue-950/60 text-blue-700 dark:text-blue-300 border border-blue-200/60 dark:border-blue-800/60 w-fit">
+                                                                    <span>{pay.split_title}</span>
+                                                                </span>
+                                                            ) : null}
+                                                        </div>
                                                     </td>
                                                     <td className="px-2 py-4 font-bold text-slate-900 dark:text-white font-mono">
                                                         {formatCurrency(pay.amount_due)}
@@ -823,6 +1077,32 @@ export default function ClientPortalServiceShow({ client, service }: ClientPorta
                                                     </td>
                                                     <td className="px-2 py-4 text-right">
                                                         <div className="flex items-center justify-end gap-1.5">
+                                                            {/* SPLIT BUTTON: ONLY FOR PARENT UNPAID & UN-INVOICED BILLS */}
+                                                            {!pay.parent_id && !pay.invoice && pay.status !== 'paid' && parseFloat(String(pay.amount_due)) > 0 && hasPermission(user, 'edit-client-portal-service-payments') && (
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() => openSplitModal(pay)}
+                                                                    className="h-8 px-2.5 rounded-lg bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400 hover:bg-gradient-to-r hover:from-[#003796] hover:via-[#0052D4] hover:to-[#1d4ed8] hover:text-white font-bold text-xs inline-flex items-center gap-1.5 cursor-pointer shadow-2xs transition-all border border-blue-200/50 hover:border-transparent"
+                                                                    title="Split this bill into partial installments"
+                                                                >
+                                                                    <Scissors className="size-3.5" />
+                                                                    <span>Split</span>
+                                                                </button>
+                                                            )}
+
+                                                            {/* MERGE BUTTON: ONLY FOR CHILD UNPAID & UN-INVOICED BILLS */}
+                                                            {pay.parent_id && !pay.invoice && pay.status !== 'paid' && hasPermission(user, 'edit-client-portal-service-payments') && (
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() => setMergingPayment(pay)}
+                                                                    className="h-8 px-2.5 rounded-lg bg-purple-50 dark:bg-purple-950/60 text-purple-600 dark:text-purple-400 hover:bg-purple-600 hover:text-white dark:hover:bg-purple-600 dark:hover:text-white font-bold text-xs inline-flex items-center gap-1.5 cursor-pointer shadow-2xs transition-all border border-purple-200/50"
+                                                                    title="Merge this installment back into parent bill"
+                                                                >
+                                                                    <GitMerge className="size-3.5" />
+                                                                    <span>Merge</span>
+                                                                </button>
+                                                            )}
+
                                                             {/* MARK AS PAID BUTTON (Only if invoice exists & payment is unpaid) */}
                                                             {pay.invoice && pay.status !== 'paid' && hasPermission(user, 'edit-client-portal-service-payments') && (
                                                                 <button
@@ -904,7 +1184,153 @@ export default function ClientPortalServiceShow({ client, service }: ClientPorta
                     </div>
                 )}
 
-                {/* 4. TAB 3 CONTENT: CREDENTIALS */}
+                {/* 3. TAB 3 CONTENT: TASKS */}
+                {activeTab === 'tasks' && (
+                    <div className="space-y-4">
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 rounded-xl bg-white dark:bg-slate-900 border border-slate-200/90 dark:border-slate-800 shadow-xs">
+                            <div>
+                                <h3 className="text-base font-extrabold text-slate-900 dark:text-white">
+                                    Service Deliverables & Tasks ({service.tasks?.length || 0})
+                                </h3>
+                                <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                                    Track, assign and monitor task progress for {service.service_name}.
+                                </p>
+                            </div>
+
+                            {hasPermission(user, 'create-client-portal-service-tasks') && (
+                                <button
+                                    type="button"
+                                    onClick={openCreateTaskModal}
+                                    className="h-10 px-4 rounded-xl bg-gradient-to-r from-[#003796] via-[#0052D4] to-[#1d4ed8] text-white text-xs font-bold shadow-md shadow-blue-600/20 inline-flex items-center gap-2 cursor-pointer self-start sm:self-auto"
+                                >
+                                    <Plus className="size-4" />
+                                    <span>Add New Task</span>
+                                </button>
+                            )}
+                        </div>
+
+                        <div className="w-full overflow-x-auto scrollbar-thin bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/80 dark:border-slate-800 shadow-2xs">
+                            <table className="w-full min-w-[750px] text-left text-xs text-slate-600 dark:text-slate-300">
+                                <thead className="bg-slate-50 dark:bg-slate-800/60 border-b border-slate-200/80 dark:border-slate-800 uppercase tracking-wider text-[11px] font-bold text-slate-400">
+                                    <tr>
+                                        <th className="px-4 py-3.5">Task Title</th>
+                                        <th className="px-3 py-3.5">Assigned Employee</th>
+                                        <th className="px-3 py-3.5">Priority</th>
+                                        <th className="px-3 py-3.5">Status</th>
+                                        <th className="px-3 py-3.5">Due Date</th>
+                                        <th className="px-4 py-3.5 text-right">Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                                    {service.tasks && service.tasks.length > 0 ? (
+                                        service.tasks.map((task) => (
+                                            <tr key={task.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/40 transition-colors">
+                                                <td className="px-4 py-3.5 font-bold text-slate-900 dark:text-white">
+                                                    <div>
+                                                        <span>{task.task_title}</span>
+                                                        {task.description && (
+                                                            <p className="text-xs text-slate-400 font-normal line-clamp-1 mt-0.5">
+                                                                {task.description}
+                                                            </p>
+                                                        )}
+                                                    </div>
+                                                </td>
+                                                <td className="px-3 py-3.5 whitespace-nowrap">
+                                                    {task.assigned_employee ? (
+                                                        <div className="flex items-center gap-2">
+                                                            {task.assigned_employee.avatar ? (
+                                                                <img
+                                                                    src={task.assigned_employee.avatar}
+                                                                    alt={task.assigned_employee.name}
+                                                                    className="size-6 rounded-full object-cover border border-slate-200 dark:border-slate-700"
+                                                                />
+                                                            ) : (
+                                                                <div className="size-6 rounded-full bg-blue-100 dark:bg-blue-950 text-blue-600 dark:text-blue-400 flex items-center justify-center font-bold text-[10px]">
+                                                                    {task.assigned_employee.name.charAt(0)}
+                                                                </div>
+                                                            )}
+                                                            <span className="font-semibold text-slate-800 dark:text-slate-200 text-xs">
+                                                                {task.assigned_employee.name}
+                                                            </span>
+                                                        </div>
+                                                    ) : (
+                                                        <span className="text-slate-400 italic">Unassigned</span>
+                                                    )}
+                                                </td>
+                                                <td className="px-3 py-3.5 whitespace-nowrap">
+                                                    <span
+                                                        className={`px-2.5 py-1 rounded-full text-[10px] font-black uppercase ${task.priority === 'urgent' || task.priority === 'high'
+                                                            ? 'bg-rose-50 text-rose-700 dark:bg-rose-950/60 dark:text-rose-300'
+                                                            : task.priority === 'medium'
+                                                                ? 'bg-blue-50 text-blue-700 dark:bg-blue-950/60 dark:text-blue-300'
+                                                                : 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300'
+                                                            }`}
+                                                    >
+                                                        {task.priority}
+                                                    </span>
+                                                </td>
+                                                <td className="px-3 py-3.5 whitespace-nowrap">
+                                                    {hasPermission(user, 'edit-client-portal-service-tasks') ? (
+                                                        <select
+                                                            value={task.status}
+                                                            onChange={(e) => handleTaskStatusQuickChange(task, e.target.value)}
+                                                            className="h-8 px-2.5 rounded-lg bg-slate-100 dark:bg-slate-800 text-[11px] font-bold text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700 focus:ring-1 focus:ring-blue-500 cursor-pointer"
+                                                        >
+                                                            <option value="todo">To Do</option>
+                                                            <option value="in_progress">In Progress</option>
+                                                            <option value="in_review">In Review</option>
+                                                            <option value="completed">Completed</option>
+                                                            <option value="cancelled">Cancelled</option>
+                                                        </select>
+                                                    ) : (
+                                                        <span className="capitalize text-xs font-semibold text-slate-700 dark:text-slate-300">
+                                                            {task.status.replace('_', ' ')}
+                                                        </span>
+                                                    )}
+                                                </td>
+                                                <td className="px-3 py-3.5 whitespace-nowrap font-medium text-slate-500">
+                                                    {task.due_date ? formatDateOnly(task.due_date) : '-'}
+                                                </td>
+                                                <td className="px-4 py-3.5 text-right whitespace-nowrap">
+                                                    <div className="flex items-center justify-end gap-1.5">
+                                                        {hasPermission(user, 'edit-client-portal-service-tasks') && (
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => openEditTaskModal(task)}
+                                                                className="p-1.5 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 transition-all cursor-pointer"
+                                                                title="Edit Task"
+                                                            >
+                                                                <Edit2 className="size-3.5" />
+                                                            </button>
+                                                        )}
+                                                        {hasPermission(user, 'delete-client-portal-service-tasks') && (
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => setDeletingTask(task)}
+                                                                className="p-1.5 rounded-lg bg-rose-50 text-rose-600 dark:bg-rose-950/60 dark:text-rose-400 hover:bg-rose-600 hover:text-white transition-all cursor-pointer"
+                                                                title="Delete Task"
+                                                            >
+                                                                <Trash2 className="size-3.5" />
+                                                            </button>
+                                                        )}
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        ))
+                                    ) : (
+                                        <tr>
+                                            <td colSpan={6} className="px-4 py-8 text-center text-slate-400 italic">
+                                                No tasks created for this service yet. Click "Add New Task" to create one.
+                                            </td>
+                                        </tr>
+                                    )}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                )}
+
+                {/* 4. TAB 4 CONTENT: CREDENTIALS */}
                 {activeTab === 'credentials' && (
                     <div className="space-y-4">
                         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 rounded-xl bg-white dark:bg-slate-900 border border-slate-200/90 dark:border-slate-800 shadow-xs">
@@ -1093,6 +1519,182 @@ export default function ClientPortalServiceShow({ client, service }: ClientPorta
                 </div>
             )}
 
+            {/* SPLIT PAYMENT MODAL */}
+            {splittingPayment && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-950/60 backdrop-blur-xs overflow-y-auto">
+                    <div className="w-full max-w-md max-h-[90vh] my-auto overflow-y-auto rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-4 sm:p-6 shadow-2xl space-y-4">
+                        <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-3">
+                            <div className="flex items-center gap-2">
+                                <div className="p-2 rounded-xl bg-blue-50 dark:bg-blue-950 text-blue-600 dark:text-blue-400">
+                                    <Scissors className="size-5" />
+                                </div>
+                                <div>
+                                    <h3 className="text-base font-extrabold text-slate-900 dark:text-white">
+                                        Split Monthly Bill
+                                    </h3>
+                                    <p className="text-xs text-slate-400 font-medium">Create partial installments for separate invoicing</p>
+                                </div>
+                            </div>
+                            <button
+                                type="button"
+                                onClick={() => setSplittingPayment(null)}
+                                className="p-1 rounded-xl text-slate-400 hover:text-slate-600 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+                            >
+                                <X className="size-5" />
+                            </button>
+                        </div>
+
+                        <form noValidate onSubmit={handleSplitSubmit} className="space-y-4">
+                            {/* Summary Card */}
+                            <div className="p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-800/40 border border-slate-100 dark:border-slate-800/60 space-y-2 text-xs">
+                                <div className="flex items-center justify-between text-slate-600 dark:text-slate-400 font-medium">
+                                    <span>Billing Month:</span>
+                                    <span className="font-bold text-slate-900 dark:text-white font-mono">{splittingPayment.billing_month}</span>
+                                </div>
+                                <div className="flex items-center justify-between text-slate-600 dark:text-slate-400 font-medium">
+                                    <span>Current Total Amount:</span>
+                                    <span className="font-bold text-slate-900 dark:text-white font-mono text-sm">{formatCurrency(splittingPayment.amount_due)}</span>
+                                </div>
+                            </div>
+
+                            <div>
+                                <label className="block text-xs font-extrabold text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-1.5">
+                                    Split Amount for New Installment ({client.currency || 'USD'}) <span className="text-rose-500">*</span>
+                                </label>
+                                <input
+                                    type="number"
+                                    step="0.01"
+                                    min="0.01"
+                                    max={parseFloat(String(splittingPayment.amount_due)) - 0.01}
+                                    value={splitAmount}
+                                    onChange={(e) => setSplitAmount(e.target.value)}
+                                    placeholder="Enter amount for the new installment..."
+                                    className="w-full h-10 px-3.5 rounded-xl bg-slate-50/50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-xs font-bold text-slate-900 dark:text-white focus:outline-none focus:border-blue-600 font-mono"
+                                    required
+                                />
+                            </div>
+
+                            {/* Live Calculation Preview */}
+                            {parseFloat(splitAmount) > 0 && parseFloat(splitAmount) < parseFloat(String(splittingPayment.amount_due)) && (
+                                <div className="grid grid-cols-2 gap-2 p-3 rounded-xl bg-blue-50/60 dark:bg-blue-950/30 border border-blue-100 dark:border-blue-900/50 text-xs">
+                                    <div className="space-y-0.5">
+                                        <span className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase">Parent Bill Remaining</span>
+                                        <div className="font-mono font-bold text-blue-700 dark:text-blue-300">
+                                            {formatCurrency(parseFloat(String(splittingPayment.amount_due)) - parseFloat(splitAmount))}
+                                        </div>
+                                    </div>
+                                    <div className="space-y-0.5">
+                                        <span className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase">New Split Installment</span>
+                                        <div className="font-mono font-bold text-emerald-600 dark:text-emerald-400">
+                                            {formatCurrency(parseFloat(splitAmount))}
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+
+                            <div>
+                                <label className="block text-xs font-extrabold text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-1.5">
+                                    Installment Label / Title (Optional)
+                                </label>
+                                <input
+                                    type="text"
+                                    value={splitTitle}
+                                    onChange={(e) => setSplitTitle(e.target.value)}
+                                    placeholder="e.g. Installment 2, Advance 50%, Part Payment"
+                                    className="w-full h-10 px-3.5 rounded-xl bg-slate-50/50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-xs font-medium text-slate-900 dark:text-white focus:outline-none focus:border-blue-600"
+                                />
+                            </div>
+
+                            <div>
+                                <label className="block text-xs font-extrabold text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-1.5">
+                                    Notes (Optional)
+                                </label>
+                                <textarea
+                                    rows={2}
+                                    value={splitNotes}
+                                    onChange={(e) => setSplitNotes(e.target.value)}
+                                    placeholder="Additional settlement notes..."
+                                    className="w-full p-3 rounded-xl bg-slate-50/50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-xs font-medium text-slate-900 dark:text-white focus:outline-none focus:border-blue-600 resize-none"
+                                />
+                            </div>
+
+                            <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-100 dark:border-slate-800">
+                                <button
+                                    type="button"
+                                    onClick={() => setSplittingPayment(null)}
+                                    className="h-10 px-3 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 text-slate-700 dark:text-slate-300 text-xs font-bold transition-all cursor-pointer"
+                                >
+                                    Cancel
+                                </button>
+                                <button
+                                    type="submit"
+                                    disabled={isSplitting || !parseFloat(splitAmount) || parseFloat(splitAmount) >= parseFloat(String(splittingPayment.amount_due))}
+                                    className="h-10 px-4 rounded-xl bg-gradient-to-r from-[#003796] via-[#0052D4] to-[#1d4ed8] hover:opacity-95 text-white text-xs font-bold transition-all shadow-md shadow-blue-600/20 flex items-center gap-2 cursor-pointer disabled:opacity-50"
+                                >
+                                    {isSplitting ? (
+                                        <>
+                                            <LoaderCircle className="size-4 animate-spin" />
+                                            <span>Splitting...</span>
+                                        </>
+                                    ) : (
+                                        <>
+                                            <Scissors className="size-4" />
+                                            <span>Confirm Split</span>
+                                        </>
+                                    )}
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            )}
+
+            {/* MERGE PAYMENT CONFIRMATION MODAL */}
+            {mergingPayment && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-900/60 backdrop-blur-xs overflow-y-auto">
+                    <div className="w-full max-w-md my-auto rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-6 shadow-2xl space-y-4 text-center">
+                        <div className="size-12 rounded-2xl bg-purple-50 dark:bg-purple-950/60 text-purple-600 dark:text-purple-400 mx-auto flex items-center justify-center">
+                            <GitMerge className="size-6" />
+                        </div>
+                        <div>
+                            <h3 className="text-base font-extrabold text-slate-900 dark:text-white">
+                                Merge Installment Back to Parent?
+                            </h3>
+                            <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 leading-relaxed">
+                                Are you sure you want to merge this split installment of <strong className="text-slate-900 dark:text-white font-mono">{formatCurrency(mergingPayment.amount_due)}</strong> ({mergingPayment.split_title || 'Split'}) back into its parent bill?
+                            </p>
+                        </div>
+
+                        <div className="flex items-center justify-center gap-3 pt-2">
+                            <button
+                                type="button"
+                                onClick={() => setMergingPayment(null)}
+                                className="h-10 px-4 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-200 text-xs font-bold transition-all cursor-pointer"
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                type="button"
+                                disabled={isMerging}
+                                onClick={handleMergeSubmit}
+                                className="h-10 px-4 rounded-xl bg-purple-600 hover:bg-purple-700 text-white text-xs font-bold transition-all shadow-md shadow-purple-600/20 flex items-center gap-2 cursor-pointer disabled:opacity-50"
+                            >
+                                {isMerging ? (
+                                    <>
+                                        <LoaderCircle className="size-4 animate-spin" />
+                                        <span>Merging...</span>
+                                    </>
+                                ) : (
+                                    <>
+                                        <GitMerge className="size-4" />
+                                        <span>Confirm Merge</span>
+                                    </>
+                                )}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
 
             {/* DELETE PAYMENT CONFIRMATION MODAL */}
             {deletingPayment && (
@@ -1364,6 +1966,213 @@ export default function ClientPortalServiceShow({ client, service }: ClientPorta
                             >
                                 {isDeletingCred && <LoaderCircle className="size-4 animate-spin" />}
                                 <span>{isDeletingCred ? 'Deleting...' : 'Confirm Delete'}</span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+            {/* TASK MODAL (Create / Edit) */}
+            {isTaskModalOpen && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-900/60 backdrop-blur-xs overflow-y-auto">
+                    <div className="w-full max-w-lg max-h-[90vh] my-auto overflow-y-auto rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-4 sm:p-6 shadow-2xl space-y-4 animate-in fade-in zoom-in-95 duration-200">
+                        <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-3">
+                            <div className="flex items-center gap-2.5">
+                                <div className="p-2.5 rounded-xl bg-blue-50 dark:bg-blue-950 text-blue-600 dark:text-blue-400">
+                                    <ListTodo className="size-5" />
+                                </div>
+                                <div>
+                                    <h3 className="text-base font-extrabold text-slate-900 dark:text-white">
+                                        {editingTask ? 'Edit Service Task' : 'Add New Service Task'}
+                                    </h3>
+                                    <p className="text-xs text-slate-400 font-medium">Manage task deliverables & priority</p>
+                                </div>
+                            </div>
+                            <button
+                                type="button"
+                                onClick={() => setIsTaskModalOpen(false)}
+                                className="size-8 rounded-xl text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-all flex items-center justify-center cursor-pointer"
+                            >
+                                <X className="size-4" />
+                            </button>
+                        </div>
+
+                        <form noValidate onSubmit={handleTaskSubmit} className="space-y-4">
+                            <div className="space-y-1.5">
+                                <label className="text-xs font-bold text-slate-700 dark:text-slate-300">Task Title *</label>
+                                <input
+                                    type="text"
+                                    value={taskFormData.task_title}
+                                    onChange={(e) => {
+                                        setTaskFormData({ ...taskFormData, task_title: e.target.value });
+                                        if (taskErrors.task_title) setTaskErrors({ ...taskErrors, task_title: '' });
+                                    }}
+                                    placeholder="e.g. Monthly SEO Audit & Performance Report"
+                                    className={`w-full h-11 px-4 rounded-xl bg-slate-50 dark:bg-slate-950 border text-xs font-medium focus:ring-2 focus:ring-blue-500 focus:outline-none ${taskErrors.task_title ? 'border-rose-500 text-rose-600' : 'border-slate-200 dark:border-slate-800'
+                                        }`}
+                                />
+                                {taskErrors.task_title && (
+                                    <p className="text-[11px] font-bold text-rose-600 dark:text-rose-400 mt-1">{taskErrors.task_title}</p>
+                                )}
+                            </div>
+
+                            <div className="space-y-1.5">
+                                <label className="text-xs font-bold text-slate-700 dark:text-slate-300">Assigned Employee</label>
+                                <SearchableSelect
+                                    options={employeeOptions}
+                                    value={taskFormData.assigned_employee_id}
+                                    onChange={(val) => {
+                                        setTaskFormData({ ...taskFormData, assigned_employee_id: val });
+                                        if (taskErrors.assigned_employee_id) setTaskErrors({ ...taskErrors, assigned_employee_id: '' });
+                                    }}
+                                    placeholder="Unassigned (Select Employee...)"
+                                    searchPlaceholder="Type employee name or code..."
+                                />
+                                {taskErrors.assigned_employee_id && (
+                                    <p className="text-[11px] font-bold text-rose-600 dark:text-rose-400 mt-1">{taskErrors.assigned_employee_id}</p>
+                                )}
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-4">
+                                <div className="space-y-1.5">
+                                    <label className="text-xs font-bold text-slate-700 dark:text-slate-300">Priority</label>
+                                    <select
+                                        value={taskFormData.priority}
+                                        onChange={(e) => {
+                                            setTaskFormData({ ...taskFormData, priority: e.target.value as any });
+                                            if (taskErrors.priority) setTaskErrors({ ...taskErrors, priority: '' });
+                                        }}
+                                        className={`w-full h-11 px-3 rounded-xl bg-slate-50 dark:bg-slate-950 border text-xs font-semibold focus:ring-2 focus:ring-blue-500 focus:outline-none ${taskErrors.priority ? 'border-rose-500 text-rose-600' : 'border-slate-200 dark:border-slate-800'
+                                            }`}
+                                    >
+                                        <option value="low">Low</option>
+                                        <option value="medium">Medium</option>
+                                        <option value="high">High</option>
+                                        <option value="urgent">Urgent</option>
+                                    </select>
+                                    {taskErrors.priority && (
+                                        <p className="text-[11px] font-bold text-rose-600 dark:text-rose-400 mt-1">{taskErrors.priority}</p>
+                                    )}
+                                </div>
+
+                                <div className="space-y-1.5">
+                                    <label className="text-xs font-bold text-slate-700 dark:text-slate-300">Status</label>
+                                    <select
+                                        value={taskFormData.status}
+                                        onChange={(e) => {
+                                            setTaskFormData({ ...taskFormData, status: e.target.value as any });
+                                            if (taskErrors.status) setTaskErrors({ ...taskErrors, status: '' });
+                                        }}
+                                        className={`w-full h-11 px-3 rounded-xl bg-slate-50 dark:bg-slate-950 border text-xs font-semibold focus:ring-2 focus:ring-blue-500 focus:outline-none ${taskErrors.status ? 'border-rose-500 text-rose-600' : 'border-slate-200 dark:border-slate-800'
+                                            }`}
+                                    >
+                                        <option value="todo">To Do</option>
+                                        <option value="in_progress">In Progress</option>
+                                        <option value="in_review">In Review</option>
+                                        <option value="completed">Completed</option>
+                                        <option value="cancelled">Cancelled</option>
+                                    </select>
+                                    {taskErrors.status && (
+                                        <p className="text-[11px] font-bold text-rose-600 dark:text-rose-400 mt-1">{taskErrors.status}</p>
+                                    )}
+                                </div>
+                            </div>
+
+                            <div className="space-y-1.5">
+                                <label className="text-xs font-bold text-slate-700 dark:text-slate-300">Due Date</label>
+                                <input
+                                    type="date"
+                                    value={taskFormData.due_date}
+                                    onChange={(e) => {
+                                        setTaskFormData({ ...taskFormData, due_date: e.target.value });
+                                        if (taskErrors.due_date) setTaskErrors({ ...taskErrors, due_date: '' });
+                                    }}
+                                    className={`w-full h-11 px-4 rounded-xl bg-slate-50 dark:bg-slate-950 border text-xs font-medium focus:ring-2 focus:ring-blue-500 focus:outline-none ${taskErrors.due_date ? 'border-rose-500 text-rose-600' : 'border-slate-200 dark:border-slate-800'
+                                        }`}
+                                />
+                                {taskErrors.due_date && (
+                                    <p className="text-[11px] font-bold text-rose-600 dark:text-rose-400 mt-1">{taskErrors.due_date}</p>
+                                )}
+                            </div>
+
+                            <div className="space-y-1.5">
+                                <label className="text-xs font-bold text-slate-700 dark:text-slate-300">Description / Instructions</label>
+                                <textarea
+                                    rows={3}
+                                    value={taskFormData.description}
+                                    onChange={(e) => {
+                                        setTaskFormData({ ...taskFormData, description: e.target.value });
+                                        if (taskErrors.description) setTaskErrors({ ...taskErrors, description: '' });
+                                    }}
+                                    placeholder="Task details..."
+                                    className={`w-full p-3 rounded-xl bg-slate-50 dark:bg-slate-950 border text-xs font-medium focus:ring-2 focus:ring-blue-500 focus:outline-none ${taskErrors.description ? 'border-rose-500 text-rose-600' : 'border-slate-200 dark:border-slate-800'
+                                        }`}
+                                />
+                                {taskErrors.description && (
+                                    <p className="text-[11px] font-bold text-rose-600 dark:text-rose-400 mt-1">{taskErrors.description}</p>
+                                )}
+                            </div>
+
+                            <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-100 dark:border-slate-800">
+                                <button
+                                    type="button"
+                                    onClick={() => setIsTaskModalOpen(false)}
+                                    disabled={isTaskSubmitting}
+                                    className="h-10 px-3 rounded-xl border border-slate-200 dark:border-slate-800 text-xs font-bold text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                                >
+                                    Cancel
+                                </button>
+                                <button
+                                    type="submit"
+                                    disabled={isTaskSubmitting}
+                                    className="h-10 px-3 rounded-xl bg-gradient-to-r from-[#003796] via-[#0052D4] to-[#1d4ed8] text-white text-xs font-bold shadow-md shadow-blue-600/20 inline-flex items-center gap-2 cursor-pointer hover:opacity-95 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                                >
+                                    {isTaskSubmitting && <LoaderCircle className="size-4 animate-spin" />}
+                                    <span>{editingTask ? 'Update Task' : 'Save Task'}</span>
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            )}
+
+            {/* DELETE TASK CONFIRMATION MODAL */}
+            {deletingTask && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-900/60 backdrop-blur-xs overflow-y-auto">
+                    <div className="w-full max-w-md max-h-[90vh] my-auto overflow-y-auto rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-4 sm:p-6 shadow-2xl space-y-4 text-center animate-in fade-in zoom-in-95 duration-200 relative">
+                        <button
+                            type="button"
+                            onClick={() => setDeletingTask(null)}
+                            className="absolute top-4 right-4 size-8 rounded-xl text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-all flex items-center justify-center cursor-pointer"
+                        >
+                            <X className="size-4" />
+                        </button>
+
+                        <div className="size-12 rounded-2xl bg-rose-50 dark:bg-rose-950/60 text-rose-600 dark:text-rose-400 flex items-center justify-center mx-auto">
+                            <Trash2 className="size-6" />
+                        </div>
+                        <div>
+                            <h3 className="text-base font-extrabold text-slate-900 dark:text-white">Delete Service Task?</h3>
+                            <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+                                Are you sure you want to delete <strong className="text-slate-800 dark:text-slate-200">{deletingTask.task_title}</strong>? This action cannot be undone.
+                            </p>
+                        </div>
+                        <div className="flex items-center justify-center gap-3 pt-2 border-t border-slate-100 dark:border-slate-800">
+                            <button
+                                type="button"
+                                onClick={() => setDeletingTask(null)}
+                                disabled={isTaskSubmitting}
+                                className="h-10 px-3 rounded-xl border border-slate-200 dark:border-slate-800 text-xs font-bold text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-all disabled:opacity-50 cursor-pointer"
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                type="button"
+                                onClick={handleDeleteTask}
+                                disabled={isTaskSubmitting}
+                                className="h-10 px-4 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold shadow-md shadow-rose-600/20 active:scale-[0.99] transition-all flex items-center gap-2 disabled:opacity-50 cursor-pointer"
+                            >
+                                {isTaskSubmitting && <LoaderCircle className="size-4 animate-spin" />}
+                                <span>{isTaskSubmitting ? 'Deleting...' : 'Confirm Delete'}</span>
                             </button>
                         </div>
                     </div>

@@ -95,6 +95,8 @@ Route::middleware(['web', 'auth'])->group(function () {
         Route::get('/', 'index')->name('index');
         Route::post('{task}/status', 'updateStatus')->name('status');
         Route::put('{task}/status', 'updateStatus');
+        Route::post('service-task/{task}/status', 'updateServiceTaskStatus')->name('service-task.status');
+        Route::put('service-task/{task}/status', 'updateServiceTaskStatus');
     });
 });
 
@@ -166,12 +168,22 @@ Route::group(['prefix' => 'client-portal', 'as' => 'client-portal.', 'middleware
             Route::post('payments/generate', 'generateMonthlyBatch')->name('payments.generate');
             Route::post('payments/{servicePayment}/generate-invoice', 'generatePaymentInvoice')->name('payments.generate-invoice');
             Route::post('payments/{servicePayment}/mark-as-paid', 'markPaymentAsPaid')->name('payments.mark-as-paid');
+            Route::post('payments/{servicePayment}/split', 'splitPayment')->name('payments.split');
+            Route::post('payments/{servicePayment}/merge', 'mergePayment')->name('payments.merge');
             Route::put('payments/update/{servicePayment}', 'updatePayment')->name('payments.update');
             Route::delete('payments/destroy/{servicePayment}', 'destroyPayment')->name('payments.destroy');
 
             Route::get('{service}', 'show')->name('show');
             Route::put('update/{service}', 'update')->name('update');
             Route::delete('destroy/{service}', 'destroy')->name('destroy');
+
+            // Tasks Sub-routes
+            Route::post('tasks/store', 'storeTask')->name('tasks.store');
+            Route::put('tasks/update/{task}', 'updateTask')->name('tasks.update');
+            Route::post('tasks/update/{task}', 'updateTask');
+            Route::post('tasks/{task}/status', 'updateTaskStatus')->name('tasks.status');
+            Route::put('tasks/{task}/status', 'updateTaskStatus');
+            Route::delete('tasks/destroy/{task}', 'destroyTask')->name('tasks.destroy');
 
             Route::post('credentials/store', 'storeCredential')->name('credentials.store');
             Route::put('credentials/update/{credential}', 'updateCredential')->name('credentials.update');

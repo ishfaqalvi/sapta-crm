@@ -5,6 +5,8 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOneThrough;
 
 class ServicePayment extends Model
 {
@@ -13,7 +15,9 @@ class ServicePayment extends Model
     protected $fillable = [
         'client_service_id',
         'client_id',
+        'parent_id',
         'billing_month',
+        'split_title',
         'amount_due',
         'amount_paid',
         'exchange_rate',
@@ -42,7 +46,17 @@ class ServicePayment extends Model
         return $this->belongsTo(Client::class);
     }
 
-    public function invoice(): \Illuminate\Database\Eloquent\Relations\HasOneThrough
+    public function parent(): BelongsTo
+    {
+        return $this->belongsTo(ServicePayment::class, 'parent_id');
+    }
+
+    public function children(): HasMany
+    {
+        return $this->hasMany(ServicePayment::class, 'parent_id');
+    }
+
+    public function invoice(): HasOneThrough
     {
         return $this->hasOneThrough(
             Invoice::class,

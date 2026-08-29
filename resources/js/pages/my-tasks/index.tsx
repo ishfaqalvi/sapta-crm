@@ -6,6 +6,7 @@ import {
     AlertCircle,
     AlertTriangle,
     ArrowRight,
+    Briefcase,
     Calendar,
     CheckCircle2,
     Clock,
@@ -13,11 +14,13 @@ import {
     Filter,
     FolderKanban,
     Globe,
+    Layers,
     LayoutGrid,
     ListTodo,
     Loader2,
     RotateCcw,
     Search,
+    Server,
     Sparkles,
     User,
     X,
@@ -25,9 +28,10 @@ import {
 } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 
-export interface AssignedTaskProject {
+export interface AssignedTaskSource {
     id: number;
-    project_name: string;
+    project_name?: string;
+    service_name?: string;
     client?: {
         id: number;
         name: string;
@@ -41,10 +45,12 @@ export interface AssignedTaskProject {
     };
 }
 
-export interface MyProjectTaskItem {
+export interface MyTaskItem {
     id: number;
-    website_project_id: number;
-    assigned_employee_id: number;
+    source_type?: 'project' | 'service';
+    website_project_id?: number;
+    client_service_id?: number;
+    assigned_employee_id?: number;
     task_title: string;
     priority: 'low' | 'medium' | 'high' | 'urgent';
     status: 'todo' | 'in_progress' | 'in_review' | 'completed' | 'cancelled';
@@ -53,7 +59,8 @@ export interface MyProjectTaskItem {
     description?: string | null;
     completed_at?: string | null;
     created_at: string;
-    website_project?: AssignedTaskProject;
+    website_project?: AssignedTaskSource | null;
+    service?: AssignedTaskSource | null;
     assigned_employee?: {
         id: number;
         name: string;
@@ -63,7 +70,7 @@ export interface MyProjectTaskItem {
 }
 
 interface MyTasksProps {
-    tasks: PaginatedData<MyProjectTaskItem>;
+    tasks: PaginatedData<MyTaskItem>;
     stats: {
         total: number;
         todo: number;
@@ -73,6 +80,7 @@ interface MyTasksProps {
         urgent: number;
     };
     projects: { id: number; project_name: string }[];
+    services?: { id: number; service_name: string }[];
     employee?: {
         id: number;
         name: string;
@@ -82,11 +90,20 @@ interface MyTasksProps {
         search?: string;
         status?: string;
         priority?: string;
+        source_type?: string;
         project_id?: string;
+        service_id?: string;
     };
 }
 
-export default function MyTasksIndex({ tasks, stats, projects = [], employee, filters }: MyTasksProps) {
+export default function MyTasksIndex({
+    tasks,
+    stats,
+    projects = [],
+    services = [],
+    employee,
+    filters,
+}: MyTasksProps) {
     const { auth } = usePage().props as unknown as SharedData;
     const user = auth?.user;
 
@@ -98,7 +115,9 @@ export default function MyTasksIndex({ tasks, stats, projects = [], employee, fi
     const [searchQuery, setSearchQuery] = useState(filters?.search || '');
     const [selectedStatus, setSelectedStatus] = useState(filters?.status || '');
     const [selectedPriority, setSelectedPriority] = useState(filters?.priority || '');
+    const [selectedSourceType, setSelectedSourceType] = useState(filters?.source_type || '');
     const [selectedProject, setSelectedProject] = useState(filters?.project_id || '');
+    const [selectedService, setSelectedService] = useState(filters?.service_id || '');
     const [updatingTaskId, setUpdatingTaskId] = useState<number | null>(null);
 
     const isFirstRender = useRef(true);
@@ -116,7 +135,9 @@ export default function MyTasksIndex({ tasks, stats, projects = [], employee, fi
                     search: searchQuery,
                     status: selectedStatus,
                     priority: selectedPriority,
+                    source_type: selectedSourceType,
                     project_id: selectedProject,
+                    service_id: selectedService,
                 },
                 {
                     preserveState: true,
@@ -127,24 +148,33 @@ export default function MyTasksIndex({ tasks, stats, projects = [], employee, fi
         }, 300);
 
         return () => clearTimeout(timer);
-    }, [searchQuery, selectedStatus, selectedPriority, selectedProject]);
+    }, [searchQuery, selectedStatus, selectedPriority, selectedSourceType, selectedProject, selectedService]);
 
     const handleClearFilters = () => {
         setSearchQuery('');
         setSelectedStatus('');
         setSelectedPriority('');
+        setSelectedSourceType('');
         setSelectedProject('');
+        setSelectedService('');
         router.get('/my-tasks', {}, { preserveState: true, preserveScroll: true });
     };
 
-    const hasActiveFilters = Boolean(searchQuery || selectedStatus || selectedPriority || selectedProject);
+    const hasActiveFilters = Boolean(
+        searchQuery || selectedStatus || selectedPriority || selectedSourceType || selectedProject || selectedService
+    );
 
-    const handleStatusChange = (task: MyProjectTaskItem, newStatus: string) => {
+    const handleStatusChange = (task: MyTaskItem, newStatus: string) => {
         if (task.status === newStatus || updatingTaskId === task.id) return;
 
         setUpdatingTaskId(task.id);
+        const endpoint =
+            task.source_type === 'service' || task.client_service_id
+                ? `/my-tasks/service-task/${task.id}/status`
+                : `/my-tasks/${task.id}/status`;
+
         router.post(
-            `/my-tasks/${task.id}/status`,
+            endpoint,
             { status: newStatus },
             {
                 preserveScroll: true,
@@ -222,20 +252,20 @@ export default function MyTasksIndex({ tasks, stats, projects = [], employee, fi
                 );
             case 'high':
                 return (
-                    <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-amber-50 text-amber-700 dark:bg-amber-950/60 dark:text-amber-300 border border-amber-200 dark:border-amber-800 inline-flex items-center gap-1 shadow-2xs">
+                    <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-amber-50 text-amber-700 dark:bg-amber-950/60 dark:text-amber-300 border border-amber-200 dark:border-amber-800 inline-flex items-center gap-1">
                         <AlertTriangle className="size-3" />
                         High
                     </span>
                 );
             case 'medium':
                 return (
-                    <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-blue-50 text-blue-700 dark:bg-blue-950/60 dark:text-blue-300 border border-blue-200 dark:border-blue-800 inline-flex items-center gap-1 shadow-2xs">
+                    <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-blue-50 text-blue-700 dark:bg-blue-950/60 dark:text-blue-300 border border-blue-200 dark:border-blue-800 inline-flex items-center gap-1">
                         Medium
                     </span>
                 );
             default:
                 return (
-                    <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300 border border-slate-200 dark:border-slate-700 inline-flex items-center gap-1 shadow-2xs">
+                    <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300 border border-slate-200 dark:border-slate-700">
                         Low
                     </span>
                 );
@@ -245,75 +275,75 @@ export default function MyTasksIndex({ tasks, stats, projects = [], employee, fi
     const getStatusOptionClass = (status: string) => {
         switch (status) {
             case 'completed':
-                return 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300 border-emerald-300 dark:border-emerald-800';
+                return 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/70 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800';
             case 'in_progress':
-                return 'bg-blue-50 text-blue-700 dark:bg-blue-950/60 dark:text-blue-300 border-blue-300 dark:border-blue-800';
+                return 'bg-blue-50 text-blue-700 dark:bg-blue-950/70 dark:text-blue-300 border-blue-200 dark:border-blue-800';
             case 'in_review':
-                return 'bg-purple-50 text-purple-700 dark:bg-purple-950/60 dark:text-purple-300 border-purple-300 dark:border-purple-800';
+                return 'bg-purple-50 text-purple-700 dark:bg-purple-950/70 dark:text-purple-300 border-purple-200 dark:border-purple-800';
             case 'cancelled':
-                return 'bg-rose-50 text-rose-700 dark:bg-rose-950/60 dark:text-rose-300 border-rose-300 dark:border-rose-800';
+                return 'bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400 border-slate-200 dark:border-slate-700';
             default:
-                return 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300 border-slate-300 dark:border-slate-700';
+                return 'bg-amber-50 text-amber-700 dark:bg-amber-950/70 dark:text-amber-300 border-amber-200 dark:border-amber-800';
         }
     };
 
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
-            <Head title="My Assigned Tasks | Employee Workspace" />
+            <Head title="My Assigned Tasks | Sapta CRM" />
 
-            <div className="p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto space-y-6 w-full min-w-0">
+            <div className="p-3 sm:p-6 mx-auto space-y-6">
                 {/* Header Banner */}
-                <div className="relative overflow-hidden rounded-3xl bg-gradient-to-r from-[#003796] via-[#0052D4] to-[#1d4ed8] p-6 sm:p-8 text-white shadow-xl shadow-blue-600/15">
-                    <div className="absolute right-0 top-0 -mt-10 -mr-10 size-64 rounded-full bg-white/10 blur-3xl pointer-events-none" />
-                    <div className="absolute left-1/3 bottom-0 -mb-10 size-48 rounded-full bg-blue-400/20 blur-2xl pointer-events-none" />
+                <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-[#003796] via-[#0052D4] to-[#1d4ed8] p-6 sm:p-8 text-white shadow-xl shadow-blue-900/20">
+                    <div className="absolute -right-10 -bottom-10 size-60 rounded-full bg-white/10 blur-2xl pointer-events-none" />
+                    <div className="absolute right-20 top-4 size-32 rounded-full bg-cyan-400/20 blur-xl pointer-events-none" />
 
-                    <div className="relative z-10 flex flex-col sm:flex-row sm:items-center justify-between gap-6">
+                    <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
                         <div className="space-y-2">
-                            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/15 backdrop-blur-md border border-white/20 text-xs font-bold text-blue-100">
-                                <Sparkles className="size-3.5 text-amber-300" />
-                                <span>Employee Workspace</span>
+                            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/15 backdrop-blur-md border border-white/20 text-xs font-black uppercase tracking-wider text-cyan-200 shadow-2xs">
+                                <Sparkles className="size-3.5" />
+                                Employee Task Workspace
                             </div>
-                            <h1 className="text-2xl sm:text-3xl font-black tracking-tight text-white">
-                                My Assigned Tasks
+                            <h1 className="text-2xl sm:text-3xl md:text-4xl font-black tracking-tight">
+                                My Assigned Deliverables
                             </h1>
-                            <p className="text-xs sm:text-sm text-blue-100/90 font-medium max-w-xl">
-                                Track all deliverables, sprints, and project milestones assigned to you. Click on any task to jump straight to the project workspace.
+                            <p className="text-sm text-blue-100/90 max-w-xl font-medium leading-relaxed">
+                                Manage and track all your active task deliverables across website projects and client recurring services in real-time.
                             </p>
                         </div>
 
                         {employee && (
-                            <div className="p-3.5 rounded-2xl bg-white/10 backdrop-blur-md border border-white/15 flex items-center gap-3 shrink-0">
-                                <div className="size-10 rounded-xl bg-white/20 flex items-center justify-center font-bold text-white shadow-xs">
-                                    <User className="size-5" />
+                            <div className="flex items-center gap-3.5 p-3 rounded-2xl bg-white/10 backdrop-blur-md border border-white/15 self-start md:self-auto shrink-0 shadow-lg">
+                                <div className="size-11 rounded-xl bg-gradient-to-tr from-white/30 to-white/10 border border-white/30 flex items-center justify-center font-black text-white text-base">
+                                    {employee.name.charAt(0)}
                                 </div>
-                                <div>
-                                    <div className="text-xs font-black text-white">{employee.name}</div>
-                                    <div className="text-[11px] font-mono text-blue-200">{employee.employee_code}</div>
+                                <div className="text-left">
+                                    <div className="font-extrabold text-sm text-white">{employee.name}</div>
+                                    <div className="text-[11px] font-mono font-medium text-cyan-200">{employee.employee_code}</div>
                                 </div>
                             </div>
                         )}
                     </div>
                 </div>
 
-                {/* 1. High-Impact KPI Stat Cards */}
-                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 sm:gap-4">
-                    {/* Total Assigned */}
+                {/* 1. KPI Stats Cards */}
+                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+                    {/* Total */}
                     <div className="bg-white dark:bg-slate-900 rounded-2xl p-4 border border-slate-200/80 dark:border-slate-800 shadow-2xs space-y-1 relative overflow-hidden group">
-                        <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-blue-500 to-indigo-600" />
-                        <span className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400">Total Assigned</span>
+                        <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-blue-600 to-indigo-600" />
+                        <span className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400">Total Tasks</span>
                         <div className="text-xl sm:text-2xl font-black text-slate-900 dark:text-white font-mono">{stats.total}</div>
                         <div className="text-[10px] text-slate-500 dark:text-slate-400 font-medium flex items-center gap-1">
-                            <ListTodo className="size-3 text-blue-500" /> All Milestones
+                            <ListTodo className="size-3 text-blue-500" /> All Deliverables
                         </div>
                     </div>
 
                     {/* To Do */}
                     <div className="bg-white dark:bg-slate-900 rounded-2xl p-4 border border-slate-200/80 dark:border-slate-800 shadow-2xs space-y-1 relative overflow-hidden group">
-                        <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-slate-400 to-slate-600" />
+                        <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-amber-400 to-orange-500" />
                         <span className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400">To Do</span>
-                        <div className="text-xl sm:text-2xl font-black text-slate-700 dark:text-slate-300 font-mono">{stats.todo}</div>
+                        <div className="text-xl sm:text-2xl font-black text-amber-600 dark:text-amber-400 font-mono">{stats.todo}</div>
                         <div className="text-[10px] text-slate-500 dark:text-slate-400 font-medium flex items-center gap-1">
-                            <Clock className="size-3 text-slate-400" /> Pending Start
+                            <Clock className="size-3 text-amber-500" /> Pending Start
                         </div>
                     </div>
 
@@ -366,7 +396,7 @@ export default function MyTasksIndex({ tasks, stats, projects = [], employee, fi
                             <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 size-4 text-slate-400" />
                             <input
                                 type="text"
-                                placeholder="Search by task title, description, or project name..."
+                                placeholder="Search by task title, description, project, or service..."
                                 value={searchQuery}
                                 onChange={(e) => setSearchQuery(e.target.value)}
                                 className="w-full h-10 pl-10 pr-4 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-xs font-medium text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-600/20 focus:border-blue-600 transition-all"
@@ -384,25 +414,64 @@ export default function MyTasksIndex({ tasks, stats, projects = [], employee, fi
 
                         {/* Filter Dropdowns */}
                         <div className="flex flex-wrap items-center gap-2.5">
-                            {/* Project Filter */}
-                            <div className="min-w-[150px]">
+                            {/* Type Filter */}
+                            <div className="min-w-[130px]">
                                 <select
-                                    value={selectedProject}
-                                    onChange={(e) => setSelectedProject(e.target.value)}
-                                    aria-label="Filter by Project"
+                                    value={selectedSourceType}
+                                    onChange={(e) => {
+                                        setSelectedSourceType(e.target.value);
+                                        if (e.target.value === 'project') setSelectedService('');
+                                        if (e.target.value === 'service') setSelectedProject('');
+                                    }}
+                                    aria-label="Filter by Source"
                                     className="w-full h-10 px-3 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-xs font-semibold text-slate-700 dark:text-slate-300 focus:outline-none focus:ring-2 focus:ring-blue-600/20 cursor-pointer"
                                 >
-                                    <option value="">All Projects</option>
-                                    {projects.map((proj) => (
-                                        <option key={proj.id} value={proj.id}>
-                                            {proj.project_name}
-                                        </option>
-                                    ))}
+                                    <option value="">All Sources</option>
+                                    <option value="project">Projects Only</option>
+                                    <option value="service">Services Only</option>
                                 </select>
                             </div>
 
+                            {/* Project Filter */}
+                            {selectedSourceType !== 'service' && projects.length > 0 && (
+                                <div className="min-w-[150px]">
+                                    <select
+                                        value={selectedProject}
+                                        onChange={(e) => setSelectedProject(e.target.value)}
+                                        aria-label="Filter by Project"
+                                        className="w-full h-10 px-3 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-xs font-semibold text-slate-700 dark:text-slate-300 focus:outline-none focus:ring-2 focus:ring-blue-600/20 cursor-pointer"
+                                    >
+                                        <option value="">All Projects</option>
+                                        {projects.map((proj) => (
+                                            <option key={proj.id} value={proj.id}>
+                                                {proj.project_name}
+                                            </option>
+                                        ))}
+                                    </select>
+                                </div>
+                            )}
+
+                            {/* Service Filter */}
+                            {selectedSourceType !== 'project' && services.length > 0 && (
+                                <div className="min-w-[150px]">
+                                    <select
+                                        value={selectedService}
+                                        onChange={(e) => setSelectedService(e.target.value)}
+                                        aria-label="Filter by Service"
+                                        className="w-full h-10 px-3 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-xs font-semibold text-slate-700 dark:text-slate-300 focus:outline-none focus:ring-2 focus:ring-blue-600/20 cursor-pointer"
+                                    >
+                                        <option value="">All Services</option>
+                                        {services.map((srv) => (
+                                            <option key={srv.id} value={srv.id}>
+                                                {srv.service_name}
+                                            </option>
+                                        ))}
+                                    </select>
+                                </div>
+                            )}
+
                             {/* Status Filter */}
-                            <div className="min-w-[130px]">
+                            <div className="min-w-[120px]">
                                 <select
                                     value={selectedStatus}
                                     onChange={(e) => setSelectedStatus(e.target.value)}
@@ -419,7 +488,7 @@ export default function MyTasksIndex({ tasks, stats, projects = [], employee, fi
                             </div>
 
                             {/* Priority Filter */}
-                            <div className="min-w-[130px]">
+                            <div className="min-w-[120px]">
                                 <select
                                     value={selectedPriority}
                                     onChange={(e) => setSelectedPriority(e.target.value)}
@@ -469,11 +538,11 @@ export default function MyTasksIndex({ tasks, stats, projects = [], employee, fi
                             <thead className="bg-slate-50 dark:bg-slate-800/60 text-slate-500 dark:text-slate-400 font-extrabold uppercase text-[10px] tracking-wider border-b border-slate-200/80 dark:border-slate-800">
                                 <tr>
                                     <th className="py-3.5 px-4">Task Deliverable</th>
-                                    <th className="py-3.5 px-4">Related Project & Client</th>
+                                    <th className="py-3.5 px-4">Source & Client</th>
                                     <th className="py-3.5 px-4">Priority</th>
                                     <th className="py-3.5 px-4">Status & Action</th>
                                     <th className="py-3.5 px-4">Due Date</th>
-                                    <th className="py-3.5 px-4 text-right">Go To Project</th>
+                                    <th className="py-3.5 px-4 text-right">Workspace</th>
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
@@ -481,10 +550,20 @@ export default function MyTasksIndex({ tasks, stats, projects = [], employee, fi
                                     tasks.data.map((task) => {
                                         const dueInfo = getDueDateStatus(task.due_date, task.status);
                                         const isUpdating = updatingTaskId === task.id;
+                                        const isService = task.source_type === 'service' || Boolean(task.client_service_id);
+                                        const sourceTitle = isService
+                                            ? task.service?.service_name || 'Client Service'
+                                            : task.website_project?.project_name || 'Website Project';
+                                        const sourceClient = isService
+                                            ? task.service?.client
+                                            : task.website_project?.client;
+                                        const targetUrl = isService
+                                            ? `/client-portal/services/${task.client_service_id || task.service?.id}?tab=tasks`
+                                            : `/client-portal/projects/${task.website_project_id || task.website_project?.id}?tab=tasks`;
 
                                         return (
                                             <tr
-                                                key={task.id}
+                                                key={`${task.source_type || 'task'}-${task.id}`}
                                                 className={`hover:bg-blue-50/20 dark:hover:bg-slate-800/40 transition-colors ${task.status === 'completed' ? 'opacity-75' : ''
                                                     }`}
                                             >
@@ -502,23 +581,31 @@ export default function MyTasksIndex({ tasks, stats, projects = [], employee, fi
                                                     </div>
                                                 </td>
 
-                                                {/* Related Project & Client */}
+                                                {/* Source & Client */}
                                                 <td className="py-4 px-4 align-top">
                                                     <div className="space-y-1">
                                                         <div className="flex items-center gap-1.5">
-                                                            <FolderKanban className="size-3.5 text-blue-500 shrink-0" />
+                                                            {isService ? (
+                                                                <span className="px-1.5 py-0.5 rounded-md text-[9px] font-black uppercase tracking-wider bg-purple-50 text-purple-700 dark:bg-purple-950/60 dark:text-purple-300 border border-purple-200/50">
+                                                                    Service
+                                                                </span>
+                                                            ) : (
+                                                                <span className="px-1.5 py-0.5 rounded-md text-[9px] font-black uppercase tracking-wider bg-blue-50 text-blue-700 dark:bg-blue-950/60 dark:text-blue-300 border border-blue-200/50">
+                                                                    Project
+                                                                </span>
+                                                            )}
                                                             <span className="font-bold text-slate-800 dark:text-slate-200 text-xs">
-                                                                {task.website_project?.project_name || 'Project'}
+                                                                {sourceTitle}
                                                             </span>
                                                         </div>
-                                                        {task.website_project?.client && (
+                                                        {sourceClient && (
                                                             <div className="flex items-center gap-1.5 text-[11px] text-slate-400 font-medium">
                                                                 <Globe className="size-3 text-cyan-500 shrink-0" />
                                                                 <span>
-                                                                    {task.website_project.client.company_name || task.website_project.client.name}
+                                                                    {sourceClient.company_name || sourceClient.name}
                                                                 </span>
                                                                 <span className="text-[10px] font-mono px-1 rounded bg-slate-100 dark:bg-slate-800 text-slate-500">
-                                                                    {task.website_project.client.client_code}
+                                                                    {sourceClient.client_code}
                                                                 </span>
                                                             </div>
                                                         )}
@@ -576,14 +663,14 @@ export default function MyTasksIndex({ tasks, stats, projects = [], employee, fi
                                                     </div>
                                                 </td>
 
-                                                {/* Action Link to Project */}
+                                                {/* Action Link to Workspace */}
                                                 <td className="py-4 px-4 align-top text-right whitespace-nowrap">
                                                     <Link
-                                                        href={`/client-portal/projects/${task.website_project_id}`}
+                                                        href={targetUrl}
                                                         className="px-3 py-1.5 rounded-xl bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400 hover:bg-gradient-to-r hover:from-[#003796] hover:via-[#0052D4] hover:to-[#1d4ed8] hover:text-white dark:hover:text-white hover:shadow-md hover:shadow-blue-600/20 active:scale-[0.99] transition-all inline-flex items-center gap-1.5 text-xs font-bold"
-                                                        title="Open Project Workspace"
+                                                        title={isService ? 'Open Service Workspace' : 'Open Project Workspace'}
                                                     >
-                                                        <span>View Project</span>
+                                                        <span>{isService ? 'View Service' : 'View Project'}</span>
                                                         <ArrowRight className="size-3.5" />
                                                     </Link>
                                                 </td>
@@ -603,7 +690,7 @@ export default function MyTasksIndex({ tasks, stats, projects = [], employee, fi
                                                 <p className="text-xs text-slate-400 font-medium">
                                                     {hasActiveFilters
                                                         ? 'Try adjusting your search criteria or resetting filters.'
-                                                        : 'You currently have no project deliverables or tasks assigned to you.'}
+                                                        : 'You currently have no project or service deliverables assigned to you.'}
                                                 </p>
                                                 {hasActiveFilters && (
                                                     <button

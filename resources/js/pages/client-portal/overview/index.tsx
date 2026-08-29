@@ -198,18 +198,31 @@ interface ClientPortalOverviewProps {
     client: ClientDetailItem;
     invoices?: InvoiceItemData[];
     canViewOverview?: boolean;
+    canViewProjectBudget?: boolean;
+    canViewServiceBudget?: boolean;
+    canViewInvoices?: boolean;
 }
 
 export default function ClientPortalOverview({
     client,
     invoices = [],
     canViewOverview,
+    canViewProjectBudget: initialCanViewProjectBudget,
+    canViewServiceBudget: initialCanViewServiceBudget,
+    canViewInvoices: initialCanViewInvoices,
 }: ClientPortalOverviewProps) {
     const page = usePage();
     const authUser = (page.props.auth as any)?.user;
     const isAdmin = authUser?.type === 'admin';
-    const canViewProjectBudget = hasPermission(authUser, 'view-client-portal-project-budget');
-    const canViewServiceBudget = hasPermission(authUser, 'view-client-portal-service-budget');
+    const canViewProjectBudget = initialCanViewProjectBudget !== undefined
+        ? Boolean(initialCanViewProjectBudget)
+        : (hasPermission(authUser, 'view-client-portal-project-budget') || hasPermission(authUser, 'view-client-portal-overview-budget'));
+    const canViewServiceBudget = initialCanViewServiceBudget !== undefined
+        ? Boolean(initialCanViewServiceBudget)
+        : (hasPermission(authUser, 'view-client-portal-service-budget') || hasPermission(authUser, 'view-client-portal-overview-budget'));
+    const canViewInvoices = initialCanViewInvoices !== undefined
+        ? Boolean(initialCanViewInvoices)
+        : hasPermission(authUser, 'view-client-portal-invoices');
 
     const [activeTabSection, setActiveTabSection] = useState<'projects' | 'services' | 'infrastructure' | 'invoices'>('projects');
 
@@ -382,6 +395,25 @@ export default function ClientPortalOverview({
     const servicesCategoryData = Object.keys(servicesCategoryMap).map((cat) => ({
         category: cat.length > 14 ? cat.substring(0, 12) + '...' : cat,
         MonthlyInvestment: servicesCategoryMap[cat],
+    }));
+
+    // Chart Data 1B (Operational Mode): Project Progress & Tasks Count
+    const projectProgressData = projectsList.map((proj) => ({
+        name: proj.project_name.length > 16 ? proj.project_name.substring(0, 14) + '...' : proj.project_name,
+        Progress: proj.progress_percentage || 0,
+        Tasks: (proj.tasks || []).length,
+    }));
+
+    // Chart Data 4B (Operational Mode): Services Count by Category
+    const servicesCategoryCountMap: { [key: string]: number } = {};
+    clientServicesList.forEach((s) => {
+        const cat = s.category?.name || 'General';
+        servicesCategoryCountMap[cat] = (servicesCategoryCountMap[cat] || 0) + 1;
+    });
+
+    const servicesCategoryCountData = Object.keys(servicesCategoryCountMap).map((cat) => ({
+        category: cat.length > 14 ? cat.substring(0, 12) + '...' : cat,
+        ActiveServices: servicesCategoryCountMap[cat],
     }));
 
     return (
@@ -582,82 +614,151 @@ export default function ClientPortalOverview({
                         </span>
                     </div>
 
-                    <div className="flex items-center gap-2">
-                        <Link
-                            href="/client-portal/invoices"
-                            className="px-3 py-1.5 rounded-xl bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400 font-bold hover:underline inline-flex items-center gap-1"
-                        >
-                            <Receipt className="size-3.5" />
-                            <span>{invoicesList.length} Invoices & Statements</span>
-                            <ArrowRight className="size-3" />
-                        </Link>
-                    </div>
+                    {canViewInvoices && (
+                        <div className="flex items-center gap-2">
+                            <Link
+                                href="/client-portal/invoices"
+                                className="px-3 py-1.5 rounded-xl bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400 font-bold hover:underline inline-flex items-center gap-1"
+                            >
+                                <Receipt className="size-3.5" />
+                                <span>{invoicesList.length} Invoices & Statements</span>
+                                <ArrowRight className="size-3" />
+                            </Link>
+                        </div>
+                    )}
                 </div>
 
                 {/* 3. Colorful Interactive Recharts Visualizations Grid (4 Rich Charts) */}
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                    {/* Visual 1: Project Investment & Clearance Breakdown (Bar Chart - Left 2 Columns) */}
-                    <div className="lg:col-span-2 bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/80 dark:border-slate-800 p-5 sm:p-6 shadow-xs space-y-6">
-                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 dark:border-slate-800 pb-4">
-                            <div className="flex items-center gap-3">
-                                <div className="p-2.5 rounded-2xl bg-gradient-to-tr from-indigo-600 to-purple-600 text-white shadow-md shadow-indigo-600/20">
-                                    <BarChart2 className="size-5" />
+                    {/* Visual 1: Project Investment & Clearance Breakdown (Bar Chart - Left 2 Columns) OR Project Progress */}
+                    {canViewProjectBudget ? (
+                        <div className="lg:col-span-2 bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/80 dark:border-slate-800 p-5 sm:p-6 shadow-xs space-y-6">
+                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 dark:border-slate-800 pb-4">
+                                <div className="flex items-center gap-3">
+                                    <div className="p-2.5 rounded-2xl bg-gradient-to-tr from-indigo-600 to-purple-600 text-white shadow-md shadow-indigo-600/20">
+                                        <BarChart2 className="size-5" />
+                                    </div>
+                                    <div>
+                                        <h2 className="font-extrabold text-slate-900 dark:text-white text-base">Project Financial Allocations</h2>
+                                        <p className="text-xs text-slate-400 font-medium">Budget vs Cleared Payment Comparison</p>
+                                    </div>
                                 </div>
-                                <div>
-                                    <h2 className="font-extrabold text-slate-900 dark:text-white text-base">Project Financial Allocations</h2>
-                                    <p className="text-xs text-slate-400 font-medium">Budget vs Cleared Payment Comparison</p>
+                                <div className="flex items-center gap-3 text-xs font-bold bg-slate-50 dark:bg-slate-800/60 px-3 py-1.5 rounded-xl border border-slate-100 dark:border-slate-800">
+                                    <span className="flex items-center gap-1.5 text-indigo-600 dark:text-indigo-400">
+                                        <span className="size-2.5 rounded-full bg-indigo-600 inline-block shadow-xs" /> Total Budget
+                                    </span>
+                                    <span className="flex items-center gap-1.5 text-emerald-600 dark:text-emerald-400">
+                                        <span className="size-2.5 rounded-full bg-emerald-500 inline-block shadow-xs" /> Cleared Paid
+                                    </span>
                                 </div>
                             </div>
-                            <div className="flex items-center gap-3 text-xs font-bold bg-slate-50 dark:bg-slate-800/60 px-3 py-1.5 rounded-xl border border-slate-100 dark:border-slate-800">
-                                <span className="flex items-center gap-1.5 text-indigo-600 dark:text-indigo-400">
-                                    <span className="size-2.5 rounded-full bg-indigo-600 inline-block shadow-xs" /> Total Budget
-                                </span>
-                                <span className="flex items-center gap-1.5 text-emerald-600 dark:text-emerald-400">
-                                    <span className="size-2.5 rounded-full bg-emerald-500 inline-block shadow-xs" /> Cleared Paid
-                                </span>
-                            </div>
-                        </div>
 
-                        {projectInvestmentData.length > 0 ? (
-                            <div className="h-64 sm:h-72 w-full">
-                                <ResponsiveContainer width="100%" height="100%">
-                                    <BarChart data={projectInvestmentData} margin={{ top: 10, right: 10, left: -10, bottom: 0 }}>
-                                        <defs>
-                                            <linearGradient id="budgetGrad" x1="0" y1="0" x2="0" y2="1">
-                                                <stop offset="0%" stopColor="#6366f1" stopOpacity={1} />
-                                                <stop offset="100%" stopColor="#4f46e5" stopOpacity={0.8} />
-                                            </linearGradient>
-                                            <linearGradient id="clearedGrad" x1="0" y1="0" x2="0" y2="1">
-                                                <stop offset="0%" stopColor="#10b981" stopOpacity={1} />
-                                                <stop offset="100%" stopColor="#059669" stopOpacity={0.8} />
-                                            </linearGradient>
-                                        </defs>
-                                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#3341551a" />
-                                        <XAxis dataKey="name" stroke="#94a3b8" fontSize={11} tickLine={false} />
-                                        <YAxis stroke="#94a3b8" fontSize={11} tickLine={false} tickFormatter={(val) => `${val >= 1000 ? `${(val / 1000).toFixed(0)}k` : val}`} />
-                                        <Tooltip
-                                            contentStyle={{
-                                                backgroundColor: '#0f172a',
-                                                borderColor: '#1e293b',
-                                                borderRadius: '12px',
-                                                color: '#fff',
-                                                fontSize: '12px',
-                                                boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.3)',
-                                            }}
-                                            formatter={(val: any) => [formatCurrency(val), 'Amount']}
-                                        />
-                                        <Bar dataKey="Budget" fill="url(#budgetGrad)" radius={[6, 6, 0, 0]} maxBarSize={36} />
-                                        <Bar dataKey="Cleared" fill="url(#clearedGrad)" radius={[6, 6, 0, 0]} maxBarSize={36} />
-                                    </BarChart>
-                                </ResponsiveContainer>
+                            {projectInvestmentData.length > 0 ? (
+                                <div className="h-64 sm:h-72 w-full">
+                                    <ResponsiveContainer width="100%" height="100%">
+                                        <BarChart data={projectInvestmentData} margin={{ top: 10, right: 10, left: -10, bottom: 0 }}>
+                                            <defs>
+                                                <linearGradient id="budgetGrad" x1="0" y1="0" x2="0" y2="1">
+                                                    <stop offset="0%" stopColor="#6366f1" stopOpacity={1} />
+                                                    <stop offset="100%" stopColor="#4f46e5" stopOpacity={0.8} />
+                                                </linearGradient>
+                                                <linearGradient id="clearedGrad" x1="0" y1="0" x2="0" y2="1">
+                                                    <stop offset="0%" stopColor="#10b981" stopOpacity={1} />
+                                                    <stop offset="100%" stopColor="#059669" stopOpacity={0.8} />
+                                                </linearGradient>
+                                            </defs>
+                                            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#3341551a" />
+                                            <XAxis dataKey="name" stroke="#94a3b8" fontSize={11} tickLine={false} />
+                                            <YAxis stroke="#94a3b8" fontSize={11} tickLine={false} tickFormatter={(val) => `${val >= 1000 ? `${(val / 1000).toFixed(0)}k` : val}`} />
+                                            <Tooltip
+                                                contentStyle={{
+                                                    backgroundColor: '#0f172a',
+                                                    borderColor: '#1e293b',
+                                                    borderRadius: '12px',
+                                                    color: '#fff',
+                                                    fontSize: '12px',
+                                                    boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.3)',
+                                                }}
+                                                formatter={(val: any) => [formatCurrency(val), 'Amount']}
+                                            />
+                                            <Bar dataKey="Budget" fill="url(#budgetGrad)" radius={[6, 6, 0, 0]} maxBarSize={36} />
+                                            <Bar dataKey="Cleared" fill="url(#clearedGrad)" radius={[6, 6, 0, 0]} maxBarSize={36} />
+                                        </BarChart>
+                                    </ResponsiveContainer>
+                                </div>
+                            ) : (
+                                <div className="h-64 flex flex-col items-center justify-center text-slate-400 text-sm italic">
+                                    <BarChart2 className="size-10 mb-2 opacity-30 text-indigo-500" />
+                                    No project investment data available yet.
+                                </div>
+                            )}
+                        </div>
+                    ) : (
+                        <div className="lg:col-span-2 bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/80 dark:border-slate-800 p-5 sm:p-6 shadow-xs space-y-6">
+                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 dark:border-slate-800 pb-4">
+                                <div className="flex items-center gap-3">
+                                    <div className="p-2.5 rounded-2xl bg-gradient-to-tr from-indigo-600 to-purple-600 text-white shadow-md shadow-indigo-600/20">
+                                        <BarChart2 className="size-5" />
+                                    </div>
+                                    <div>
+                                        <h2 className="font-extrabold text-slate-900 dark:text-white text-base">Projects Development & Progress</h2>
+                                        <p className="text-xs text-slate-400 font-medium">Completion Percentage & Sprint Velocity</p>
+                                    </div>
+                                </div>
+                                <div className="flex items-center gap-3 text-xs font-bold bg-slate-50 dark:bg-slate-800/60 px-3 py-1.5 rounded-xl border border-slate-100 dark:border-slate-800">
+                                    <span className="flex items-center gap-1.5 text-indigo-600 dark:text-indigo-400">
+                                        <span className="size-2.5 rounded-full bg-indigo-600 inline-block shadow-xs" /> Progress (%)
+                                    </span>
+                                    <span className="flex items-center gap-1.5 text-blue-600 dark:text-blue-400">
+                                        <span className="size-2.5 rounded-full bg-blue-500 inline-block shadow-xs" /> Sprint Tasks
+                                    </span>
+                                </div>
                             </div>
-                        ) : (
-                            <div className="h-64 flex flex-col items-center justify-center text-slate-400 text-sm italic">
-                                <BarChart2 className="size-10 mb-2 opacity-30 text-indigo-500" />
-                                No project investment data available yet.
-                            </div>
-                        )}
-                    </div>
+
+                            {projectsList.length > 0 ? (
+                                <div className="h-64 sm:h-72 w-full">
+                                    <ResponsiveContainer width="100%" height="100%">
+                                        <BarChart data={projectProgressData} margin={{ top: 10, right: 10, left: -10, bottom: 0 }}>
+                                            <defs>
+                                                <linearGradient id="progGrad" x1="0" y1="0" x2="0" y2="1">
+                                                    <stop offset="0%" stopColor="#6366f1" stopOpacity={1} />
+                                                    <stop offset="100%" stopColor="#4f46e5" stopOpacity={0.8} />
+                                                </linearGradient>
+                                                <linearGradient id="taskGrad" x1="0" y1="0" x2="0" y2="1">
+                                                    <stop offset="0%" stopColor="#3b82f6" stopOpacity={1} />
+                                                    <stop offset="100%" stopColor="#2563eb" stopOpacity={0.8} />
+                                                </linearGradient>
+                                            </defs>
+                                            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#3341551a" />
+                                            <XAxis dataKey="name" stroke="#94a3b8" fontSize={11} tickLine={false} />
+                                            <YAxis stroke="#94a3b8" fontSize={11} tickLine={false} />
+                                            <Tooltip
+                                                contentStyle={{
+                                                    backgroundColor: '#0f172a',
+                                                    borderColor: '#1e293b',
+                                                    borderRadius: '12px',
+                                                    color: '#fff',
+                                                    fontSize: '12px',
+                                                    boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.3)',
+                                                }}
+                                                formatter={(val: any, name?: any) => [
+                                                    String(name) === 'Progress' ? `${val}%` : `${val} Tasks`,
+                                                    String(name) === 'Progress' ? 'Completion' : 'Total Tasks',
+                                                ]}
+                                            />
+                                            <Bar dataKey="Progress" fill="url(#progGrad)" radius={[6, 6, 0, 0]} maxBarSize={36} />
+                                            <Bar dataKey="Tasks" fill="url(#taskGrad)" radius={[6, 6, 0, 0]} maxBarSize={36} />
+                                        </BarChart>
+                                    </ResponsiveContainer>
+                                </div>
+                            ) : (
+                                <div className="h-64 flex flex-col items-center justify-center text-slate-400 text-sm italic">
+                                    <BarChart2 className="size-10 mb-2 opacity-30 text-indigo-500" />
+                                    No project progress data available yet.
+                                </div>
+                            )}
+                        </div>
+                    )}
 
                     {/* Visual 2: Deliverable Tasks Breakdown (Donut Pie Chart - Right 1 Column) */}
                     <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/80 dark:border-slate-800 p-5 sm:p-6 shadow-xs space-y-6">
@@ -802,47 +903,87 @@ export default function ClientPortalOverview({
                                     <TrendingUp className="size-5" />
                                 </div>
                                 <div>
-                                    <h2 className="font-extrabold text-slate-900 dark:text-white text-base">Monthly Services by Category</h2>
-                                    <p className="text-xs text-slate-400 font-medium">Subscription Spend by Service Domain</p>
+                                    <h2 className="font-extrabold text-slate-900 dark:text-white text-base">
+                                        {canViewServiceBudget ? 'Monthly Services by Category' : 'Active Services by Domain'}
+                                    </h2>
+                                    <p className="text-xs text-slate-400 font-medium">
+                                        {canViewServiceBudget ? 'Subscription Spend by Service Domain' : 'Service Distribution Across Categories'}
+                                    </p>
                                 </div>
                             </div>
                             <span className="text-xs font-bold text-cyan-600 dark:text-cyan-400 font-mono bg-cyan-50 dark:bg-cyan-950/60 px-3 py-1.5 rounded-xl border border-cyan-200 dark:border-cyan-800">
-                                {formatCurrency(totalServicesMonthly)} / mo
+                                {canViewServiceBudget ? `${formatCurrency(totalServicesMonthly)} / mo` : `${clientServicesList.length} Active Services`}
                             </span>
                         </div>
 
-                        {servicesCategoryData.length > 0 ? (
-                            <div className="h-64 w-full">
-                                <ResponsiveContainer width="100%" height="100%">
-                                    <BarChart data={servicesCategoryData} margin={{ top: 10, right: 10, left: -10, bottom: 0 }}>
-                                        <defs>
-                                            <linearGradient id="serviceGrad" x1="0" y1="0" x2="0" y2="1">
-                                                <stop offset="0%" stopColor="#06b6d4" stopOpacity={1} />
-                                                <stop offset="100%" stopColor="#0891b2" stopOpacity={0.8} />
-                                            </linearGradient>
-                                        </defs>
-                                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#3341551a" />
-                                        <XAxis dataKey="category" stroke="#94a3b8" fontSize={11} tickLine={false} />
-                                        <YAxis stroke="#94a3b8" fontSize={11} tickLine={false} tickFormatter={(val) => `${val >= 1000 ? `${(val / 1000).toFixed(0)}k` : val}`} />
-                                        <Tooltip
-                                            contentStyle={{
-                                                backgroundColor: '#0f172a',
-                                                borderColor: '#1e293b',
-                                                borderRadius: '12px',
-                                                color: '#fff',
-                                                fontSize: '12px',
-                                            }}
-                                            formatter={(val: any) => [formatCurrency(val), 'Monthly Fee']}
-                                        />
-                                        <Bar dataKey="MonthlyInvestment" fill="url(#serviceGrad)" radius={[8, 8, 0, 0]} maxBarSize={44} />
-                                    </BarChart>
-                                </ResponsiveContainer>
-                            </div>
+                        {canViewServiceBudget ? (
+                            servicesCategoryData.length > 0 ? (
+                                <div className="h-64 w-full">
+                                    <ResponsiveContainer width="100%" height="100%">
+                                        <BarChart data={servicesCategoryData} margin={{ top: 10, right: 10, left: -10, bottom: 0 }}>
+                                            <defs>
+                                                <linearGradient id="serviceGrad" x1="0" y1="0" x2="0" y2="1">
+                                                    <stop offset="0%" stopColor="#06b6d4" stopOpacity={1} />
+                                                    <stop offset="100%" stopColor="#0891b2" stopOpacity={0.8} />
+                                                </linearGradient>
+                                            </defs>
+                                            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#3341551a" />
+                                            <XAxis dataKey="category" stroke="#94a3b8" fontSize={11} tickLine={false} />
+                                            <YAxis stroke="#94a3b8" fontSize={11} tickLine={false} tickFormatter={(val) => `${val >= 1000 ? `${(val / 1000).toFixed(0)}k` : val}`} />
+                                            <Tooltip
+                                                contentStyle={{
+                                                    backgroundColor: '#0f172a',
+                                                    borderColor: '#1e293b',
+                                                    borderRadius: '12px',
+                                                    color: '#fff',
+                                                    fontSize: '12px',
+                                                }}
+                                                formatter={(val: any) => [formatCurrency(val), 'Monthly Fee']}
+                                            />
+                                            <Bar dataKey="MonthlyInvestment" fill="url(#serviceGrad)" radius={[8, 8, 0, 0]} maxBarSize={44} />
+                                        </BarChart>
+                                    </ResponsiveContainer>
+                                </div>
+                            ) : (
+                                <div className="h-64 flex flex-col items-center justify-center text-slate-400 text-sm italic">
+                                    <LineChart className="size-10 mb-2 opacity-30 text-cyan-500" />
+                                    No active monthly services configured yet.
+                                </div>
+                            )
                         ) : (
-                            <div className="h-64 flex flex-col items-center justify-center text-slate-400 text-sm italic">
-                                <LineChart className="size-10 mb-2 opacity-30 text-cyan-500" />
-                                No active monthly services configured yet.
-                            </div>
+                            servicesCategoryCountData.length > 0 ? (
+                                <div className="h-64 w-full">
+                                    <ResponsiveContainer width="100%" height="100%">
+                                        <BarChart data={servicesCategoryCountData} margin={{ top: 10, right: 10, left: -10, bottom: 0 }}>
+                                            <defs>
+                                                <linearGradient id="serviceCountGrad" x1="0" y1="0" x2="0" y2="1">
+                                                    <stop offset="0%" stopColor="#06b6d4" stopOpacity={1} />
+                                                    <stop offset="100%" stopColor="#0891b2" stopOpacity={0.8} />
+                                                </linearGradient>
+                                            </defs>
+                                            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#3341551a" />
+                                            <XAxis dataKey="category" stroke="#94a3b8" fontSize={11} tickLine={false} />
+                                            <YAxis stroke="#94a3b8" fontSize={11} tickLine={false} />
+                                            <Tooltip
+                                                contentStyle={{
+                                                    backgroundColor: '#0f172a',
+                                                    borderColor: '#1e293b',
+                                                    borderRadius: '12px',
+                                                    color: '#fff',
+                                                    fontSize: '12px',
+                                                }}
+                                                formatter={(val: any) => [`${val} Services`, 'Count']}
+                                            />
+                                            <Bar dataKey="ActiveServices" fill="url(#serviceCountGrad)" radius={[8, 8, 0, 0]} maxBarSize={44} />
+                                        </BarChart>
+                                    </ResponsiveContainer>
+                                </div>
+                            ) : (
+                                <div className="h-64 flex flex-col items-center justify-center text-slate-400 text-sm italic">
+                                    <LineChart className="size-10 mb-2 opacity-30 text-cyan-500" />
+                                    No active services configured yet.
+                                </div>
+                            )
                         )}
                     </div>
                 </div>
@@ -887,17 +1028,19 @@ export default function ClientPortalOverview({
                             <span>3. Domains & Hosting ({domainsList.length + hostingsList.length})</span>
                         </button>
 
-                        <button
-                            type="button"
-                            onClick={() => setActiveTabSection('invoices')}
-                            className={`px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-2 ${activeTabSection === 'invoices'
-                                ? 'bg-gradient-to-r from-[#003796] via-[#0052D4] to-[#1d4ed8] text-white shadow-md shadow-blue-600/20'
-                                : 'text-slate-600 dark:text-slate-400 hover:bg-white dark:hover:bg-slate-800'
-                                }`}
-                        >
-                            <Receipt className="size-4" />
-                            <span>4. Invoices & Billing ({invoicesList.length})</span>
-                        </button>
+                        {canViewInvoices && (
+                            <button
+                                type="button"
+                                onClick={() => setActiveTabSection('invoices')}
+                                className={`px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-2 ${activeTabSection === 'invoices'
+                                    ? 'bg-gradient-to-r from-[#003796] via-[#0052D4] to-[#1d4ed8] text-white shadow-md shadow-blue-600/20'
+                                    : 'text-slate-600 dark:text-slate-400 hover:bg-white dark:hover:bg-slate-800'
+                                    }`}
+                            >
+                                <Receipt className="size-4" />
+                                <span>4. Invoices & Billing ({invoicesList.length})</span>
+                            </button>
+                        )}
                     </div>
 
                     {/* TAB 1: Projects Showcase */}
@@ -1156,7 +1299,7 @@ export default function ClientPortalOverview({
                     )}
 
                     {/* TAB 4: Invoices & Statements */}
-                    {activeTabSection === 'invoices' && (
+                    {activeTabSection === 'invoices' && canViewInvoices && (
                         <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/80 dark:border-slate-800 overflow-hidden shadow-xs">
                             <div className="p-5 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between bg-slate-50/50 dark:bg-slate-900/50">
                                 <div>

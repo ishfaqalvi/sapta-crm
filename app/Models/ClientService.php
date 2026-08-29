@@ -59,4 +59,9 @@ class ClientService extends Model
     {
         return $this->hasMany(ClientDocument::class, 'client_service_id');
     }
+
+    public function tasks(): HasMany
+    {
+        return $this->hasMany(ServiceTask::class, 'client_service_id');
+    }
 }

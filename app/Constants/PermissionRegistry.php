@@ -13,6 +13,7 @@ class PermissionRegistry
             // 1. Core & Operations
             'Executive Dashboard' => [
                 'view-dashboard',
+                'view-dashboard-budget',
             ],
             'Client Hub' => [
                 'view-clients',
@@ -146,6 +147,7 @@ class PermissionRegistry
             // 1. Overview
             'Portal Overview' => [
                 'view-client-portal-overview',
+                'view-client-portal-overview-budget',
             ],
 
             // 2. Projects & Sub-tabs
@@ -187,6 +189,12 @@ class PermissionRegistry
                 'edit-client-portal-services',
                 'delete-client-portal-services',
                 'view-client-portal-service-budget',
+            ],
+            'Service Tasks & Timeline' => [
+                'view-client-portal-service-tasks',
+                'create-client-portal-service-tasks',
+                'edit-client-portal-service-tasks',
+                'delete-client-portal-service-tasks',
             ],
             'Service Credentials' => [
                 'view-client-portal-service-credentials',

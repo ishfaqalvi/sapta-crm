@@ -77,6 +77,11 @@ class Employee extends Model
         return $this->hasMany(ProjectTask::class, 'assigned_employee_id');
     }
 
+    public function serviceTasks(): HasMany
+    {
+        return $this->hasMany(ServiceTask::class, 'assigned_employee_id');
+    }
+
     /**
      * Mutator for avatar attribute.
      */

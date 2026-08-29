@@ -33,7 +33,7 @@ export function ClientSidebar({ client, activeTab }: ClientSidebarProps) {
     const page = usePage();
     const currentUrl = page.url;
     const authUser = (page.props.auth as any)?.user;
-    const isAdmin = authUser?.type === 'admin';
+    const isStaff = authUser?.type === 'admin' || authUser?.type === 'employee' || authUser?.roles?.includes('Super Admin') || authUser?.roles?.includes('Employee') || authUser?.roles?.includes('admin');
 
     const activeRef = useRef<HTMLAnchorElement | null>(null);
 
@@ -205,7 +205,7 @@ export function ClientSidebar({ client, activeTab }: ClientSidebarProps) {
 
             {/* Footer */}
             <SidebarFooter className="p-3 border-t border-slate-200/50 dark:border-slate-800/50 space-y-2">
-                {isAdmin ? (
+                {isStaff ? (
                     <Link
                         href="/clients"
                         className="flex items-center justify-center gap-2 w-full py-2.5 px-3 rounded-xl bg-slate-100/80 dark:bg-slate-800/80 hover:bg-slate-200/80 dark:hover:bg-slate-700/80 text-slate-700 dark:text-slate-300 text-xs font-bold transition-all border border-slate-200/60 dark:border-slate-800/60 backdrop-blur-md"

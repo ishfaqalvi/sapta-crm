@@ -52,8 +52,33 @@ class ProjectController extends Controller
         $search = $request->query('search');
         $status = $request->query('status');
 
-        $projects = WebsiteProject::with(['category', 'payments', 'tasks.assignedEmployee'])
-            ->where('client_id', $clientId)
+        $user = Auth::user();
+        $employee = null;
+        if ($user && ($user->type === 'employee' || $user->employee_id)) {
+            $employee = $user->employee ?: Employee::where('user_id', $user->id)->first();
+        }
+
+        $projectsQuery = WebsiteProject::with([
+            'category',
+            'payments',
+            'tasks' => function ($q) use ($user, $employee) {
+                if ($user && $user->type === 'employee') {
+                    $employeeId = $employee ? $employee->id : 0;
+                    $q->where('assigned_employee_id', $employeeId);
+                }
+                $q->with('assignedEmployee');
+            },
+        ])
+            ->where('client_id', $clientId);
+
+        if ($user && $user->type === 'employee') {
+            $employeeId = $employee ? $employee->id : 0;
+            $projectsQuery->whereHas('tasks', function ($query) use ($employeeId) {
+                $query->where('assigned_employee_id', $employeeId);
+            });
+        }
+
+        $projects = $projectsQuery
             ->when($search, function ($query, $search) {
                 $query->where('project_name', 'like', "%{$search}%");
             })
@@ -64,7 +89,14 @@ class ProjectController extends Controller
             ->paginate(12)
             ->withQueryString();
 
-        $allProjects = WebsiteProject::with('payments')->where('client_id', $clientId)->get();
+        $allProjectsQuery = WebsiteProject::with('payments')->where('client_id', $clientId);
+        if ($user && $user->type === 'employee') {
+            $employeeId = $employee ? $employee->id : 0;
+            $allProjectsQuery->whereHas('tasks', function ($query) use ($employeeId) {
+                $query->where('assigned_employee_id', $employeeId);
+            });
+        }
+        $allProjects = $allProjectsQuery->get();
 
         $totalBudget = (float) $allProjects->sum('total_budget');
         $totalCollected = (float) $allProjects->sum(function ($proj) {
@@ -116,6 +148,14 @@ class ProjectController extends Controller
         $employee = null;
         if ($user && ($user->type === 'employee' || $user->employee_id)) {
             $employee = $user->employee ?: Employee::where('user_id', $user->id)->first();
+        }
+
+        if ($user && $user->type === 'employee') {
+            $employeeId = $employee ? $employee->id : 0;
+            $hasAssignedTask = $project->tasks()->where('assigned_employee_id', $employeeId)->exists();
+            if (!$hasAssignedTask) {
+                abort(403, 'Unauthorized access: No tasks assigned to you on this project.');
+            }
         }
 
         $project->load([
