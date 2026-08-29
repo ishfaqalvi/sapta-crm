@@ -15,6 +15,11 @@ class ServiceCategoryController extends Controller
      */
     public function index(Request $request): Response
     {
+        $user = auth()->user();
+        if (!$user || (!$user->hasRole('Super Admin') && !$user->hasPermissionTo('view-service-categories') && !$user->can('view-service-categories'))) {
+            abort(403, 'Unauthorized. You do not have permission to view service categories.');
+        }
+
         $query = ServiceCategory::query()->withCount('services');
 
         if ($request->filled('search')) {
@@ -50,6 +55,11 @@ class ServiceCategoryController extends Controller
      */
     public function store(Request $request): RedirectResponse
     {
+        $user = auth()->user();
+        if (!$user || (!$user->hasRole('Super Admin') && !$user->hasPermissionTo('create-service-categories') && !$user->can('create-service-categories'))) {
+            abort(403, 'Unauthorized. You do not have permission to create service categories.');
+        }
+
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:255', 'unique:service_categories,name'],
             'is_active' => ['boolean'],
@@ -65,6 +75,11 @@ class ServiceCategoryController extends Controller
      */
     public function update(Request $request, ServiceCategory $serviceCategory): RedirectResponse
     {
+        $user = auth()->user();
+        if (!$user || (!$user->hasRole('Super Admin') && !$user->hasPermissionTo('edit-service-categories') && !$user->can('edit-service-categories'))) {
+            abort(403, 'Unauthorized. You do not have permission to edit service categories.');
+        }
+
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:255', 'unique:service_categories,name,' . $serviceCategory->id],
             'is_active' => ['boolean'],
@@ -80,6 +95,11 @@ class ServiceCategoryController extends Controller
      */
     public function destroy(ServiceCategory $serviceCategory): RedirectResponse
     {
+        $user = auth()->user();
+        if (!$user || (!$user->hasRole('Super Admin') && !$user->hasPermissionTo('delete-service-categories') && !$user->can('delete-service-categories'))) {
+            abort(403, 'Unauthorized. You do not have permission to delete service categories.');
+        }
+
         if ($serviceCategory->services()->count() > 0) {
             return redirect()->back()->with('error', 'Cannot delete service category assigned to existing client services/retainers.');
         }

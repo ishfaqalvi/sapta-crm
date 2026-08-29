@@ -135,6 +135,12 @@ class PermissionRegistry
                 'view-settings',
                 'edit-settings',
             ],
+            'Database Backups' => [
+                'view-database-backups',
+                'create-database-backups',
+                'download-database-backups',
+                'delete-database-backups',
+            ],
         ];
     }
 

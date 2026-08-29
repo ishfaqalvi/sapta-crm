@@ -17,6 +17,11 @@ class DepartmentController extends Controller
      */
     public function index(Request $request): Response
     {
+        $user = auth()->user();
+        if (!$user || (!$user->hasRole('Super Admin') && !$user->hasPermissionTo('view-departments') && !$user->can('view-departments'))) {
+            abort(403, 'Unauthorized. You do not have permission to view departments.');
+        }
+
         $search = $request->query('search');
 
         $departments = Department::with([
@@ -50,6 +55,11 @@ class DepartmentController extends Controller
      */
     public function store(Request $request): RedirectResponse
     {
+        $user = auth()->user();
+        if (!$user || (!$user->hasRole('Super Admin') && !$user->hasPermissionTo('create-departments') && !$user->can('create-departments'))) {
+            abort(403, 'Unauthorized. You do not have permission to create departments.');
+        }
+
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:255'],
             'code' => ['required', 'string', 'max:50', Rule::unique('departments', 'code')],
@@ -72,6 +82,11 @@ class DepartmentController extends Controller
      */
     public function update(Request $request, Department $department): RedirectResponse
     {
+        $user = auth()->user();
+        if (!$user || (!$user->hasRole('Super Admin') && !$user->hasPermissionTo('edit-departments') && !$user->can('edit-departments'))) {
+            abort(403, 'Unauthorized. You do not have permission to edit departments.');
+        }
+
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:255'],
             'code' => ['required', 'string', 'max:50', Rule::unique('departments', 'code')->ignore($department->id)],
@@ -94,6 +109,11 @@ class DepartmentController extends Controller
      */
     public function destroy(Department $department): RedirectResponse
     {
+        $user = auth()->user();
+        if (!$user || (!$user->hasRole('Super Admin') && !$user->hasPermissionTo('delete-departments') && !$user->can('delete-departments'))) {
+            abort(403, 'Unauthorized. You do not have permission to delete departments.');
+        }
+
         if ($department->employees()->count() > 0) {
             return redirect()->back()->with('error', 'Cannot delete department assigned to existing employees.');
         }
@@ -115,6 +135,11 @@ class DepartmentController extends Controller
      */
     public function storeSubDepartment(Request $request): RedirectResponse
     {
+        $user = auth()->user();
+        if (!$user || (!$user->hasRole('Super Admin') && !$user->hasPermissionTo('create-departments') && !$user->can('create-departments'))) {
+            abort(403, 'Unauthorized. You do not have permission to create sub-departments.');
+        }
+
         $validated = $request->validate([
             'department_id' => ['required', 'exists:departments,id'],
             'name' => ['required', 'string', 'max:255'],
@@ -139,6 +164,11 @@ class DepartmentController extends Controller
      */
     public function updateSubDepartment(Request $request, SubDepartment $subDepartment): RedirectResponse
     {
+        $user = auth()->user();
+        if (!$user || (!$user->hasRole('Super Admin') && !$user->hasPermissionTo('edit-departments') && !$user->can('edit-departments'))) {
+            abort(403, 'Unauthorized. You do not have permission to edit sub-departments.');
+        }
+
         $validated = $request->validate([
             'department_id' => ['required', 'exists:departments,id'],
             'name' => ['required', 'string', 'max:255'],
@@ -163,6 +193,11 @@ class DepartmentController extends Controller
      */
     public function destroySubDepartment(SubDepartment $subDepartment): RedirectResponse
     {
+        $user = auth()->user();
+        if (!$user || (!$user->hasRole('Super Admin') && !$user->hasPermissionTo('delete-departments') && !$user->can('delete-departments'))) {
+            abort(403, 'Unauthorized. You do not have permission to delete sub-departments.');
+        }
+
         if ($subDepartment->employees()->count() > 0) {
             return redirect()->back()->with('error', 'Cannot delete sub-department assigned to existing employees.');
         }

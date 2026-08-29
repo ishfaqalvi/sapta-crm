@@ -16,6 +16,11 @@ class DesignationController extends Controller
      */
     public function index(Request $request): Response
     {
+        $user = auth()->user();
+        if (!$user || (!$user->hasRole('Super Admin') && !$user->hasPermissionTo('view-designations') && !$user->can('view-designations'))) {
+            abort(403, 'Unauthorized. You do not have permission to view designations.');
+        }
+
         $search = $request->query('search');
 
         $designations = Designation::with('department')
@@ -46,6 +51,11 @@ class DesignationController extends Controller
      */
     public function store(Request $request): RedirectResponse
     {
+        $user = auth()->user();
+        if (!$user || (!$user->hasRole('Super Admin') && !$user->hasPermissionTo('create-designations') && !$user->can('create-designations'))) {
+            abort(403, 'Unauthorized. You do not have permission to create designations.');
+        }
+
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:255'],
             'department_id' => ['nullable', 'exists:departments,id'],
@@ -68,6 +78,11 @@ class DesignationController extends Controller
      */
     public function update(Request $request, Designation $designation): RedirectResponse
     {
+        $user = auth()->user();
+        if (!$user || (!$user->hasRole('Super Admin') && !$user->hasPermissionTo('edit-designations') && !$user->can('edit-designations'))) {
+            abort(403, 'Unauthorized. You do not have permission to edit designations.');
+        }
+
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:255'],
             'department_id' => ['nullable', 'exists:departments,id'],
@@ -90,6 +105,11 @@ class DesignationController extends Controller
      */
     public function destroy(Designation $designation): RedirectResponse
     {
+        $user = auth()->user();
+        if (!$user || (!$user->hasRole('Super Admin') && !$user->hasPermissionTo('delete-designations') && !$user->can('delete-designations'))) {
+            abort(403, 'Unauthorized. You do not have permission to delete designations.');
+        }
+
         if ($designation->employees()->count() > 0) {
             return redirect()->back()->with('error', 'Cannot delete designation assigned to existing employees.');
         }

@@ -15,6 +15,11 @@ class ProjectCategoryController extends Controller
      */
     public function index(Request $request): Response
     {
+        $user = auth()->user();
+        if (!$user || (!$user->hasRole('Super Admin') && !$user->hasPermissionTo('view-project-categories') && !$user->can('view-project-categories'))) {
+            abort(403, 'Unauthorized. You do not have permission to view project categories.');
+        }
+
         $query = ProjectCategory::query()->withCount('projects');
 
         if ($request->filled('search')) {
@@ -50,6 +55,11 @@ class ProjectCategoryController extends Controller
      */
     public function store(Request $request): RedirectResponse
     {
+        $user = auth()->user();
+        if (!$user || (!$user->hasRole('Super Admin') && !$user->hasPermissionTo('create-project-categories') && !$user->can('create-project-categories'))) {
+            abort(403, 'Unauthorized. You do not have permission to create project categories.');
+        }
+
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:255', 'unique:project_categories,name'],
             'is_active' => ['boolean'],
@@ -65,6 +75,11 @@ class ProjectCategoryController extends Controller
      */
     public function update(Request $request, ProjectCategory $projectCategory): RedirectResponse
     {
+        $user = auth()->user();
+        if (!$user || (!$user->hasRole('Super Admin') && !$user->hasPermissionTo('edit-project-categories') && !$user->can('edit-project-categories'))) {
+            abort(403, 'Unauthorized. You do not have permission to edit project categories.');
+        }
+
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:255', 'unique:project_categories,name,' . $projectCategory->id],
             'is_active' => ['boolean'],
@@ -80,6 +95,11 @@ class ProjectCategoryController extends Controller
      */
     public function destroy(ProjectCategory $projectCategory): RedirectResponse
     {
+        $user = auth()->user();
+        if (!$user || (!$user->hasRole('Super Admin') && !$user->hasPermissionTo('delete-project-categories') && !$user->can('delete-project-categories'))) {
+            abort(403, 'Unauthorized. You do not have permission to delete project categories.');
+        }
+
         if ($projectCategory->projects()->count() > 0) {
             return redirect()->back()->with('error', 'Cannot delete category assigned to existing projects.');
         }

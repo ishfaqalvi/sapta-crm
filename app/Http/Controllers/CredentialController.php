@@ -18,6 +18,11 @@ class CredentialController extends Controller
      */
     public function index(Request $request): Response
     {
+        $user = auth()->user();
+        if (!$user || (!$user->hasRole('Super Admin') && !$user->hasPermissionTo('view-credentials') && !$user->can('view-credentials'))) {
+            abort(403, 'Unauthorized. You do not have permission to view credentials vault.');
+        }
+
         $search = $request->query('search');
         $type = $request->query('type');
         $clientId = $request->query('client_id');

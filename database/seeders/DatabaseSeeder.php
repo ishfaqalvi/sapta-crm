@@ -15,14 +15,14 @@ class DatabaseSeeder extends Seeder
             PermissionSeeder::class,
             RoleSeeder::class,
             AdminUserSeeder::class,
-            EmployeeSeeder::class,
-            ProjectCategorySeeder::class,
-            TaskCategorySeeder::class,
-            ServiceCategorySeeder::class,
-            IncomeCategorySeeder::class,
-            ExpenseCategorySeeder::class,
-            ClientSeeder::class,
-            ClientUserSeeder::class,
+            // EmployeeSeeder::class,
+            // ProjectCategorySeeder::class,
+            // TaskCategorySeeder::class,
+            // ServiceCategorySeeder::class,
+            // IncomeCategorySeeder::class,
+            // ExpenseCategorySeeder::class,
+            // ClientSeeder::class,
+            // ClientUserSeeder::class,
         ]);
     }
 }

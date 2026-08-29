@@ -42,7 +42,8 @@ use App\Http\Controllers\{
     ReportController,
     NotificationController,
     MyTaskController,
-    TaskMessageController
+    TaskMessageController,
+    DatabaseBackupController
 };
 use App\Http\Controllers\Settings\{
     ProfileController,
@@ -630,5 +631,17 @@ Route::middleware(['web', 'admin.access'])->group(function () {
     Route::controller(SystemSettingsController::class)->as('settings.')->group(function () {
         Route::get('settings', 'index')->name('index');
         Route::post('settings', 'update')->name('update');
+    });
+
+    /*
+    |--------------------------------------------------------------------------
+    | Database Backup & System Recovery Routes
+    |--------------------------------------------------------------------------
+    */
+    Route::controller(DatabaseBackupController::class)->prefix('database-backups')->as('database-backups.')->group(function () {
+        Route::get('/', 'index')->name('index');
+        Route::post('create', 'create')->name('create');
+        Route::get('download/{filename}', 'download')->name('download');
+        Route::delete('destroy/{filename}', 'destroy')->name('destroy');
     });
 });

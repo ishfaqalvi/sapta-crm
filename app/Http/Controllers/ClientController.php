@@ -19,6 +19,11 @@ class ClientController extends Controller
      */
     public function index(Request $request): Response
     {
+        $user = auth()->user();
+        if (!$user || (!$user->hasRole('Super Admin') && !$user->hasPermissionTo('view-clients') && !$user->can('view-clients'))) {
+            abort(403, 'Unauthorized. You do not have permission to view clients.');
+        }
+
         $search = $request->query('search');
         $status = $request->query('status');
         $currency = $request->query('currency');
@@ -76,6 +81,11 @@ class ClientController extends Controller
      */
     public function create(): Response
     {
+        $user = auth()->user();
+        if (!$user || (!$user->hasRole('Super Admin') && !$user->hasPermissionTo('create-clients') && !$user->can('create-clients'))) {
+            abort(403, 'Unauthorized. You do not have permission to create clients.');
+        }
+
         return Inertia::render('clients/create', [
             'next_client_code' => Client::generateClientCode(),
             'currencies' => Currency::where('is_active', true)->select('code', 'name', 'symbol')->get(),
@@ -87,6 +97,11 @@ class ClientController extends Controller
      */
     public function show(Client $client): RedirectResponse
     {
+        $user = auth()->user();
+        if (!$user || (!$user->hasRole('Super Admin') && !$user->hasPermissionTo('view-clients') && !$user->can('view-clients'))) {
+            abort(403, 'Unauthorized. You do not have permission to access this client workspace.');
+        }
+
         $this->setActiveClientContext($client->id);
 
         return redirect()->route('client-portal.overview.index');
@@ -97,6 +112,11 @@ class ClientController extends Controller
      */
     public function edit(Client $client): Response
     {
+        $user = auth()->user();
+        if (!$user || (!$user->hasRole('Super Admin') && !$user->hasPermissionTo('edit-clients') && !$user->can('edit-clients'))) {
+            abort(403, 'Unauthorized. You do not have permission to edit client details.');
+        }
+
         return Inertia::render('clients/edit', [
             'client' => $client,
             'currencies' => Currency::where('is_active', true)->select('code', 'name', 'symbol')->get(),
@@ -108,6 +128,11 @@ class ClientController extends Controller
      */
     public function store(Request $request): RedirectResponse
     {
+        $user = auth()->user();
+        if (!$user || (!$user->hasRole('Super Admin') && !$user->hasPermissionTo('create-clients') && !$user->can('create-clients'))) {
+            abort(403, 'Unauthorized. You do not have permission to create clients.');
+        }
+
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:255'],
             'company_name' => ['nullable', 'string', 'max:255'],
@@ -134,6 +159,11 @@ class ClientController extends Controller
      */
     public function update(Request $request, Client $client): RedirectResponse
     {
+        $user = auth()->user();
+        if (!$user || (!$user->hasRole('Super Admin') && !$user->hasPermissionTo('edit-clients') && !$user->can('edit-clients'))) {
+            abort(403, 'Unauthorized. You do not have permission to edit client details.');
+        }
+
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:255'],
             'company_name' => ['nullable', 'string', 'max:255'],
@@ -158,6 +188,11 @@ class ClientController extends Controller
      */
     public function destroy(Client $client): RedirectResponse
     {
+        $user = auth()->user();
+        if (!$user || (!$user->hasRole('Super Admin') && !$user->hasPermissionTo('delete-clients') && !$user->can('delete-clients'))) {
+            abort(403, 'Unauthorized. You do not have permission to delete clients.');
+        }
+
         if ($client->user) {
             $client->user->delete();
         }

@@ -22,6 +22,11 @@ class EmployeeController extends Controller
      */
     public function index(Request $request): Response
     {
+        $user = auth()->user();
+        if (!$user || (!$user->hasRole('Super Admin') && !$user->hasPermissionTo('view-employees') && !$user->can('view-employees'))) {
+            abort(403, 'Unauthorized. You do not have permission to view employees directory.');
+        }
+
         $search = $request->query('search');
         $departmentId = $request->query('department_id');
         $status = $request->query('status');
@@ -63,6 +68,11 @@ class EmployeeController extends Controller
      */
     public function create(): Response
     {
+        $user = auth()->user();
+        if (!$user || (!$user->hasRole('Super Admin') && !$user->hasPermissionTo('create-employees') && !$user->can('create-employees'))) {
+            abort(403, 'Unauthorized. You do not have permission to create employees.');
+        }
+
         $departments = Department::with('subDepartments')->where('is_active', true)->get();
         $designations = Designation::where('is_active', true)->get();
         $users = User::select('id', 'name', 'email', 'type')->get();
@@ -81,6 +91,11 @@ class EmployeeController extends Controller
      */
     public function store(Request $request): RedirectResponse
     {
+        $user = auth()->user();
+        if (!$user || (!$user->hasRole('Super Admin') && !$user->hasPermissionTo('create-employees') && !$user->can('create-employees'))) {
+            abort(403, 'Unauthorized. You do not have permission to create employees.');
+        }
+
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:255'],
             'email' => ['required', 'email', 'max:255', Rule::unique('employees', 'email')],
@@ -185,6 +200,11 @@ class EmployeeController extends Controller
      */
     public function show(Employee $employee): Response
     {
+        $user = auth()->user();
+        if (!$user || (!$user->hasRole('Super Admin') && !$user->hasPermissionTo('view-employees') && !$user->can('view-employees') && (int)$user->employee_id !== (int)$employee->id)) {
+            abort(403, 'Unauthorized. You do not have permission to view this employee profile.');
+        }
+
         $employee->load([
             'department',
             'subDepartment',
@@ -208,6 +228,11 @@ class EmployeeController extends Controller
      */
     public function edit(Employee $employee): Response
     {
+        $user = auth()->user();
+        if (!$user || (!$user->hasRole('Super Admin') && !$user->hasPermissionTo('edit-employees') && !$user->can('edit-employees'))) {
+            abort(403, 'Unauthorized. You do not have permission to edit employee profiles.');
+        }
+
         $departments = Department::with('subDepartments')->where('is_active', true)->get();
         $designations = Designation::where('is_active', true)->get();
         $users = User::select('id', 'name', 'email', 'type')->get();
@@ -229,6 +254,11 @@ class EmployeeController extends Controller
      */
     public function update(Request $request, Employee $employee): RedirectResponse
     {
+        $user = auth()->user();
+        if (!$user || (!$user->hasRole('Super Admin') && !$user->hasPermissionTo('edit-employees') && !$user->can('edit-employees'))) {
+            abort(403, 'Unauthorized. You do not have permission to edit employee profiles.');
+        }
+
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:255'],
             'email' => ['required', 'email', 'max:255', Rule::unique('employees', 'email')->ignore($employee->id)],
@@ -327,6 +357,11 @@ class EmployeeController extends Controller
      */
     public function destroy(Employee $employee): RedirectResponse
     {
+        $user = auth()->user();
+        if (!$user || (!$user->hasRole('Super Admin') && !$user->hasPermissionTo('delete-employees') && !$user->can('delete-employees'))) {
+            abort(403, 'Unauthorized. You do not have permission to delete employee profiles.');
+        }
+
         if ($employee->user_id) {
             User::where('id', $employee->user_id)->delete();
         }

@@ -33,7 +33,12 @@ export function ClientSidebar({ client, activeTab }: ClientSidebarProps) {
     const page = usePage();
     const currentUrl = page.url;
     const authUser = (page.props.auth as any)?.user;
-    const isStaff = authUser?.type === 'admin' || authUser?.type === 'employee' || authUser?.roles?.includes('Super Admin') || authUser?.roles?.includes('Employee') || authUser?.roles?.includes('admin');
+    const isStaff =
+        authUser?.type === 'admin' ||
+        authUser?.type === 'employee' ||
+        Boolean(authUser?.employee_id) ||
+        authUser?.roles?.some((r: string) => ['admin', 'super admin', 'employee', 'manager', 'hr', 'staff'].includes(String(r).toLowerCase())) ||
+        (authUser?.type && authUser.type !== 'client');
 
     const activeRef = useRef<HTMLAnchorElement | null>(null);
 
@@ -207,7 +212,7 @@ export function ClientSidebar({ client, activeTab }: ClientSidebarProps) {
             <SidebarFooter className="p-3 border-t border-slate-200/50 dark:border-slate-800/50 space-y-2">
                 {isStaff ? (
                     <Link
-                        href="/clients"
+                        href="/dashboard"
                         className="flex items-center justify-center gap-2 w-full py-2.5 px-3 rounded-xl bg-slate-100/80 dark:bg-slate-800/80 hover:bg-slate-200/80 dark:hover:bg-slate-700/80 text-slate-700 dark:text-slate-300 text-xs font-bold transition-all border border-slate-200/60 dark:border-slate-800/60 backdrop-blur-md"
                     >
                         <ArrowLeft className="size-4 text-blue-600 dark:text-blue-400" />
