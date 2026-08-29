@@ -523,7 +523,7 @@ Route::middleware(['web', 'admin.access'])->group(function () {
 
     /*
     |--------------------------------------------------------------------------
-    | Department & Sub-Department Routes
+    | Department Routes
     |--------------------------------------------------------------------------
     */
     Route::controller(DepartmentController::class)->prefix('departments')->as('departments.')->group(function () {
@@ -531,9 +531,17 @@ Route::middleware(['web', 'admin.access'])->group(function () {
         Route::post('/', 'store')->name('store');
         Route::put('/{department}', 'update')->name('update');
         Route::delete('/{department}', 'destroy')->name('destroy');
-        Route::post('sub-departments', 'storeSubDepartment')->name('sub-departments.store');
-        Route::put('sub-departments/{subDepartment}', 'updateSubDepartment')->name('sub-departments.update');
-        Route::delete('sub-departments/{subDepartment}', 'destroySubDepartment')->name('sub-departments.destroy');
+    });
+
+    /*
+    |--------------------------------------------------------------------------
+    | Sub-Department Routes
+    |--------------------------------------------------------------------------
+    */
+    Route::controller(DepartmentController::class)->prefix('sub-departments')->as('sub-departments.')->group(function () {
+        Route::post('/', 'storeSubDepartment')->name('store');
+        Route::put('/{subDepartment}', 'updateSubDepartment')->name('update');
+        Route::delete('/{subDepartment}', 'destroySubDepartment')->name('destroy');
     });
 
     /*

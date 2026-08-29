@@ -747,7 +747,7 @@ export default function DepartmentsIndex({ departments, filters }: DepartmentsIn
                                     <Button
                                         type="submit"
                                         disabled={subDeptForm.processing}
-                                        className="h-10 px-5 rounded-xl bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white text-xs font-bold shadow-md shadow-purple-600/20 active:scale-[0.99] transition-all cursor-pointer inline-flex items-center gap-2"
+                                        className="h-10 px-5 rounded-xl bg-gradient-to-r from-[#003796] via-[#0052D4] to-[#1d4ed8] hover:from-[#002a75] hover:to-[#0040b8] text-white text-xs font-bold shadow-md shadow-blue-600/20 active:scale-[0.99] transition-all cursor-pointer inline-flex items-center gap-2"
                                     >
                                         {subDeptForm.processing ? (
                                             <>
