@@ -45,7 +45,7 @@ class MyTaskController extends Controller
         $serviceId = $request->query('service_id');
 
         // 1. Project Tasks Query
-        $projectQuery = ProjectTask::with([
+        $projectQuery = ProjectTask::withCount('messages')->with([
             'websiteProject.client:id,name,company_name,client_code,currency',
             'websiteProject.category:id,name',
             'assignedEmployee:id,name,employee_code,avatar',
@@ -80,7 +80,7 @@ class MyTaskController extends Controller
         }
 
         // 2. Service Tasks Query
-        $serviceQuery = ServiceTask::with([
+        $serviceQuery = ServiceTask::withCount('messages')->with([
             'service.client:id,name,company_name,client_code,currency',
             'service.category:id,name',
             'assignedEmployee:id,name,employee_code,avatar',
@@ -155,6 +155,7 @@ class MyTaskController extends Controller
                     'description' => $t->description,
                     'completed_at' => $t->completed_at ? $t->completed_at->toISOString() : null,
                     'created_at' => $t->created_at ? $t->created_at->toISOString() : null,
+                    'messages_count' => $t->messages_count ?? 0,
                     'website_project_id' => $t->website_project_id,
                     'website_project' => $t->websiteProject ? [
                         'id' => $t->websiteProject->id,
@@ -181,6 +182,7 @@ class MyTaskController extends Controller
                     'description' => $t->description,
                     'completed_at' => $t->completed_at ? $t->completed_at->toISOString() : null,
                     'created_at' => $t->created_at ? $t->created_at->toISOString() : null,
+                    'messages_count' => $t->messages_count ?? 0,
                     'client_service_id' => $t->client_service_id,
                     'service' => $t->service ? [
                         'id' => $t->service->id,

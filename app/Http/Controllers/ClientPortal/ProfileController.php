@@ -17,27 +17,6 @@ class ProfileController extends Controller
     use AuthorizesClientPortalAccess;
 
     /**
-     * Retrieve the active client ID from session context or authenticated user.
-     */
-    protected function getClientId(): int
-    {
-        $user = Auth::user();
-
-        if ($user && $user->type === 'admin') {
-            $activeClientId = session('active_client_id');
-            if ($activeClientId) {
-                return (int) $activeClientId;
-            }
-        }
-
-        if ($user && $user->client_id) {
-            return (int) $user->client_id;
-        }
-
-        abort(403, 'Unauthorized Client Portal Access');
-    }
-
-    /**
      * Display Client Portal Profile & Account Settings Page.
      */
     public function index(): Response

@@ -3,7 +3,8 @@
 namespace App\Http\Controllers\ClientPortal;
 
 use App\Http\Controllers\Controller;
-use App\Models\{Client, WebsiteProject, Currency, SystemSetting, Employee, ProjectTask, ProjectPayment, ClientCredential, ProjectCategory, Invoice, InvoiceItem};
+use App\Models\{Client, WebsiteProject, Currency, SystemSetting, Employee, ProjectTask, ProjectPayment, ClientCredential, ProjectCategory, Invoice, InvoiceItem, User};
+use App\Notifications\CrmNotification;
 use App\Services\CurrencyService;
 use App\Traits\AuthorizesClientPortalAccess;
 use Illuminate\Http\RedirectResponse;
@@ -16,28 +17,6 @@ use Inertia\Response;
 class ProjectController extends Controller
 {
     use AuthorizesClientPortalAccess;
-
-    /**
-     * Retrieve the authenticated client ID securely.
-     */
-    protected function getClientId(): int
-    {
-        $user = Auth::user();
-
-        if (!$user || !$user->client_id) {
-            abort(403, 'Unauthorized Client Portal Access');
-        }
-
-        return (int) $user->client_id;
-    }
-
-    /**
-     * Retrieve client model with active currency.
-     */
-    protected function getClientModel(): Client
-    {
-        return Client::findOrFail($this->getClientId());
-    }
 
     /**
      * Display a listing of Website Projects for the authenticated client.
@@ -134,15 +113,15 @@ class ProjectController extends Controller
      */
     public function show(WebsiteProject $project): Response
     {
-        $this->authorizePermission('view-client-portal-projects');
+        $this->authorizePermission('view-client-portal-projects', $project);
 
-        $clientId = $this->getClientId();
+        $clientId = $this->getClientId($project->client_id);
 
         if ($project->client_id !== $clientId) {
             abort(403, 'Unauthorized access to project');
         }
 
-        $client = $this->getClientModel();
+        $client = $this->getClientModel($project->client_id);
 
         $user = Auth::user();
         $employee = null;
@@ -169,7 +148,7 @@ class ProjectController extends Controller
                     $employeeId = $employee ? $employee->id : 0;
                     $q->where('assigned_employee_id', $employeeId);
                 }
-                $q->with('assignedEmployee:id,name,employee_code,avatar')->orderBy('due_date', 'asc');
+                $q->with('assignedEmployee:id,name,employee_code,avatar')->withCount('messages')->orderBy('due_date', 'asc');
             },
             'credentials' => function ($q) {
                 $q->orderBy('created_at', 'desc');
@@ -253,8 +232,44 @@ class ProjectController extends Controller
         $validated['category_id'] = $request->filled('category_id') ? (int) $request->category_id : null;
         $validated['exchange_rate'] = $rate;
         $validated['total_budget_pkr'] = round((float) $validated['total_budget'] * $rate, 2);
+        $project = WebsiteProject::create($validated);
 
-        WebsiteProject::create($validated);
+        // Notify Client Portal User
+        $clientUser = $client->user ?: User::where('type', 'client')->where('client_id', $clientId)->first();
+        if ($clientUser) {
+            $clientUser->notify(new CrmNotification(
+                "New Project Registered: {$project->project_name}",
+                "A new project '{$project->project_name}' has been registered in your client portal with a total budget of {$project->currency} " . number_format((float) $project->total_budget, 2) . ".",
+                'project_created',
+                'info',
+                "/client-portal/projects/{$project->id}",
+                [
+                    'project_id' => $project->id,
+                    'project_name' => $project->project_name,
+                    'client_id' => $clientId,
+                ]
+            ));
+        }
+
+        // Notify Admins if created by non-admin
+        $authUser = Auth::user();
+        $admins = User::where('type', 'admin')
+            ->where('id', '!=', $authUser->id)
+            ->get();
+        foreach ($admins as $admin) {
+            $admin->notify(new CrmNotification(
+                "New Project Registered: {$project->project_name}",
+                "Project '{$project->project_name}' was registered for {$client->name} by {$authUser->name}.",
+                'project_created',
+                'info',
+                "/client-portal/projects/{$project->id}",
+                [
+                    'project_id' => $project->id,
+                    'project_name' => $project->project_name,
+                    'client_id' => $clientId,
+                ]
+            ));
+        }
 
         return redirect()->route('client-portal.projects.index')->with('success', 'Project created successfully.');
     }
@@ -381,7 +396,23 @@ class ProjectController extends Controller
             $validated['completed_at'] = now();
         }
 
-        ProjectTask::create($validated);
+        $task = ProjectTask::create($validated);
+
+        if ($task->assigned_employee_id) {
+            $employee = Employee::with('user')->find($task->assigned_employee_id);
+            if ($employee && $employee->user) {
+                $project = WebsiteProject::find($task->website_project_id);
+                $projectName = $project ? $project->project_name : 'Project';
+                $employee->user->notify(new CrmNotification(
+                    "New Task Assigned: {$task->task_title}",
+                    "You have been assigned to task '{$task->task_title}' on project '{$projectName}'.",
+                    'task_assigned',
+                    'info',
+                    "/tasks/detail/project/{$task->id}",
+                    ['task_id' => $task->id, 'type' => 'project']
+                ));
+            }
+        }
 
         return redirect()->back()->with('success', 'Project task created successfully.');
     }

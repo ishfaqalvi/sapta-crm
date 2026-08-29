@@ -41,7 +41,8 @@ use App\Http\Controllers\{
     InvoiceController,
     ReportController,
     NotificationController,
-    MyTaskController
+    MyTaskController,
+    TaskMessageController
 };
 use App\Http\Controllers\Settings\{
     ProfileController,
@@ -97,6 +98,20 @@ Route::middleware(['web', 'auth'])->group(function () {
         Route::put('{task}/status', 'updateStatus');
         Route::post('service-task/{task}/status', 'updateServiceTaskStatus')->name('service-task.status');
         Route::put('service-task/{task}/status', 'updateServiceTaskStatus');
+    });
+
+    // Dedicated Task Detail & Discussion Page
+    Route::controller(TaskMessageController::class)->prefix('tasks')->as('tasks.')->group(function () {
+        Route::get('detail/{type}/{id}', 'show')->name('detail');
+        Route::post('detail/{type}/{id}/status', 'updateStatus')->name('detail.status');
+    });
+
+    // Task Conversation & Discussion Routes
+    Route::controller(TaskMessageController::class)->prefix('task-messages')->as('task-messages.')->group(function () {
+        Route::get('{type}/{id}', 'index')->name('index');
+        Route::post('store', 'store')->name('store');
+        Route::delete('destroy/{message}', 'destroy')->name('destroy');
+        Route::post('destroy/{message}', 'destroy');
     });
 });
 

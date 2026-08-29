@@ -1,5 +1,6 @@
 import SearchableSelect from '@/components/searchable-select';
 import DocumentsTab, { type ClientDocumentItem } from '@/components/documents-tab';
+import TaskConversationModal, { type ConversationTaskInfo } from '@/components/task-conversation-modal';
 import ClientPortalLayout from '@/layouts/client-portal-layout';
 import { type BreadcrumbItem, type SharedData } from '@/types';
 import { hasPermission } from '@/utils/permissions';
@@ -26,6 +27,7 @@ import {
     Layers,
     ListTodo,
     LoaderCircle,
+    MessageSquare,
     Plus,
     Printer,
     Receipt,
@@ -55,6 +57,7 @@ interface ProjectTaskItem {
     description?: string;
     assigned_employee_id?: number | null;
     assigned_employee?: TaskEmployee;
+    messages_count?: number;
 }
 
 interface ProjectCredentialItem {
@@ -101,6 +104,12 @@ interface WebsiteProjectDetail {
     tasks?: ProjectTaskItem[];
     credentials?: ProjectCredentialItem[];
     documents?: ClientDocumentItem[];
+    client?: {
+        id: number;
+        name: string;
+        company_name?: string;
+        client_code?: string;
+    } | null;
 }
 
 interface CompanyInfo {
@@ -179,6 +188,34 @@ export default function ClientPortalProjectsShow({
     const [deletingTask, setDeletingTask] = useState<ProjectTaskItem | null>(null);
     const [isTaskSubmitting, setIsTaskSubmitting] = useState(false);
     const [taskErrors, setTaskErrors] = useState<Record<string, string>>({});
+
+    // Task Conversation State
+    const [conversationTask, setConversationTask] = useState<ConversationTaskInfo | null>(null);
+    const [isConversationOpen, setIsConversationOpen] = useState(false);
+
+    const openTaskConversation = (t: ProjectTaskItem) => {
+        const activeClient = project.client || client;
+        setConversationTask({
+            id: t.id,
+            task_title: t.task_title,
+            priority: t.priority,
+            status: t.status,
+            start_date: t.start_date,
+            due_date: t.due_date,
+            description: t.description,
+            source_type: 'project',
+            source_id: project.id,
+            source_title: project.project_name,
+            client: activeClient ? {
+                id: activeClient.id,
+                name: activeClient.name,
+                company_name: activeClient.company_name,
+                client_code: activeClient.client_code,
+            } : null,
+            assigned_employee: t.assigned_employee,
+        });
+        setIsConversationOpen(true);
+    };
 
     const [taskFormData, setTaskFormData] = useState({
         assigned_employee_id: '' as string | number,
@@ -1126,14 +1163,13 @@ export default function ClientPortalProjectsShow({
                                             project.tasks.map((task) => (
                                                 <tr key={task.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/40 transition-colors">
                                                     <td className="px-3 py-3.5 font-bold text-slate-900 dark:text-white">
-                                                        <div>
-                                                            <span>{task.task_title}</span>
-                                                            {task.description && (
-                                                                <p className="text-xs text-slate-400 font-normal line-clamp-1 mt-0.5">
-                                                                    {task.description}
-                                                                </p>
-                                                            )}
-                                                        </div>
+                                                        <Link
+                                                            href={`/tasks/detail/project/${task.id}`}
+                                                            className="text-left font-bold text-slate-900 dark:text-white hover:text-blue-600 dark:hover:text-blue-400 transition-colors block leading-snug"
+                                                            title="View Task Details & Discussion Page"
+                                                        >
+                                                            {task.task_title}
+                                                        </Link>
                                                     </td>
                                                     <td className="px-3 py-3.5 whitespace-nowrap">
                                                         {task.assigned_employee ? (
@@ -1183,6 +1219,16 @@ export default function ClientPortalProjectsShow({
                                                     </td>
                                                     <td className="px-3 py-3.5 text-right whitespace-nowrap">
                                                         <div className="flex items-center justify-end gap-1.5">
+                                                            {/* DEDICATED DETAIL & DISCUSSION PAGE LINK */}
+                                                            <Link
+                                                                href={`/tasks/detail/project/${task.id}`}
+                                                                className="h-8 px-2.5 rounded-lg bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400 hover:bg-gradient-to-r hover:from-[#003796] hover:via-[#0052D4] hover:to-[#1d4ed8] hover:text-white font-bold text-xs inline-flex items-center gap-1.5 cursor-pointer shadow-2xs transition-all border border-blue-200/50 hover:border-transparent"
+                                                                title="Open Task Details & Discussion Page"
+                                                            >
+                                                                <MessageSquare className="size-3.5" />
+                                                                <span>{task.messages_count || 0}</span>
+                                                            </Link>
+
                                                             {hasPermission(user, 'edit-client-portal-project-tasks') && (
                                                                 <button
                                                                     type="button"
@@ -1981,6 +2027,22 @@ export default function ClientPortalProjectsShow({
                         </div>
                     </div>
                 )}
+
+                {/* TASK CONVERSATION & DISCUSSION MODAL */}
+                <TaskConversationModal
+                    isOpen={isConversationOpen}
+                    onClose={() => setIsConversationOpen(false)}
+                    task={conversationTask}
+                    currentUserId={user?.id}
+                    onMessageCountChange={(taskId, newCount) => {
+                        if (project.tasks) {
+                            const target = project.tasks.find((t) => t.id === taskId);
+                            if (target) {
+                                target.messages_count = newCount;
+                            }
+                        }
+                    }}
+                />
             </div>
         </ClientPortalLayout>
     );

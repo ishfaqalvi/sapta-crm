@@ -9,6 +9,8 @@ use App\Models\ClientHosting;
 use App\Models\HostingPayment;
 use App\Models\Invoice;
 use App\Models\InvoiceItem;
+use App\Models\User;
+use App\Notifications\CrmNotification;
 use App\Services\CurrencyService;
 use App\Traits\AuthorizesClientPortalAccess;
 use Carbon\Carbon;
@@ -22,22 +24,6 @@ use Inertia\Response;
 class HostingController extends Controller
 {
     use AuthorizesClientPortalAccess;
-
-    protected function getClientId(): int
-    {
-        $user = Auth::user();
-
-        if (!$user || !$user->client_id) {
-            abort(403, 'Unauthorized Client Portal Access');
-        }
-
-        return (int) $user->client_id;
-    }
-
-    protected function getClientModel(): Client
-    {
-        return Client::findOrFail($this->getClientId());
-    }
 
     public function index(Request $request): Response
     {
@@ -81,12 +67,12 @@ class HostingController extends Controller
     {
         $this->authorizePermission('view-client-portal-hostings');
 
-        $clientId = $this->getClientId();
+        $clientId = $this->getClientId($hosting->client_id);
         if ((int) $hosting->client_id !== $clientId) {
             abort(403, 'Unauthorized access to hosting record');
         }
 
-        $client = $this->getClientModel();
+        $client = $this->getClientModel($hosting->client_id);
 
         // If hosting has no payments yet, auto-create initial setup/subscription payment
         if ($hosting->payments()->count() === 0) {
@@ -169,6 +155,23 @@ class HostingController extends Controller
             'due_date' => $hosting->setup_date ?? now()->toDateString(),
             'notes' => 'Auto-generated hosting subscription record.',
         ]);
+
+        // Notify Client Portal User
+        $clientUser = $client->user ?: User::where('type', 'client')->where('client_id', $clientId)->first();
+        if ($clientUser) {
+            $clientUser->notify(new CrmNotification(
+                "New Hosting Registered: {$hosting->hosting_title}",
+                "Hosting plan '{$hosting->hosting_title}' ({$hosting->provider}) has been registered in your client portal (Expires: {$hosting->expiry_date}).",
+                'hosting_created',
+                'info',
+                "/client-portal/hostings",
+                [
+                    'hosting_id' => $hosting->id,
+                    'hosting_title' => $hosting->hosting_title,
+                    'client_id' => $clientId,
+                ]
+            ));
+        }
 
         return redirect()->back()->with('success', 'Hosting package added successfully!');
     }

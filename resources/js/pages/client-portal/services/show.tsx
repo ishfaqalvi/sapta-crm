@@ -1,5 +1,6 @@
 import DocumentsTab, { type ClientDocumentItem } from '@/components/documents-tab';
 import SearchableSelect from '@/components/searchable-select';
+import TaskConversationModal, { type ConversationTaskInfo } from '@/components/task-conversation-modal';
 import ClientPortalLayout from '@/layouts/client-portal-layout';
 import { type BreadcrumbItem, type SharedData } from '@/types';
 import { hasPermission } from '@/utils/permissions';
@@ -25,6 +26,7 @@ import {
     ListTodo,
     LoaderCircle,
     Lock,
+    MessageSquare,
     Package,
     PauseCircle,
     Plus,
@@ -74,6 +76,7 @@ export interface ServiceTaskItem {
     description?: string | null;
     completed_at?: string | null;
     created_at?: string;
+    messages_count?: number;
     assigned_employee?: {
         id: number;
         name: string;
@@ -114,6 +117,14 @@ export interface ClientServiceDetailItem {
     tasks?: ServiceTaskItem[];
     credentials?: ServiceCredentialItem[];
     documents?: ClientDocumentItem[];
+    client?: {
+        id: number;
+        client_code: string;
+        name: string;
+        company_name?: string;
+        status: 'active' | 'inactive';
+        currency: string;
+    };
 }
 
 interface ClientPortalServiceShowProps {
@@ -298,6 +309,35 @@ export default function ClientPortalServiceShow({ client, service, employees = [
     const [isTaskModalOpen, setIsTaskModalOpen] = useState(false);
     const [editingTask, setEditingTask] = useState<ServiceTaskItem | null>(null);
     const [isTaskSubmitting, setIsTaskSubmitting] = useState(false);
+
+    // Task Conversation State
+    const [conversationTask, setConversationTask] = useState<ConversationTaskInfo | null>(null);
+    const [isConversationOpen, setIsConversationOpen] = useState(false);
+
+    const openTaskConversation = (t: ServiceTaskItem) => {
+        setConversationTask({
+            id: t.id,
+            task_title: t.task_title,
+            priority: t.priority,
+            status: t.status,
+            start_date: t.start_date,
+            due_date: t.due_date,
+            completed_at: t.completed_at,
+            description: t.description,
+            source_type: 'service',
+            source_id: service.id,
+            source_title: service.service_name,
+            client: (service.client || client) ? {
+                id: (service.client || client).id,
+                name: (service.client || client).name,
+                company_name: (service.client || client).company_name,
+                client_code: (service.client || client).client_code,
+            } : null,
+            assigned_employee: t.assigned_employee,
+        });
+        setIsConversationOpen(true);
+    };
+
     const [taskFormData, setTaskFormData] = useState({
         assigned_employee_id: '' as string | number,
         task_title: '',
@@ -1226,14 +1266,13 @@ export default function ClientPortalServiceShow({ client, service, employees = [
                                         service.tasks.map((task) => (
                                             <tr key={task.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/40 transition-colors">
                                                 <td className="px-4 py-3.5 font-bold text-slate-900 dark:text-white">
-                                                    <div>
-                                                        <span>{task.task_title}</span>
-                                                        {task.description && (
-                                                            <p className="text-xs text-slate-400 font-normal line-clamp-1 mt-0.5">
-                                                                {task.description}
-                                                            </p>
-                                                        )}
-                                                    </div>
+                                                    <Link
+                                                        href={`/tasks/detail/service/${task.id}`}
+                                                        className="text-left font-bold text-slate-900 dark:text-white hover:text-blue-600 dark:hover:text-blue-400 transition-colors block leading-snug"
+                                                        title="View Task Details & Discussion Page"
+                                                    >
+                                                        {task.task_title}
+                                                    </Link>
                                                 </td>
                                                 <td className="px-3 py-3.5 whitespace-nowrap">
                                                     {task.assigned_employee ? (
@@ -1293,6 +1332,16 @@ export default function ClientPortalServiceShow({ client, service, employees = [
                                                 </td>
                                                 <td className="px-4 py-3.5 text-right whitespace-nowrap">
                                                     <div className="flex items-center justify-end gap-1.5">
+                                                        {/* DEDICATED DETAIL & DISCUSSION PAGE LINK */}
+                                                        <Link
+                                                            href={`/tasks/detail/service/${task.id}`}
+                                                            className="h-8 px-2.5 rounded-lg bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400 hover:bg-gradient-to-r hover:from-[#003796] hover:via-[#0052D4] hover:to-[#1d4ed8] hover:text-white font-bold text-xs inline-flex items-center gap-1.5 cursor-pointer shadow-2xs transition-all border border-blue-200/50 hover:border-transparent"
+                                                            title="Open Task Details & Discussion Page"
+                                                        >
+                                                            <MessageSquare className="size-3.5" />
+                                                            <span>{task.messages_count || 0}</span>
+                                                        </Link>
+
                                                         {hasPermission(user, 'edit-client-portal-service-tasks') && (
                                                             <button
                                                                 type="button"
@@ -2178,6 +2227,22 @@ export default function ClientPortalServiceShow({ client, service, employees = [
                     </div>
                 </div>
             )}
+
+            {/* TASK CONVERSATION & DISCUSSION MODAL */}
+            <TaskConversationModal
+                isOpen={isConversationOpen}
+                onClose={() => setIsConversationOpen(false)}
+                task={conversationTask}
+                currentUserId={user?.id}
+                onMessageCountChange={(taskId, newCount) => {
+                    if (service.tasks) {
+                        const target = service.tasks.find((t) => t.id === taskId);
+                        if (target) {
+                            target.messages_count = newCount;
+                        }
+                    }
+                }}
+            />
         </ClientPortalLayout>
     );
 }

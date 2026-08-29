@@ -1,4 +1,5 @@
 import Pagination, { type PaginatedData } from '@/components/pagination';
+import TaskConversationModal, { type ConversationTaskInfo } from '@/components/task-conversation-modal';
 import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem, type SharedData } from '@/types';
 import { Head, Link, router, usePage } from '@inertiajs/react';
@@ -18,6 +19,7 @@ import {
     LayoutGrid,
     ListTodo,
     Loader2,
+    MessageSquare,
     RotateCcw,
     Search,
     Server,
@@ -59,6 +61,7 @@ export interface MyTaskItem {
     description?: string | null;
     completed_at?: string | null;
     created_at: string;
+    messages_count?: number;
     website_project?: AssignedTaskSource | null;
     service?: AssignedTaskSource | null;
     assigned_employee?: {
@@ -119,6 +122,41 @@ export default function MyTasksIndex({
     const [selectedProject, setSelectedProject] = useState(filters?.project_id || '');
     const [selectedService, setSelectedService] = useState(filters?.service_id || '');
     const [updatingTaskId, setUpdatingTaskId] = useState<number | null>(null);
+
+    // Task Conversation State
+    const [conversationTask, setConversationTask] = useState<ConversationTaskInfo | null>(null);
+    const [isConversationOpen, setIsConversationOpen] = useState(false);
+
+    const openTaskConversation = (t: MyTaskItem) => {
+        const isService = t.source_type === 'service';
+        const sourceTitle = isService
+            ? t.service?.service_name || 'Client Service'
+            : t.website_project?.project_name || 'Website Project';
+        const sourceId = isService ? (t.client_service_id || t.service?.id) : (t.website_project_id || t.website_project?.id);
+        const sourceClient = isService ? t.service?.client : t.website_project?.client;
+
+        setConversationTask({
+            id: t.id,
+            task_title: t.task_title,
+            priority: t.priority,
+            status: t.status,
+            start_date: t.start_date,
+            due_date: t.due_date,
+            completed_at: t.completed_at,
+            description: t.description,
+            source_type: t.source_type || 'project',
+            source_id: sourceId,
+            source_title: sourceTitle,
+            client: sourceClient ? {
+                id: sourceClient.id,
+                name: sourceClient.name,
+                company_name: sourceClient.company_name,
+                client_code: sourceClient.client_code,
+            } : null,
+            assigned_employee: t.assigned_employee,
+        });
+        setIsConversationOpen(true);
+    };
 
     const isFirstRender = useRef(true);
 
@@ -567,18 +605,15 @@ export default function MyTasksIndex({
                                                 className={`hover:bg-blue-50/20 dark:hover:bg-slate-800/40 transition-colors ${task.status === 'completed' ? 'opacity-75' : ''
                                                     }`}
                                             >
-                                                {/* Task Title & Description */}
+                                                {/* Task Title */}
                                                 <td className="py-4 px-4 align-top max-w-[280px]">
-                                                    <div className="space-y-1">
-                                                        <span className="font-black text-slate-900 dark:text-white text-xs block leading-snug">
-                                                            {task.task_title}
-                                                        </span>
-                                                        {task.description && (
-                                                            <p className="text-[11px] text-slate-500 dark:text-slate-400 line-clamp-2 leading-relaxed">
-                                                                {task.description}
-                                                            </p>
-                                                        )}
-                                                    </div>
+                                                    <Link
+                                                        href={`/tasks/detail/${task.source_type || 'project'}/${task.id}`}
+                                                        className="text-left font-black text-slate-900 dark:text-white hover:text-blue-600 dark:hover:text-blue-400 transition-colors text-xs block leading-snug"
+                                                        title="View Task Details & Discussion Page"
+                                                    >
+                                                        {task.task_title}
+                                                    </Link>
                                                 </td>
 
                                                 {/* Source & Client */}
@@ -663,16 +698,28 @@ export default function MyTasksIndex({
                                                     </div>
                                                 </td>
 
-                                                {/* Action Link to Workspace */}
+                                                {/* Action Link to Workspace & Conversation */}
                                                 <td className="py-4 px-4 align-top text-right whitespace-nowrap">
-                                                    <Link
-                                                        href={targetUrl}
-                                                        className="px-3 py-1.5 rounded-xl bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400 hover:bg-gradient-to-r hover:from-[#003796] hover:via-[#0052D4] hover:to-[#1d4ed8] hover:text-white dark:hover:text-white hover:shadow-md hover:shadow-blue-600/20 active:scale-[0.99] transition-all inline-flex items-center gap-1.5 text-xs font-bold"
-                                                        title={isService ? 'Open Service Workspace' : 'Open Project Workspace'}
-                                                    >
-                                                        <span>{isService ? 'View Service' : 'View Project'}</span>
-                                                        <ArrowRight className="size-3.5" />
-                                                    </Link>
+                                                    <div className="inline-flex items-center gap-2">
+                                                        {/* CONVERSATION / QUERY BUTTON */}
+                                                        <Link
+                                                            href={`/tasks/detail/${task.source_type || 'project'}/${task.id}`}
+                                                            className="h-8 px-2.5 rounded-xl bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400 hover:bg-gradient-to-r hover:from-[#003796] hover:via-[#0052D4] hover:to-[#1d4ed8] hover:text-white font-bold text-xs inline-flex items-center gap-1.5 cursor-pointer shadow-2xs transition-all border border-blue-200/50 hover:border-transparent"
+                                                            title="Open Task Details & Discussion Page"
+                                                        >
+                                                            <MessageSquare className="size-3.5" />
+                                                            <span>{task.messages_count || 0}</span>
+                                                        </Link>
+
+                                                        <Link
+                                                            href={targetUrl}
+                                                            className="px-3 py-1.5 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-gradient-to-r hover:from-[#003796] hover:via-[#0052D4] hover:to-[#1d4ed8] hover:text-white dark:hover:text-white hover:shadow-md hover:shadow-blue-600/20 active:scale-[0.99] transition-all inline-flex items-center gap-1.5 text-xs font-bold"
+                                                            title={isService ? 'Open Service Workspace' : 'Open Project Workspace'}
+                                                        >
+                                                            <span>{isService ? 'View Service' : 'View Project'}</span>
+                                                            <ArrowRight className="size-3.5" />
+                                                        </Link>
+                                                    </div>
                                                 </td>
                                             </tr>
                                         );
@@ -712,6 +759,22 @@ export default function MyTasksIndex({
 
                 {/* 4. Pagination */}
                 <Pagination meta={tasks} />
+
+                {/* TASK CONVERSATION & QUERY MODAL */}
+                <TaskConversationModal
+                    isOpen={isConversationOpen}
+                    onClose={() => setIsConversationOpen(false)}
+                    task={conversationTask}
+                    currentUserId={user?.id}
+                    onMessageCountChange={(taskId, newCount) => {
+                        if (tasks?.data) {
+                            const target = tasks.data.find((t) => t.id === taskId);
+                            if (target) {
+                                target.messages_count = newCount;
+                            }
+                        }
+                    }}
+                />
             </div>
         </AppLayout>
     );

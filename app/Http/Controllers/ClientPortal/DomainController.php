@@ -8,6 +8,8 @@ use App\Models\ClientDomain;
 use App\Models\DomainPayment;
 use App\Models\Invoice;
 use App\Models\InvoiceItem;
+use App\Models\User;
+use App\Notifications\CrmNotification;
 use App\Services\CurrencyService;
 use App\Traits\AuthorizesClientPortalAccess;
 use Carbon\Carbon;
@@ -21,22 +23,6 @@ use Inertia\Response;
 class DomainController extends Controller
 {
     use AuthorizesClientPortalAccess;
-
-    protected function getClientId(): int
-    {
-        $user = Auth::user();
-
-        if (!$user || !$user->client_id) {
-            abort(403, 'Unauthorized Client Portal Access');
-        }
-
-        return (int) $user->client_id;
-    }
-
-    protected function getClientModel(): Client
-    {
-        return Client::findOrFail($this->getClientId());
-    }
 
     public function index(Request $request): Response
     {
@@ -76,12 +62,12 @@ class DomainController extends Controller
     {
         $this->authorizePermission('view-client-portal-domains');
 
-        $clientId = $this->getClientId();
+        $clientId = $this->getClientId($domain->client_id);
         if ((int) $domain->client_id !== $clientId) {
             abort(403, 'Unauthorized access to domain record');
         }
 
-        $client = $this->getClientModel();
+        $client = $this->getClientModel($domain->client_id);
 
         // If domain has no payments yet, auto-create the initial registration payment
         if ($domain->payments()->count() === 0) {
@@ -161,6 +147,23 @@ class DomainController extends Controller
             'due_date' => $domain->registration_date ?? now()->toDateString(),
             'notes' => 'Auto-generated registration payment record.',
         ]);
+
+        // Notify Client Portal User
+        $clientUser = $client->user ?: User::where('type', 'client')->where('client_id', $clientId)->first();
+        if ($clientUser) {
+            $clientUser->notify(new CrmNotification(
+                "New Domain Registered: {$domain->domain_name}",
+                "Domain '{$domain->domain_name}' has been registered in your client portal (Expires: {$domain->expiry_date}).",
+                'domain_created',
+                'info',
+                "/client-portal/domains",
+                [
+                    'domain_id' => $domain->id,
+                    'domain_name' => $domain->domain_name,
+                    'client_id' => $clientId,
+                ]
+            ));
+        }
 
         return redirect()->back()->with('success', 'Domain record added successfully!');
     }

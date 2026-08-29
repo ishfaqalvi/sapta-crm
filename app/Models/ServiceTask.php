@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\MorphMany;
 
 class ServiceTask extends Model
 {
@@ -36,5 +37,10 @@ class ServiceTask extends Model
     public function assignedEmployee(): BelongsTo
     {
         return $this->belongsTo(Employee::class, 'assigned_employee_id');
+    }
+
+    public function messages(): MorphMany
+    {
+        return $this->morphMany(TaskMessage::class, 'taskable')->oldest();
     }
 }

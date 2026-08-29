@@ -20,12 +20,7 @@ class OverviewController extends Controller
     protected function getAuthenticatedClient(bool $withRelations = true): Client
     {
         $user = Auth::user();
-
-        if (!$user || !$user->client_id) {
-            abort(403, 'Unauthorized Client Portal Access');
-        }
-
-        $client = Client::findOrFail($user->client_id);
+        $client = $this->getClientModel();
 
         if (!$withRelations) {
             return $client;

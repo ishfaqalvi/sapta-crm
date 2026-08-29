@@ -28,28 +28,6 @@ class InvoiceController extends Controller
     use AuthorizesClientPortalAccess;
 
     /**
-     * Retrieve the authenticated client ID securely.
-     */
-    protected function getClientId(): int
-    {
-        $user = Auth::user();
-
-        if (!$user || !$user->client_id) {
-            abort(403, 'Unauthorized Client Portal Access');
-        }
-
-        return (int) $user->client_id;
-    }
-
-    /**
-     * Retrieve client model securely.
-     */
-    protected function getClientModel(): Client
-    {
-        return Client::findOrFail($this->getClientId());
-    }
-
-    /**
      * Display a listing of Invoices for the authenticated client.
      */
     public function index(Request $request): Response
@@ -242,13 +220,13 @@ class InvoiceController extends Controller
     {
         $this->authorizePermission('view-client-portal-invoices');
 
-        $clientId = $this->getClientId();
+        $clientId = $this->getClientId($invoice->client_id);
 
         if ($invoice->client_id !== $clientId) {
             abort(403, 'Unauthorized access to Invoice');
         }
 
-        $client = $this->getClientModel();
+        $client = $this->getClientModel($invoice->client_id);
 
         $invoice->load(['client', 'items']);
 
@@ -275,7 +253,7 @@ class InvoiceController extends Controller
     {
         $this->authorizePermission('edit-client-portal-invoices');
 
-        $clientId = $this->getClientId();
+        $clientId = $this->getClientId($invoice->client_id);
 
         if ($invoice->client_id !== $clientId) {
             abort(403, 'Unauthorized access to Invoice');
@@ -285,7 +263,7 @@ class InvoiceController extends Controller
             return redirect()->back()->with('error', 'Paid invoices cannot be edited.');
         }
 
-        $client = $this->getClientModel();
+        $client = $this->getClientModel($invoice->client_id);
         $invoice->load([
             'items' => function ($q) {
                 $q->orderBy('id', 'asc');
@@ -685,7 +663,7 @@ class InvoiceController extends Controller
     {
         $this->authorizePermission('print-client-portal-invoices');
 
-        $clientId = $this->getClientId();
+        $clientId = $this->getClientId($invoice->client_id);
 
         if ($invoice->client_id !== $clientId) {
             abort(403, 'Unauthorized access to Invoice');

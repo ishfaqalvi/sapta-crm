@@ -26,28 +26,6 @@ class ReportController extends Controller
     use AuthorizesClientPortalAccess;
 
     /**
-     * Retrieve the authenticated client ID securely.
-     */
-    protected function getClientId(): int
-    {
-        $user = Auth::user();
-
-        if (!$user || !$user->client_id) {
-            abort(403, 'Unauthorized Client Portal Access');
-        }
-
-        return (int) $user->client_id;
-    }
-
-    /**
-     * Retrieve client model securely.
-     */
-    protected function getClientModel(): Client
-    {
-        return Client::findOrFail($this->getClientId());
-    }
-
-    /**
      * Normalize status across various database status variations.
      */
     protected function normalizeStatus(?string $status): string

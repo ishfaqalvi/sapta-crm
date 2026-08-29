@@ -13,6 +13,8 @@ use App\Models\InvoiceItem;
 use App\Models\ServicePayment;
 use App\Models\ServiceTask;
 use App\Models\SystemSetting;
+use App\Models\User;
+use App\Notifications\CrmNotification;
 use App\Services\CurrencyService;
 use App\Traits\AuthorizesClientPortalAccess;
 use Illuminate\Http\RedirectResponse;
@@ -26,22 +28,6 @@ use Inertia\Response;
 class ClientServiceController extends Controller
 {
     use AuthorizesClientPortalAccess;
-
-    protected function getClientId(): int
-    {
-        $user = Auth::user();
-
-        if (!$user || !$user->client_id) {
-            abort(403, 'Unauthorized Client Portal Access');
-        }
-
-        return (int) $user->client_id;
-    }
-
-    protected function getClientModel(): Client
-    {
-        return Client::findOrFail($this->getClientId());
-    }
 
     /**
      * Display a listing of Client Services for the authenticated client.
@@ -159,15 +145,15 @@ class ClientServiceController extends Controller
      */
     public function show(ClientService $service): Response
     {
-        $this->authorizePermission('view-client-portal-services');
+        $this->authorizePermission('view-client-portal-services', null, $service);
 
-        $clientId = $this->getClientId();
+        $clientId = $this->getClientId($service->client_id);
 
         if ($service->client_id !== $clientId) {
             abort(403, 'Unauthorized access to Client Service');
         }
 
-        $client = $this->getClientModel();
+        $client = $this->getClientModel($service->client_id);
 
         $user = Auth::user();
         $employee = null;
@@ -193,7 +179,7 @@ class ClientServiceController extends Controller
                     $employeeId = $employee ? $employee->id : 0;
                     $q->where('assigned_employee_id', $employeeId);
                 }
-                $q->with('assignedEmployee:id,name,employee_code,avatar')->orderBy('due_date', 'asc');
+                $q->with('assignedEmployee:id,name,employee_code,avatar')->withCount('messages')->orderBy('due_date', 'asc');
             },
             'credentials' => function ($q) {
                 $q->orderBy('created_at', 'desc');
@@ -336,6 +322,45 @@ class ClientServiceController extends Controller
             'exchange_rate' => $rate,
             'amount_paid_pkr' => 0.00
         ]);
+
+        // Notify Client Portal User
+        $clientUser = $client->user ?: User::where('type', 'client')->where('client_id', $clientId)->first();
+        if ($clientUser) {
+            $clientUser->notify(new CrmNotification(
+                "New Service Registered: {$service->service_name}",
+                "A new recurring service '{$service->service_name}' ({$service->currency} " . number_format((float) $service->monthly_fee, 2) . "/mo) has been registered in your client portal.",
+                'service_created',
+                'info',
+                "/client-portal/services/{$service->id}",
+                [
+                    'service_id' => $service->id,
+                    'service_name' => $service->service_name,
+                    'client_id' => $clientId,
+                ]
+            ));
+        }
+
+        // Notify Admins if registered by non-admin
+        $authUser = Auth::user();
+        if ($authUser && $authUser->type !== 'admin') {
+            $admins = User::where('type', 'admin')
+                ->where('id', '!=', $authUser->id)
+                ->get();
+            foreach ($admins as $admin) {
+                $admin->notify(new CrmNotification(
+                    "New Service Registered: {$service->service_name}",
+                    "Service '{$service->service_name}' was registered for {$client->name} by {$authUser->name}.",
+                    'service_created',
+                    'info',
+                    "/client-portal/services/{$service->id}",
+                    [
+                        'service_id' => $service->id,
+                        'service_name' => $service->service_name,
+                        'client_id' => $clientId,
+                    ]
+                ));
+            }
+        }
 
         return redirect()->back()->with('success', 'Service created successfully.');
     }
@@ -869,7 +894,23 @@ class ClientServiceController extends Controller
             $validated['completed_at'] = now();
         }
 
-        ServiceTask::create($validated);
+        $task = ServiceTask::create($validated);
+
+        if ($task->assigned_employee_id) {
+            $employee = Employee::with('user')->find($task->assigned_employee_id);
+            if ($employee && $employee->user) {
+                $service = ClientService::find($task->client_service_id);
+                $serviceName = $service ? $service->service_name : 'Service';
+                $employee->user->notify(new CrmNotification(
+                    "New Task Assigned: {$task->task_title}",
+                    "You have been assigned to task '{$task->task_title}' on service '{$serviceName}'.",
+                    'task_assigned',
+                    'info',
+                    "/tasks/detail/service/{$task->id}",
+                    ['task_id' => $task->id, 'type' => 'service']
+                ));
+            }
+        }
 
         return redirect()->back()->with('success', 'Service task created successfully.');
     }
