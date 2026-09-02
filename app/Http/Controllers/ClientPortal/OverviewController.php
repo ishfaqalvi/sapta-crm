@@ -81,6 +81,9 @@ class OverviewController extends Controller
             'credentials' => function ($q) {
                 $q->latest();
             },
+            'quotations' => function ($q) {
+                $q->latest();
+            },
         ]);
     }
 
@@ -109,6 +112,9 @@ class OverviewController extends Controller
 
         $canViewInvoices = $isSuperAdmin
             || ($user->hasPermissionTo('view-client-portal-invoices') || $user->can('view-client-portal-invoices'));
+
+        $canViewQuotations = $isSuperAdmin
+            || ($user->hasPermissionTo('view-client-portal-quotations') || $user->can('view-client-portal-quotations'));
 
         $client = $this->getAuthenticatedClient($canViewOverview);
 
@@ -147,13 +153,24 @@ class OverviewController extends Controller
                 ->get();
         }
 
+        $quotations = [];
+        if ($canViewQuotations && $canViewOverview && $client->id) {
+            $quotations = \App\Models\Quotation::where('client_id', $client->id)
+                ->with('items')
+                ->latest()
+                ->take(10)
+                ->get();
+        }
+
         return Inertia::render('client-portal/overview/index', [
             'client' => $client,
             'invoices' => $invoices,
+            'quotations' => $quotations,
             'canViewOverview' => $canViewOverview,
             'canViewProjectBudget' => $canViewProjectBudget,
             'canViewServiceBudget' => $canViewServiceBudget,
             'canViewInvoices' => $canViewInvoices,
+            'canViewQuotations' => $canViewQuotations,
         ]);
     }
 }

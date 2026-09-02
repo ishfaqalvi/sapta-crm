@@ -541,8 +541,8 @@ export default function PayrollIndex({ payrolls, summary, filters }: PayrollInde
                                                     {isPaid ? (
                                                         <div className="space-y-1">
                                                             <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-extrabold bg-emerald-50 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800">
-                                                                <Lock className="size-3 text-emerald-600" />
-                                                                <span>Paid & Locked</span>
+                                                                <CheckCircle2 className="size-3 text-emerald-600" />
+                                                                <span>Paid</span>
                                                             </span>
                                                             {item.payment_date && (
                                                                 <span className="text-[11px] font-bold text-slate-500 dark:text-slate-400 block tracking-tight">
@@ -575,7 +575,7 @@ export default function PayrollIndex({ payrolls, summary, filters }: PayrollInde
                                                             </a>
                                                         )}
 
-                                                        {/* Mark Paid Button with Confirmation Modal Trigger (Irreversible) */}
+                                                        {/* Mark Paid Button with Confirmation Modal Trigger */}
                                                         {!isPaid ? (
                                                             hasPermission(authUser, 'manage-payroll-status') && (
                                                                 <button
@@ -588,13 +588,13 @@ export default function PayrollIndex({ payrolls, summary, filters }: PayrollInde
                                                                 </button>
                                                             )
                                                         ) : (
-                                                            <span className="size-8 rounded-xl bg-emerald-50 dark:bg-emerald-950/50 text-emerald-600 dark:text-emerald-400 flex items-center justify-center border border-emerald-200/60 select-none" title="Payment Complete & Locked">
+                                                            <span className="size-8 rounded-xl bg-emerald-50 dark:bg-emerald-950/50 text-emerald-600 dark:text-emerald-400 flex items-center justify-center border border-emerald-200/60 select-none" title="Payment Disbursed">
                                                                 <ShieldCheck className="size-4" />
                                                             </span>
                                                         )}
 
                                                         {/* Edit Modal Button */}
-                                                        {!isPaid && hasPermission(authUser, 'edit-payroll') && (
+                                                        {hasPermission(authUser, 'edit-payroll') && (
                                                             <button
                                                                 onClick={() => handleEdit(item)}
                                                                 className="size-8 rounded-xl bg-purple-50 dark:bg-purple-950/60 text-purple-600 dark:text-purple-400 hover:bg-purple-600 hover:text-white dark:hover:bg-purple-600 dark:hover:text-white transition-all flex items-center justify-center shadow-2xs cursor-pointer"
@@ -605,7 +605,7 @@ export default function PayrollIndex({ payrolls, summary, filters }: PayrollInde
                                                         )}
 
                                                         {/* Delete Button */}
-                                                        {!isPaid && hasPermission(authUser, 'delete-payroll') && (
+                                                        {hasPermission(authUser, 'delete-payroll') && (
                                                             <button
                                                                 onClick={() => handleDelete(item)}
                                                                 className="size-8 rounded-xl bg-rose-50 dark:bg-rose-950/40 text-rose-600 dark:text-rose-400 hover:bg-rose-600 hover:text-white dark:hover:bg-rose-600 dark:hover:text-white transition-all flex items-center justify-center shadow-2xs cursor-pointer"

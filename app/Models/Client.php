@@ -74,6 +74,16 @@ class Client extends Model
         return $this->hasMany(ClientHosting::class);
     }
 
+    public function invoices()
+    {
+        return $this->hasMany(Invoice::class);
+    }
+
+    public function quotations()
+    {
+        return $this->hasMany(Quotation::class);
+    }
+
     /**
      * Relationship: Client has one portal User account (type = client).
      */

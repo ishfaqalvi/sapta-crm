@@ -6,6 +6,7 @@ import {
     ArrowLeft,
     BarChart3,
     Edit3,
+    FileSpreadsheet,
     FileText,
     Globe,
     Key,
@@ -102,6 +103,14 @@ export function ClientSidebar({ client, activeTab }: ClientSidebarProps) {
             description: 'Financial Statements',
             href: '/client-portal/invoices',
             permission: 'view-client-portal-invoices',
+        },
+        {
+            id: 'quotations',
+            title: 'Quotations',
+            icon: FileSpreadsheet,
+            description: 'Estimates & Proposals',
+            href: '/client-portal/quotations',
+            permission: 'view-client-portal-quotations',
         },
         {
             id: 'reports',

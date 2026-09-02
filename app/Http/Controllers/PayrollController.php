@@ -179,11 +179,6 @@ class PayrollController extends Controller
             abort(403, 'Unauthorized. You do not have permission to edit or adjust monthly payroll records.');
         }
 
-        // Locked if already paid
-        if ($payroll->payment_status === 'paid' && $request->input('payment_status') !== 'paid') {
-            return redirect()->back()->with('error', 'Paid payroll records are locked and cannot be changed back to unpaid!');
-        }
-
         $validated = $request->validate([
             'total_working_days' => ['required', 'integer', 'min:1', 'max:31'],
             'leaves_taken' => ['required', 'numeric', 'min:0', 'max:31'],
@@ -200,11 +195,11 @@ class PayrollController extends Controller
         $payroll->bonuses_pkr = $validated['bonuses_pkr'];
         $payroll->other_deductions_pkr = $validated['other_deductions_pkr'];
 
-        if ($payroll->payment_status !== 'paid') {
-            $payroll->payment_status = $validated['payment_status'];
-            if ($validated['payment_status'] === 'paid' && !$payroll->payment_date) {
-                $payroll->payment_date = now();
-            }
+        $payroll->payment_status = $validated['payment_status'];
+        if ($validated['payment_status'] === 'paid' && !$payroll->payment_date) {
+            $payroll->payment_date = now();
+        } elseif ($validated['payment_status'] !== 'paid') {
+            $payroll->payment_date = null;
         }
 
         $payroll->notes = $validated['notes'] ?? null;
@@ -325,10 +320,6 @@ class PayrollController extends Controller
         $user = auth()->user();
         if (!$user || (!$user->hasRole('Super Admin') && !$user->hasPermissionTo('delete-payroll') && !$user->can('delete-payroll'))) {
             abort(403, 'Unauthorized. You do not have permission to delete monthly payroll records.');
-        }
-
-        if ($payroll->payment_status === 'paid') {
-            return redirect()->back()->with('error', 'Paid and locked payroll records cannot be deleted!');
         }
 
         $employeeName = $payroll->employee ? $payroll->employee->name : 'Employee';

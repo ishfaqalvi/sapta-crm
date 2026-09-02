@@ -131,7 +131,15 @@ export default function TaskShowPage({ client, task }: TaskShowPageProps) {
         currency: task.client.currency || 'USD',
     } : null);
 
-    const breadcrumbs: BreadcrumbItem[] = [
+    const breadcrumbs: BreadcrumbItem[] = task.source_type === 'general' ? [
+        { title: 'Dashboard', href: '/dashboard' },
+        { title: 'Client Operations', href: '/tasks' },
+        { title: 'General Tasks', href: '/tasks' },
+        {
+            title: task.task_title || `Task #${task.id}`,
+            href: `/tasks/detail/general/${task.id}`,
+        },
+    ] : [
         { title: 'Overview', href: '/client-portal/overview' },
         {
             title: task.source_type === 'service' ? 'Services' : 'Projects',
@@ -367,11 +375,11 @@ export default function TaskShowPage({ client, task }: TaskShowPageProps) {
     const priorityBadge = getPriorityBadge(task.priority);
     const statusBadge = getStatusBadge(currentStatus);
 
-    const backUrl = task.source_url || (task.source_type === 'service' ? '/client-portal/services' : '/client-portal/projects');
+    const backUrl = task.source_type === 'general' ? '/tasks' : (task.source_url || (task.source_type === 'service' ? '/client-portal/services' : '/client-portal/projects'));
 
     const PageContent = (
         <div className="p-2 sm:p-6 w-full space-y-6 bg-slate-50/50 dark:bg-slate-950">
-            <Head title={`Task: ${task.task_title} | Client Portal`} />
+            <Head title={`Task: ${task.task_title} | ${task.source_type === 'general' ? 'General Tasks' : 'Client Portal'}`} />
 
             {/* 1. TOP HEADER BAR: TABS & TITLE ON LEFT, ACTION BUTTONS ON RIGHT */}
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-2.5 rounded-xl bg-white dark:bg-slate-900 border border-slate-200/90 dark:border-slate-800 shadow-xs">
@@ -407,7 +415,7 @@ export default function TaskShowPage({ client, task }: TaskShowPageProps) {
                             className="h-10 px-3 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 text-xs font-bold transition-all inline-flex items-center gap-2 cursor-pointer"
                         >
                             <ExternalLink className="size-3.5 text-blue-500" />
-                            <span>Open {task.source_type === 'service' ? 'Service' : 'Project'}</span>
+                            <span>Open {task.source_type === 'service' ? 'Service' : (task.source_type === 'general' ? 'Tasks List' : 'Project')}</span>
                         </Link>
                     )}
 
@@ -426,7 +434,7 @@ export default function TaskShowPage({ client, task }: TaskShowPageProps) {
                 <div className="space-y-1.5 min-w-0 flex-1">
                     <div className="flex flex-wrap items-center gap-2">
                         <span className="px-2.5 py-0.5 rounded-lg text-[10px] font-black uppercase tracking-wider bg-blue-50 text-blue-700 dark:bg-blue-950/60 dark:text-blue-300 border border-blue-200/60">
-                            {task.source_type === 'service' ? 'Service Deliverable' : 'Project Task'}
+                            {task.source_type === 'service' ? 'Service Deliverable' : (task.source_type === 'general' ? 'General Task' : 'Project Task')}
                         </span>
                         <span
                             className={`px-2.5 py-0.5 rounded-lg text-[10px] font-black uppercase tracking-wider border ${priorityBadge.className}`}

@@ -257,6 +257,15 @@ class PermissionRegistry
                 'print-client-portal-invoices',
             ],
 
+            // 7. Quotations & Estimates
+            'Quotations & Estimates' => [
+                'view-client-portal-quotations',
+                'create-client-portal-quotations',
+                'edit-client-portal-quotations',
+                'delete-client-portal-quotations',
+                'print-client-portal-quotations',
+            ],
+
             // 7. General Logins & Credentials Vault
             'General Credentials Vault' => [
                 'view-client-portal-credentials',

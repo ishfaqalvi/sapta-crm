@@ -83,6 +83,10 @@ class TaskMessageController extends Controller
                     'currency' => $task->service->client->currency ?? 'USD',
                 ];
             }
+        } elseif ($type === 'general') {
+            $sourceTitle = $task->taskCategory ? $task->taskCategory->name : 'General Task';
+            $sourceId = $task->id;
+            $sourceUrl = '/tasks';
         }
 
         $taskData = [
@@ -194,6 +198,9 @@ class TaskMessageController extends Controller
                     'client_code' => $task->service->client->client_code,
                 ];
             }
+        } elseif ($type === 'general') {
+            $sourceTitle = $task->taskCategory ? $task->taskCategory->name : 'General Task';
+            $sourceId = $task->id;
         }
 
         return response()->json([
@@ -250,14 +257,14 @@ class TaskMessageController extends Controller
         if ($request->hasFile('attachment') && $request->file('attachment')->isValid()) {
             $file = $request->file('attachment');
             $attachmentName = $file->getClientOriginalName();
-            $filename = time() . '_' . Str::random(10) . '.' . $file->getClientOriginalExtension();
-            $file->move(public_path('uploads/task_messages'), $filename);
-            $attachmentPath = '/uploads/task_messages/' . $filename;
+            $filename = 'task_' . $validated['task_type'] . '_' . $task->id . '_' . time() . '_' . uniqid() . '.' . $file->getClientOriginalExtension();
+            $file->move(public_path('uploads/task-messages'), $filename);
+            $attachmentPath = '/uploads/task-messages/' . $filename;
         }
 
         $message = new TaskMessage([
             'user_id' => $user->id,
-            'message' => $validated['message'] ?? 'Attached a file',
+            'message' => $validated['message'] ?? '',
             'attachment' => $attachmentPath,
             'attachment_name' => $attachmentName,
         ]);
@@ -265,7 +272,7 @@ class TaskMessageController extends Controller
         $task->messages()->save($message);
         $message->load('user:id,name,email,avatar,type,employee_id');
 
-        // Dispatch notifications between Admin & Employee
+        // Trigger in-app notification
         $this->dispatchTaskMessageNotification($user, $task, $validated['task_type'], $message);
 
         return response()->json([
@@ -275,9 +282,9 @@ class TaskMessageController extends Controller
     }
 
     /**
-     * Delete a task message.
+     * Delete a message/comment.
      */
-    public function destroy(Request $request, $message): JsonResponse
+    public function destroy(Request $request, int $message): JsonResponse
     {
         $user = Auth::user();
         if (!$user) {
@@ -286,17 +293,19 @@ class TaskMessageController extends Controller
 
         $taskMessage = $message instanceof TaskMessage ? $message : TaskMessage::find($message);
         if (!$taskMessage) {
-            return response()->json(['error' => 'Message not found or already deleted'], 404);
+            return response()->json(['error' => 'Message not found'], 404);
         }
 
-        // Allow deletion if user is author OR user is an admin OR has management access
+        // Allow owner or Admin to delete message
+        $isOwner = $taskMessage->user_id === $user->id;
         $isAdmin = ($user->type === 'admin' || $user->hasRole('Super Admin') || $user->hasRole('admin'));
-        if ((int) $taskMessage->user_id !== (int) $user->id && !$isAdmin) {
-            return response()->json(['error' => 'Unauthorized: You can only delete your own messages.'], 403);
+
+        if (!$isOwner && !$isAdmin) {
+            return response()->json(['error' => 'Unauthorized to delete this message'], 403);
         }
 
-        if (method_exists($taskMessage, 'deleteOldAttachmentFile')) {
-            $taskMessage->deleteOldAttachmentFile();
+        if ($taskMessage->attachment && file_exists(public_path($taskMessage->attachment))) {
+            @unlink(public_path($taskMessage->attachment));
         }
         $taskMessage->delete();
 
@@ -314,7 +323,7 @@ class TaskMessageController extends Controller
         return match ($type) {
             'project' => ProjectTask::with(['websiteProject.client', 'assignedEmployee'])->find($id),
             'service' => ServiceTask::with(['service.client', 'assignedEmployee'])->find($id),
-            'general' => Task::with(['assignedEmployee'])->find($id),
+            'general' => Task::with(['taskCategory', 'assignedEmployee'])->find($id),
             default => null,
         };
     }
@@ -328,7 +337,7 @@ class TaskMessageController extends Controller
         $sourceTitle = match ($type) {
             'project' => $task->websiteProject?->project_name ?? 'Website Project',
             'service' => $task->service?->service_name ?? 'Client Service',
-            default => 'General Task',
+            default => ($task->taskCategory?->name ?? 'General Task'),
         };
 
         $isSenderAdmin = ($sender->type === 'admin' || $sender->hasRole('Super Admin') || $sender->hasRole('admin'));

@@ -11,6 +11,7 @@ use App\Http\Controllers\ClientPortal\{
     ProjectController,
     ClientServiceController,
     InvoiceController as ClientInvoiceController,
+    QuotationController as ClientQuotationController,
     CredentialController as ClientCredentialController,
     ProfileController as ClientProfileController,
     ReportController as ClientReportController,
@@ -226,6 +227,27 @@ Route::group(['prefix' => 'client-portal', 'as' => 'client-portal.', 'middleware
         Route::patch('{invoice}/status', 'updateStatus')->name('status');
         Route::delete('destroy/{invoice}', 'destroy')->name('destroy');
         Route::get('{invoice}/pdf', 'pdf')->name('pdf');
+    });
+
+    /*
+    |--------------------------------------------------------------------------
+    | Quotations & Proposals Routes
+    |--------------------------------------------------------------------------
+    */
+    Route::controller(ClientQuotationController::class)->prefix('quotations')->as('quotations.')->group(function () {
+        Route::get('/', 'index')->name('index');
+        Route::get('create', 'create')->name('create');
+        Route::post('store', 'store')->name('store');
+        Route::get('{quotation}', 'show')->name('show');
+        Route::get('{quotation}/edit', 'edit')->name('edit');
+        Route::put('{quotation}', 'update');
+        Route::put('update/{quotation}', 'update')->name('update');
+        Route::post('{quotation}', 'update');
+        Route::post('update/{quotation}', 'update');
+        Route::patch('{quotation}/status', 'updateStatus')->name('status');
+        Route::delete('{quotation}', 'destroy');
+        Route::delete('destroy/{quotation}', 'destroy')->name('destroy');
+        Route::get('{quotation}/pdf', 'pdf')->name('pdf');
     });
 
     /*

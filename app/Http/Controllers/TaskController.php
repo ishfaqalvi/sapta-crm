@@ -26,7 +26,8 @@ class TaskController extends Controller
             abort(403, 'Unauthorized. You do not have permission to view general tasks.');
         }
 
-        $query = Task::with(['taskCategory', 'assignedEmployee.department', 'createdBy']);
+        $query = Task::with(['taskCategory', 'assignedEmployee.department', 'createdBy'])
+            ->withCount('messages');
 
         if ($request->filled('search')) {
             $search = $request->query('search');

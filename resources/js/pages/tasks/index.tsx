@@ -18,6 +18,7 @@ import {
     Filter,
     ListTodo,
     LoaderCircle,
+    MessageSquare,
     Paperclip,
     Plus,
     RotateCcw,
@@ -82,6 +83,7 @@ interface TaskItem {
     task_category: TaskCategorySimple | null;
     assigned_employee: EmployeeSimple | null;
     created_by: UserSimple | null;
+    messages_count?: number;
 }
 
 interface TasksIndexProps {
@@ -510,14 +512,24 @@ export default function TasksIndex({ tasks, stats, categories = [], employees = 
                                                 )}
                                             </td>
 
-                                            {/* Actions */}
+                                             {/* Actions */}
                                             <td className="px-6 py-4 text-right whitespace-nowrap">
                                                 <div className="flex items-center justify-end gap-1.5">
+                                                    {/* Dedicated Discussion & Details Page Link */}
+                                                    <Link
+                                                        href={`/tasks/detail/general/${task.id}`}
+                                                        className="h-8 px-2.5 rounded-xl bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400 hover:bg-gradient-to-r hover:from-[#003796] hover:via-[#0052D4] hover:to-[#1d4ed8] hover:text-white font-bold text-xs inline-flex items-center gap-1.5 cursor-pointer shadow-2xs transition-all border border-blue-200/50 hover:border-transparent"
+                                                        title="Open Task Discussion & Details Page"
+                                                    >
+                                                        <MessageSquare className="size-3.5" />
+                                                        <span>{task.messages_count || 0}</span>
+                                                    </Link>
+
                                                     <button
                                                         type="button"
                                                         onClick={() => setViewingTask(task)}
-                                                        className="size-8 rounded-xl bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400 hover:bg-blue-600 hover:text-white dark:hover:bg-blue-600 dark:hover:text-white transition-all flex items-center justify-center shadow-2xs cursor-pointer"
-                                                        title="View Task Details"
+                                                        className="size-8 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-blue-600 hover:text-white dark:hover:bg-blue-600 dark:hover:text-white transition-all flex items-center justify-center shadow-2xs cursor-pointer"
+                                                        title="Quick View Task Details"
                                                     >
                                                         <Eye className="size-3.5" />
                                                     </button>
@@ -663,11 +675,20 @@ export default function TasksIndex({ tasks, stats, categories = [], employees = 
 
                             {/* Modal Actions Footer */}
                             <div className="flex items-center justify-between pt-3 border-t border-slate-100 dark:border-slate-800">
-                                <div>
+                                <div className="flex items-center gap-2">
+                                    <Link
+                                        href={`/tasks/detail/general/${viewingTask.id}`}
+                                        className="h-9 px-3.5 rounded-xl bg-gradient-to-r from-[#003796] via-[#0052D4] to-[#1d4ed8] hover:opacity-95 text-white font-bold text-xs inline-flex items-center gap-1.5 transition-all cursor-pointer shadow-md shadow-blue-500/20"
+                                        title="Open Dedicated Task Details & Discussion Page"
+                                    >
+                                        <MessageSquare className="size-3.5" />
+                                        <span>Open Discussion Page ({viewingTask.messages_count || 0})</span>
+                                    </Link>
+
                                     {hasPermission(user, 'edit-tasks') && (
                                         <Link
                                             href={route('tasks.edit', viewingTask.id)}
-                                            className="h-9 px-4 rounded-xl bg-gradient-to-r from-[#003796] via-[#0052D4] to-[#1d4ed8] hover:opacity-95 text-white text-xs font-bold transition-all shadow-md shadow-blue-500/20 inline-flex items-center gap-1.5 cursor-pointer"
+                                            className="h-9 px-3.5 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 text-xs font-bold transition-all inline-flex items-center gap-1.5 cursor-pointer"
                                         >
                                             <Edit2 className="size-3.5" />
                                             <span>Edit Task</span>
