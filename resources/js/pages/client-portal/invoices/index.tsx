@@ -28,9 +28,10 @@ export interface InvoiceLineItem {
     id?: number;
     invoice_id?: number;
     description: string;
-    quantity: number;
-    unit_price: number | string;
+    quantity?: number;
+    unit_price?: number | string;
     amount?: number | string;
+    remaining_cost?: number | string;
 }
 
 export interface ClientInvoiceItem {
@@ -405,7 +406,7 @@ export default function ClientPortalInvoicesIndex({
                                                             <Printer className="size-3.5" />
                                                         </a>
                                                     )}
-                                                    {item.status !== 'paid' && hasPermission(user, 'delete-client-portal-invoices') && (
+                                                    {hasPermission(user, 'delete-client-portal-invoices') && (
                                                         <button
                                                             onClick={() => setDeletingInvoice(item)}
                                                             className="size-8 rounded-xl bg-rose-50 dark:bg-rose-950/40 text-rose-600 dark:text-rose-400 hover:bg-rose-600 hover:text-white dark:hover:bg-rose-600 dark:hover:text-white transition-all flex items-center justify-center cursor-pointer shadow-2xs"
@@ -522,13 +523,12 @@ export default function ClientPortalInvoicesIndex({
                         {/* Line Items Table */}
                         <div className="border border-slate-200/80 dark:border-slate-800 rounded-xl overflow-hidden w-full min-w-0">
                             <div className="w-full overflow-x-auto scrollbar-thin">
-                                <table className="w-full min-w-[500px] text-left border-collapse text-xs">
+                                <table className="w-full min-w-[400px] text-left border-collapse text-xs">
                                     <thead>
                                         <tr className="bg-slate-50 dark:bg-slate-800/60 border-b border-slate-200/80 dark:border-slate-800 text-[10px] font-extrabold uppercase text-slate-400 tracking-wider">
                                             <th className="p-3">Description</th>
-                                            <th className="p-3 text-center">Qty</th>
-                                            <th className="p-3 text-right">Unit Price</th>
                                             <th className="p-3 text-right">Amount</th>
+                                            <th className="p-3 text-right">Remaining Cost</th>
                                         </tr>
                                     </thead>
                                     <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60 font-medium">
@@ -536,14 +536,13 @@ export default function ClientPortalInvoicesIndex({
                                             viewingInvoice.items.map((item, idx) => (
                                                 <tr key={item.id || idx}>
                                                     <td className="p-3 font-semibold text-slate-800 dark:text-slate-200">{item.description}</td>
-                                                    <td className="p-3 text-center font-mono">{item.quantity}</td>
-                                                    <td className="p-3 text-right font-mono">{formatCurrency(item.unit_price, viewingInvoice.currency_code)}</td>
-                                                    <td className="p-3 text-right font-bold text-slate-900 dark:text-white font-mono">{formatCurrency(item.amount || Number(item.quantity) * Number(item.unit_price), viewingInvoice.currency_code)}</td>
+                                                    <td className="p-3 text-right font-bold text-slate-900 dark:text-white font-mono">{formatCurrency(item.amount ?? (Number(item.quantity || 1) * Number(item.unit_price || 0)), viewingInvoice.currency_code)}</td>
+                                                    <td className="p-3 text-right text-slate-600 dark:text-slate-400 font-mono">{formatCurrency(item.remaining_cost || 0, viewingInvoice.currency_code)}</td>
                                                 </tr>
                                             ))
                                         ) : (
                                             <tr>
-                                                <td colSpan={4} className="p-4 text-center text-slate-400 italic">No line items.</td>
+                                                <td colSpan={3} className="p-4 text-center text-slate-400 italic">No line items.</td>
                                             </tr>
                                         )}
                                     </tbody>
@@ -631,7 +630,7 @@ export default function ClientPortalInvoicesIndex({
                         </div>
 
                         <p className="text-xs text-slate-600 dark:text-slate-300 font-medium">
-                            Are you sure you want to delete invoice statement <strong className="text-slate-900 dark:text-white">{deletingInvoice.invoice_number}</strong>?
+                            Are you sure you want to delete invoice statement <strong className="text-slate-900 dark:text-white">{deletingInvoice.invoice_number}</strong>? All associated line items (project milestones, services, domain/hosting renewals) will be automatically reverted to unpaid/due.
                         </p>
 
                         <div className="flex items-center justify-end gap-3 pt-2">

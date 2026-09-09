@@ -63,9 +63,11 @@ class QuotationController extends Controller
 
         $stats = [
             'total' => $allQuotations->count(),
-            'accepted_total' => (float) $allQuotations->where('status', 'accepted')->sum('total_amount'),
+            'accepted_total' => (float) $allQuotations->whereIn('status', ['accepted', 'paid'])->sum('total_amount'),
+            'paid_total' => (float) $allQuotations->where('status', 'paid')->sum('total_amount'),
             'pending_total' => (float) $allQuotations->whereIn('status', ['draft', 'sent'])->sum('total_amount'),
             'accepted_count' => $allQuotations->where('status', 'accepted')->count(),
+            'paid_count' => $allQuotations->where('status', 'paid')->count(),
             'sent_count' => $allQuotations->where('status', 'sent')->count(),
             'draft_count' => $allQuotations->where('status', 'draft')->count(),
         ];
@@ -147,14 +149,16 @@ class QuotationController extends Controller
             'discount' => 'nullable|numeric|min:0',
             'date' => 'required|date',
             'expiry_date' => 'nullable|date|after_or_equal:date',
-            'status' => 'required|in:draft,sent,accepted,rejected,expired',
+            'status' => 'required|in:draft,sent,accepted,paid,rejected,expired',
             'notes' => 'nullable|string|max:3000',
             'terms' => 'nullable|string|max:3000',
             'authorized_by_text' => 'nullable|string|max:255',
+            'signature_image' => 'nullable|image|mimes:jpeg,png,jpg,gif,svg,webp|max:2048',
             'items' => 'required|array|min:1',
             'items.*.description' => 'required|string|max:1000',
-            'items.*.quantity' => 'required|numeric|min:0.01',
-            'items.*.unit_price' => 'required|numeric|min:0',
+            'items.*.amount' => 'nullable|numeric|min:0',
+            'items.*.unit_price' => 'nullable|numeric|min:0',
+            'items.*.quantity' => 'nullable|numeric',
         ], [
             'quotation_number.required' => 'Quotation number is required.',
             'quotation_number.unique' => 'This quotation number has already been taken.',
@@ -169,10 +173,6 @@ class QuotationController extends Controller
             'items.required' => 'Please add at least one line item to the quotation.',
             'items.min' => 'Please add at least one line item to the quotation.',
             'items.*.description.required' => 'Item description is required.',
-            'items.*.quantity.required' => 'Item quantity is required.',
-            'items.*.quantity.min' => 'Item quantity must be greater than 0.',
-            'items.*.unit_price.required' => 'Item price is required.',
-            'items.*.unit_price.min' => 'Item price cannot be negative.',
         ]);
 
         DB::beginTransaction();
@@ -187,7 +187,8 @@ class QuotationController extends Controller
             // Calculate Subtotal from Items
             $subtotal = 0;
             foreach ($validated['items'] as $itemData) {
-                $subtotal += ((float) $itemData['quantity'] * (float) $itemData['unit_price']);
+                $itemAmount = isset($itemData['amount']) && $itemData['amount'] !== '' ? (float) $itemData['amount'] : (float) ($itemData['unit_price'] ?? 0);
+                $subtotal += $itemAmount;
             }
 
             $taxRate = (float) ($validated['tax_rate'] ?? 0);
@@ -234,19 +235,22 @@ class QuotationController extends Controller
                 $quotation->company_logo = $request->file('company_logo');
             }
 
+            if ($request->hasFile('signature_image')) {
+                $quotation->signature_image = $request->file('signature_image');
+            }
+
             $quotation->save();
 
             foreach ($validated['items'] as $index => $itemData) {
-                $qty = (float) $itemData['quantity'];
-                $price = (float) $itemData['unit_price'];
-                $amount = round($qty * $price, 2);
+                $itemAmount = isset($itemData['amount']) && $itemData['amount'] !== '' ? (float) $itemData['amount'] : (float) ($itemData['unit_price'] ?? 0);
+                $cleanAmount = round($itemAmount, 2);
 
                 QuotationItem::create([
                     'quotation_id' => $quotation->id,
                     'description' => $itemData['description'],
-                    'quantity' => $qty,
-                    'unit_price' => $price,
-                    'amount' => $amount,
+                    'quantity' => 1.00,
+                    'unit_price' => $cleanAmount,
+                    'amount' => $cleanAmount,
                     'sort_order' => $index + 1,
                 ]);
             }
@@ -345,14 +349,17 @@ class QuotationController extends Controller
             'discount' => 'nullable|numeric|min:0',
             'date' => 'required|date',
             'expiry_date' => 'nullable|date|after_or_equal:date',
-            'status' => 'required|in:draft,sent,accepted,rejected,expired',
+            'status' => 'required|in:draft,sent,accepted,paid,rejected,expired',
             'notes' => 'nullable|string|max:3000',
             'terms' => 'nullable|string|max:3000',
             'authorized_by_text' => 'nullable|string|max:255',
+            'signature_image' => 'nullable|image|mimes:jpeg,png,jpg,gif,svg,webp|max:2048',
+            'remove_signature_image' => 'nullable|boolean',
             'items' => 'required|array|min:1',
             'items.*.description' => 'required|string|max:1000',
-            'items.*.quantity' => 'required|numeric|min:0.01',
-            'items.*.unit_price' => 'required|numeric|min:0',
+            'items.*.amount' => 'nullable|numeric|min:0',
+            'items.*.unit_price' => 'nullable|numeric|min:0',
+            'items.*.quantity' => 'nullable|numeric',
         ], [
             'quotation_number.required' => 'Quotation number is required.',
             'quotation_number.unique' => 'This quotation number has already been taken.',
@@ -367,10 +374,6 @@ class QuotationController extends Controller
             'items.required' => 'Please add at least one line item to the quotation.',
             'items.min' => 'Please add at least one line item to the quotation.',
             'items.*.description.required' => 'Item description is required.',
-            'items.*.quantity.required' => 'Item quantity is required.',
-            'items.*.quantity.min' => 'Item quantity must be greater than 0.',
-            'items.*.unit_price.required' => 'Item price is required.',
-            'items.*.unit_price.min' => 'Item price cannot be negative.',
         ]);
 
         DB::beginTransaction();
@@ -385,7 +388,8 @@ class QuotationController extends Controller
             // Calculate Subtotal
             $subtotal = 0;
             foreach ($validated['items'] as $itemData) {
-                $subtotal += ((float) $itemData['quantity'] * (float) $itemData['unit_price']);
+                $itemAmount = isset($itemData['amount']) && $itemData['amount'] !== '' ? (float) $itemData['amount'] : (float) ($itemData['unit_price'] ?? 0);
+                $subtotal += $itemAmount;
             }
 
             $taxRate = (float) ($validated['tax_rate'] ?? 0);
@@ -432,21 +436,26 @@ class QuotationController extends Controller
                 $quotation->company_logo = null;
             }
 
+            if ($request->hasFile('signature_image')) {
+                $quotation->signature_image = $request->file('signature_image');
+            } elseif ($request->boolean('remove_signature_image')) {
+                $quotation->signature_image = null;
+            }
+
             $quotation->save();
 
             // Sync items
             $quotation->items()->delete();
             foreach ($validated['items'] as $index => $itemData) {
-                $qty = (float) $itemData['quantity'];
-                $price = (float) $itemData['unit_price'];
-                $amount = round($qty * $price, 2);
+                $itemAmount = isset($itemData['amount']) && $itemData['amount'] !== '' ? (float) $itemData['amount'] : (float) ($itemData['unit_price'] ?? 0);
+                $cleanAmount = round($itemAmount, 2);
 
                 QuotationItem::create([
                     'quotation_id' => $quotation->id,
                     'description' => $itemData['description'],
-                    'quantity' => $qty,
-                    'unit_price' => $price,
-                    'amount' => $amount,
+                    'quantity' => 1.00,
+                    'unit_price' => $cleanAmount,
+                    'amount' => $cleanAmount,
                     'sort_order' => $index + 1,
                 ]);
             }
@@ -474,7 +483,7 @@ class QuotationController extends Controller
         }
 
         $validated = $request->validate([
-            'status' => 'required|in:draft,sent,accepted,rejected,expired',
+            'status' => 'required|in:draft,sent,accepted,paid,rejected,expired',
         ]);
 
         $quotation->update(['status' => $validated['status']]);
@@ -522,7 +531,29 @@ class QuotationController extends Controller
 
         $pdf->setPaper('a4', 'portrait');
 
-        $filename = 'Quotation-' . str_replace(' ', '_', $quotation->quotation_number) . '.pdf';
+        $isInvoice = in_array($quotation->status, ['accepted', 'paid']);
+        $docPrefix = $isInvoice ? 'Invoice-' : 'Quotation-';
+        $filename = $docPrefix . str_replace(' ', '_', $quotation->quotation_number) . '.pdf';
         return $pdf->stream($filename);
+    }
+
+    /**
+     * Display a clean, dedicated standalone print page for the Quotation.
+     */
+    public function print(Quotation $quotation)
+    {
+        $this->authorizePermission('print-client-portal-quotations');
+
+        $clientId = $this->getClientId();
+        if ($quotation->client_id !== $clientId) {
+            abort(403, 'Unauthorized access to this quotation.');
+        }
+
+        $quotation->load(['items', 'client']);
+
+        return view('pdf.quotation-print', [
+            'quotation' => $quotation,
+            'client' => $quotation->client,
+        ]);
     }
 }

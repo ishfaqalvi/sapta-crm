@@ -7,6 +7,7 @@ use App\Models\Task;
 use App\Models\TaskCategory;
 use App\Models\User;
 use App\Notifications\CrmNotification;
+use App\Services\TaskNotificationService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
@@ -132,19 +133,9 @@ class TaskController extends Controller
 
         $task->save();
 
-        // Trigger Notification to Assigned Employee
+        // Trigger Email & In-App Notification to Assigned Employee
         if ($task->assigned_employee_id) {
-            $employeeUser = User::where('employee_id', $task->assigned_employee_id)->first();
-            if ($employeeUser && $employeeUser->id !== auth()->id()) {
-                $employeeUser->notify(new CrmNotification(
-                    "New Task Assigned: {$task->task_title}",
-                    "You have been assigned task '{$task->task_title}' (Code: {$task->task_code}, Priority: " . ucfirst($task->priority) . ").",
-                    'task_assigned',
-                    $task->priority === 'urgent' ? 'urgent' : ($task->priority === 'high' ? 'warning' : 'info'),
-                    '/tasks',
-                    ['task_id' => $task->id, 'task_code' => $task->task_code]
-                ));
-            }
+            TaskNotificationService::notifyAssignedEmployee($task, 'general');
         }
 
         return redirect()->route('tasks.index')->with('success', "Task {$task->task_code} created successfully!");
@@ -214,19 +205,9 @@ class TaskController extends Controller
         $task->fill($validated);
         $task->save();
 
-        // Notify newly assigned employee if assignment changed
+        // Notify newly assigned employee if assignment changed (Email & In-App)
         if ($task->assigned_employee_id && $task->assigned_employee_id !== $oldAssignedId) {
-            $employeeUser = User::where('employee_id', $task->assigned_employee_id)->first();
-            if ($employeeUser && $employeeUser->id !== auth()->id()) {
-                $employeeUser->notify(new CrmNotification(
-                    "Task Assigned: {$task->task_title}",
-                    "You have been assigned task '{$task->task_title}' (Code: {$task->task_code}).",
-                    'task_assigned',
-                    'info',
-                    '/tasks',
-                    ['task_id' => $task->id, 'task_code' => $task->task_code]
-                ));
-            }
+            TaskNotificationService::notifyAssignedEmployee($task, 'general', $oldAssignedId);
         }
 
         // Notify Super Admins if completed

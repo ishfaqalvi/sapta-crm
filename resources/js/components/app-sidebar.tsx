@@ -68,6 +68,18 @@ const rawNavGroups: PermissionNavGroup[] = [
                 permission: 'view-clients',
             },
             {
+                title: 'Projects Directory',
+                url: '/projects',
+                icon: FolderKanban,
+                permission: 'view-projects',
+            },
+            {
+                title: 'Services Directory',
+                url: '/services',
+                icon: Layers,
+                permission: 'view-services',
+            },
+            {
                 title: 'Credentials Vault',
                 url: '/credentials',
                 icon: Key,

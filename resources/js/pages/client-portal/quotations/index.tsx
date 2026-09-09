@@ -8,6 +8,7 @@ import {
     Calendar,
     CheckCircle2,
     Clock,
+    DollarSign,
     Download,
     Eye,
     FileSpreadsheet,
@@ -27,8 +28,8 @@ export interface QuotationLineItem {
     id?: number;
     quotation_id?: number;
     description: string;
-    quantity: number;
-    unit_price: number | string;
+    quantity?: number;
+    unit_price?: number | string;
     amount: number | string;
 }
 
@@ -50,6 +51,7 @@ export interface QuotationRecord {
     company_email?: string | null;
     company_whatsapp?: string | null;
     company_logo?: string | null;
+    signature_image?: string | null;
     greeting?: string | null;
     opening_text?: string | null;
     closing_text?: string | null;
@@ -61,7 +63,7 @@ export interface QuotationRecord {
     total_amount_pkr: number | string;
     date: string;
     expiry_date?: string | null;
-    status: 'draft' | 'sent' | 'accepted' | 'rejected' | 'expired';
+    status: 'draft' | 'sent' | 'accepted' | 'paid' | 'rejected' | 'expired';
     notes?: string | null;
     terms?: string | null;
     authorized_by_text?: string | null;
@@ -82,8 +84,10 @@ interface ClientPortalQuotationsIndexProps {
     stats: {
         total: number;
         accepted_total: number;
+        paid_total?: number;
         pending_total: number;
         accepted_count: number;
+        paid_count?: number;
         sent_count: number;
         draft_count: number;
     };
@@ -196,10 +200,12 @@ export default function ClientPortalQuotationsIndex({
 
     const getStatusBadgeClass = (status: string) => {
         switch (status) {
-            case 'accepted':
+            case 'paid':
                 return 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300 border-emerald-200/60 focus:ring-emerald-500/20';
-            case 'sent':
+            case 'accepted':
                 return 'bg-blue-50 text-blue-700 dark:bg-blue-950/60 dark:text-blue-300 border-blue-200/60 focus:ring-blue-500/20';
+            case 'sent':
+                return 'bg-cyan-50 text-cyan-700 dark:bg-cyan-950/60 dark:text-cyan-300 border-cyan-200/60 focus:ring-cyan-500/20';
             case 'rejected':
                 return 'bg-rose-50 text-rose-700 dark:bg-rose-950/60 dark:text-rose-300 border-rose-200/60 focus:ring-rose-500/20';
             case 'expired':
@@ -222,7 +228,7 @@ export default function ClientPortalQuotationsIndex({
                             Quotations Directory
                         </h1>
                         <p className="text-slate-500 dark:text-slate-400 text-xs mt-0.5">
-                            Manage and track proposals, formal pricing estimates, and quotes for your workspace.
+                            Manage and track proposals, formal pricing estimates, and invoices for your workspace.
                         </p>
                     </div>
 
@@ -244,7 +250,7 @@ export default function ClientPortalQuotationsIndex({
                             <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400">Total Quotations</p>
                             <h3 className="text-xl font-extrabold text-slate-900 dark:text-white mt-0.5">{stats.total}</h3>
                             <p className="text-[10px] text-slate-500 dark:text-slate-400 font-semibold mt-1">
-                                {stats.accepted_count} Accepted • {stats.sent_count + stats.draft_count} Pending
+                                {stats.accepted_count + (stats.paid_count || 0)} Accepted/Paid • {stats.sent_count + stats.draft_count} Pending
                             </p>
                         </div>
                         <div className="size-11 rounded-2xl bg-blue-50 dark:bg-blue-950 text-blue-600 dark:text-blue-400 flex items-center justify-center shrink-0">
@@ -254,12 +260,12 @@ export default function ClientPortalQuotationsIndex({
 
                     <div className="p-4 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 shadow-xs flex items-center justify-between">
                         <div>
-                            <p className="text-[11px] font-bold uppercase tracking-wider text-emerald-600 dark:text-emerald-400">Accepted Quotes</p>
+                            <p className="text-[11px] font-bold uppercase tracking-wider text-emerald-600 dark:text-emerald-400">Accepted / Invoices</p>
                             <h3 className="text-xl font-extrabold text-emerald-600 dark:text-emerald-400 mt-0.5">
                                 {formatCurrency(stats.accepted_total)}
                             </h3>
                             <p className="text-[10px] text-emerald-600/80 font-bold mt-1">
-                                Approved proposals
+                                {stats.paid_count || 0} Paid • {stats.accepted_count} Accepted
                             </p>
                         </div>
                         <div className="size-11 rounded-2xl bg-emerald-50 dark:bg-emerald-950 text-emerald-600 dark:text-emerald-400 flex items-center justify-center shrink-0">
@@ -325,6 +331,7 @@ export default function ClientPortalQuotationsIndex({
                             <option value="draft">Draft ({stats.draft_count})</option>
                             <option value="sent">Sent ({stats.sent_count})</option>
                             <option value="accepted">Accepted ({stats.accepted_count})</option>
+                            <option value="paid">Paid ({stats.paid_count || 0})</option>
                             <option value="rejected">Rejected</option>
                             <option value="expired">Expired</option>
                         </select>
@@ -429,6 +436,7 @@ export default function ClientPortalQuotationsIndex({
                                                             <option value="draft">Draft</option>
                                                             <option value="sent">Sent</option>
                                                             <option value="accepted">Accepted</option>
+                                                            <option value="paid">Paid</option>
                                                             <option value="rejected">Rejected</option>
                                                             <option value="expired">Expired</option>
                                                         </select>
@@ -447,6 +455,18 @@ export default function ClientPortalQuotationsIndex({
 
                                             <td className="px-6 py-4 text-right">
                                                 <div className="flex items-center justify-end gap-1.5">
+                                                    {/* Quick Mark as Paid if Accepted */}
+                                                    {hasPermission(user, 'edit-client-portal-quotations') && item.status === 'accepted' && (
+                                                        <button
+                                                            onClick={() => handleStatusChange(item.id, 'paid')}
+                                                            className="h-8 px-2.5 rounded-xl bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-600 hover:text-white transition-all flex items-center gap-1 cursor-pointer text-[11px] font-bold shadow-2xs"
+                                                            title="Mark as Paid"
+                                                        >
+                                                            <CheckCircle2 className="size-3.5" />
+                                                            <span className="hidden sm:inline">Paid</span>
+                                                        </button>
+                                                    )}
+
                                                     <button
                                                         onClick={() => setViewingQuotation(item)}
                                                         className="size-8 rounded-xl bg-purple-50 dark:bg-purple-950/60 text-purple-600 dark:purple-400 hover:bg-purple-600 hover:text-white dark:hover:bg-purple-600 dark:hover:text-white transition-all flex items-center justify-center cursor-pointer shadow-2xs"
@@ -531,6 +551,7 @@ export default function ClientPortalQuotationsIndex({
                                                 <option value="draft">Draft</option>
                                                 <option value="sent">Sent</option>
                                                 <option value="accepted">Accepted</option>
+                                                <option value="paid">Paid</option>
                                                 <option value="rejected">Rejected</option>
                                                 <option value="expired">Expired</option>
                                             </select>
@@ -579,33 +600,32 @@ export default function ClientPortalQuotationsIndex({
                             </div>
                         </div>
 
-                        {/* Line Items Table */}
+                        {/* Line Items Table (No Quantity column) */}
                         <div className="border border-slate-200/80 dark:border-slate-800 rounded-xl overflow-hidden w-full min-w-0">
                             <div className="w-full overflow-x-auto scrollbar-thin">
-                                <table className="w-full min-w-[500px] text-left border-collapse text-xs">
+                                <table className="w-full min-w-[400px] text-left border-collapse text-xs">
                                     <thead>
                                         <tr className="bg-slate-50 dark:bg-slate-800/60 border-b border-slate-200/80 dark:border-slate-800 text-[10px] font-extrabold uppercase text-slate-400 tracking-wider">
                                             <th className="p-3">Description</th>
-                                            <th className="p-3 text-center">Qty</th>
-                                            <th className="p-3 text-right">Price</th>
                                             <th className="p-3 text-right">Amount</th>
                                         </tr>
                                     </thead>
                                     <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60 font-medium">
                                         {viewingQuotation.items && viewingQuotation.items.length > 0 ? (
-                                            viewingQuotation.items.map((item, idx) => (
-                                                <tr key={item.id || idx}>
-                                                    <td className="p-3 font-semibold text-slate-800 dark:text-slate-200">{item.description}</td>
-                                                    <td className="p-3 text-center font-mono">{item.quantity}</td>
-                                                    <td className="p-3 text-right font-mono">{formatCurrency(item.unit_price, viewingQuotation.currency_code)}</td>
-                                                    <td className="p-3 text-right font-bold text-slate-900 dark:text-white font-mono">
-                                                        {formatCurrency(item.amount, viewingQuotation.currency_code)}
-                                                    </td>
-                                                </tr>
-                                            ))
+                                            viewingQuotation.items.map((item, idx) => {
+                                                const cleanAmount = Number(item.amount || item.unit_price || 0);
+                                                return (
+                                                    <tr key={item.id || idx}>
+                                                        <td className="p-3 font-semibold text-slate-800 dark:text-slate-200">{item.description}</td>
+                                                        <td className="p-3 text-right font-bold text-slate-900 dark:text-white font-mono">
+                                                            {formatCurrency(cleanAmount, viewingQuotation.currency_code)}
+                                                        </td>
+                                                    </tr>
+                                                );
+                                            })
                                         ) : (
                                             <tr>
-                                                <td colSpan={4} className="p-4 text-center text-slate-400 italic">No line items.</td>
+                                                <td colSpan={2} className="p-4 text-center text-slate-400 italic">No line items.</td>
                                             </tr>
                                         )}
                                     </tbody>
@@ -658,18 +678,44 @@ export default function ClientPortalQuotationsIndex({
                         )}
 
                         {/* Footer Action */}
-                        <div className="flex items-center justify-between pt-3 border-t border-slate-100 dark:border-slate-800">
-                            <a
-                                href={`/client-portal/quotations/${viewingQuotation.id}/pdf`}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="inline-flex items-center gap-1.5 text-xs text-blue-600 dark:text-blue-400 font-bold hover:underline"
-                            >
-                                <Download className="size-4" />
-                                <span>Download PDF Document</span>
-                            </a>
+                        <div className="flex items-center justify-between pt-3 border-t border-slate-100 dark:border-slate-800 flex-wrap gap-2">
+                            <div className="flex items-center gap-3">
+                                <a
+                                    href={`/client-portal/quotations/${viewingQuotation.id}/print`}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="inline-flex items-center gap-1.5 text-xs text-slate-700 dark:text-slate-300 font-bold hover:text-[#003796] hover:underline"
+                                >
+                                    <Printer className="size-4" />
+                                    <span>Print</span>
+                                </a>
+
+                                <span className="text-slate-300 dark:text-slate-700">&bull;</span>
+
+                                <a
+                                    href={`/client-portal/quotations/${viewingQuotation.id}/pdf`}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="inline-flex items-center gap-1.5 text-xs text-blue-600 dark:text-blue-400 font-bold hover:underline"
+                                >
+                                    <Download className="size-4" />
+                                    <span>Download PDF</span>
+                                </a>
+                            </div>
 
                             <div className="flex items-center gap-2">
+                                {hasPermission(user, 'edit-client-portal-quotations') && viewingQuotation.status === 'accepted' && (
+                                    <button
+                                        type="button"
+                                        onClick={() => handleStatusChange(viewingQuotation.id, 'paid')}
+                                        disabled={updatingStatusId === viewingQuotation.id}
+                                        className="h-10 px-3.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer shadow-xs"
+                                    >
+                                        <CheckCircle2 className="size-4" />
+                                        <span>Mark as Paid</span>
+                                    </button>
+                                )}
+
                                 <Link
                                     href={`/client-portal/quotations/${viewingQuotation.id}`}
                                     className="h-10 px-4 rounded-xl bg-[#003796] hover:bg-[#002b75] text-white text-xs font-bold transition-all flex items-center gap-1.5"

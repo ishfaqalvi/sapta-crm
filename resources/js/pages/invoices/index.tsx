@@ -18,9 +18,10 @@ export interface InvoiceItemData {
     id: number;
     invoice_id: number;
     description: string;
-    quantity: number;
-    unit_price: number;
+    quantity?: number;
+    unit_price?: number;
     amount: number;
+    remaining_cost?: number;
     invoiceable_type?: string | null;
     invoiceable_id?: number | null;
 }

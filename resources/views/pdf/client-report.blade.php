@@ -217,6 +217,16 @@
             padding: 8px;
         }
 
+        .items-table th.text-center,
+        .items-table td.text-center,
+        .text-center { text-align: center !important; }
+        .items-table th.text-right,
+        .items-table td.text-right,
+        .text-right { text-align: right !important; }
+        .items-table th.text-left,
+        .items-table td.text-left,
+        .text-left { text-align: left !important; }
+
         /* Footer */
         .footer {
             margin-top: 25px;

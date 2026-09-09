@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\{Client, WebsiteProject, Currency, SystemSetting, Employee, ProjectTask, ProjectPayment, ClientCredential, ProjectCategory, Invoice, InvoiceItem, User};
 use App\Notifications\CrmNotification;
 use App\Services\CurrencyService;
+use App\Services\TaskNotificationService;
 use App\Traits\AuthorizesClientPortalAccess;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -386,6 +387,7 @@ class ProjectController extends Controller
             'start_date' => 'nullable|date',
             'due_date' => 'nullable|date',
             'description' => 'nullable|string|max:2000',
+            'attachment' => 'nullable|file|max:10240|mimes:jpeg,png,jpg,webp,pdf,doc,docx,xls,xlsx,zip,txt',
         ]);
 
         $validated['assigned_employee_id'] = $request->filled('assigned_employee_id') ? $request->assigned_employee_id : null;
@@ -396,22 +398,14 @@ class ProjectController extends Controller
             $validated['completed_at'] = now();
         }
 
-        $task = ProjectTask::create($validated);
+        $task = new ProjectTask($validated);
+        if ($request->hasFile('attachment')) {
+            $task->attachment = $request->file('attachment');
+        }
+        $task->save();
 
         if ($task->assigned_employee_id) {
-            $employee = Employee::with('user')->find($task->assigned_employee_id);
-            if ($employee && $employee->user) {
-                $project = WebsiteProject::find($task->website_project_id);
-                $projectName = $project ? $project->project_name : 'Project';
-                $employee->user->notify(new CrmNotification(
-                    "New Task Assigned: {$task->task_title}",
-                    "You have been assigned to task '{$task->task_title}' on project '{$projectName}'.",
-                    'task_assigned',
-                    'info',
-                    "/tasks/detail/project/{$task->id}",
-                    ['task_id' => $task->id, 'type' => 'project']
-                ));
-            }
+            TaskNotificationService::notifyAssignedEmployee($task, 'project');
         }
 
         return redirect()->back()->with('success', 'Project task created successfully.');
@@ -441,11 +435,21 @@ class ProjectController extends Controller
             'start_date' => 'nullable|date',
             'due_date' => 'nullable|date',
             'description' => 'nullable|string|max:2000',
+            'attachment' => 'nullable',
+            'remove_attachment' => 'nullable|boolean',
         ]);
+
+        $oldAssignedId = $task->assigned_employee_id;
 
         $validated['assigned_employee_id'] = $request->filled('assigned_employee_id') ? $request->assigned_employee_id : null;
         $validated['start_date'] = $request->filled('start_date') ? $request->start_date : null;
         $validated['due_date'] = $request->filled('due_date') ? $request->due_date : null;
+
+        if ($request->boolean('remove_attachment')) {
+            $task->attachment = null;
+        } elseif ($request->hasFile('attachment')) {
+            $task->attachment = $request->file('attachment');
+        }
 
         if ($validated['status'] === 'completed' && $task->status !== 'completed') {
             $validated['completed_at'] = now();
@@ -453,7 +457,13 @@ class ProjectController extends Controller
             $validated['completed_at'] = null;
         }
 
-        $task->update($validated);
+        unset($validated['attachment'], $validated['remove_attachment']);
+        $task->fill($validated);
+        $task->save();
+
+        if ($task->assigned_employee_id && $task->assigned_employee_id !== $oldAssignedId) {
+            TaskNotificationService::notifyAssignedEmployee($task, 'project', $oldAssignedId);
+        }
 
         return redirect()->back()->with('success', 'Task updated successfully.');
     }
@@ -645,6 +655,12 @@ class ProjectController extends Controller
         $currency = $project ? ($project->currency ?? 'USD') : 'USD';
         $rate = CurrencyService::getRate($currency);
 
+        $totalBudget = (float) ($project?->total_budget ?? 0);
+        $paidSum = (float) ProjectPayment::where('website_project_id', $milestone->website_project_id)
+            ->where('status', 'paid')
+            ->sum('amount');
+        $remainingBudget = max(0, round($totalBudget - ($paidSum + (float) $milestone->amount), 2));
+
         $invoiceNumber = Invoice::generateNextInvoiceNumber();
 
         $invoice = Invoice::create([
@@ -670,6 +686,7 @@ class ProjectController extends Controller
             'quantity' => 1.00,
             'unit_price' => $milestone->amount,
             'amount' => $milestone->amount,
+            'remaining_cost' => $remainingBudget,
             'invoiceable_type' => ProjectPayment::class,
             'invoiceable_id' => $milestone->id,
         ]);

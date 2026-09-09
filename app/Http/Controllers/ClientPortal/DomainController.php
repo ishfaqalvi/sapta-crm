@@ -357,6 +357,7 @@ class DomainController extends Controller
             'quantity' => 1.00,
             'unit_price' => $amount,
             'amount' => $amount,
+            'remaining_cost' => 0.00,
             'invoiceable_type' => DomainPayment::class,
             'invoiceable_id' => $payment->id,
         ]);
@@ -448,6 +449,7 @@ class DomainController extends Controller
             'quantity' => 1.00,
             'unit_price' => $amount,
             'amount' => $amount,
+            'remaining_cost' => 0.00,
             'invoiceable_type' => ClientDomain::class,
             'invoiceable_id' => $domain->id,
         ]);

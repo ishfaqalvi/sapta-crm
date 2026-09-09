@@ -1,5 +1,5 @@
+import FilePreviewModal from '@/components/file-preview-modal';
 import Pagination, { type PaginatedData } from '@/components/pagination';
-import TaskConversationModal, { type ConversationTaskInfo } from '@/components/task-conversation-modal';
 import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem, type SharedData } from '@/types';
 import { Head, Link, router, usePage } from '@inertiajs/react';
@@ -10,8 +10,12 @@ import {
     Briefcase,
     Calendar,
     CheckCircle2,
+    CheckSquare,
     Clock,
+    Download,
     ExternalLink,
+    Eye,
+    FileText,
     Filter,
     FolderKanban,
     Globe,
@@ -20,6 +24,7 @@ import {
     ListTodo,
     Loader2,
     MessageSquare,
+    Paperclip,
     RotateCcw,
     Search,
     Server,
@@ -34,22 +39,35 @@ export interface AssignedTaskSource {
     id: number;
     project_name?: string;
     service_name?: string;
+    total_budget?: number | string | null;
+    currency?: string | null;
+    total_budget_pkr?: number | string | null;
+    monthly_fee?: number | string | null;
+    monthly_fee_pkr?: number | string | null;
+    contract_months?: number | null;
+    billing_day?: number | null;
+    start_date?: string | null;
+    deadline?: string | null;
+    progress_percentage?: number | null;
+    status?: string | null;
+    notes?: string | null;
     client?: {
         id: number;
         name: string;
         company_name?: string;
         client_code: string;
         currency: string;
-    };
+    } | null;
     category?: {
         id: number;
         name: string;
-    };
+    } | null;
 }
 
 export interface MyTaskItem {
     id: number;
-    source_type?: 'project' | 'service';
+    source_type?: 'project' | 'service' | 'general';
+    task_code?: string;
     website_project_id?: number;
     client_service_id?: number;
     assigned_employee_id?: number;
@@ -59,11 +77,14 @@ export interface MyTaskItem {
     start_date?: string | null;
     due_date?: string | null;
     description?: string | null;
+    attachment?: string | null;
+    attachment_name?: string | null;
     completed_at?: string | null;
     created_at: string;
     messages_count?: number;
     website_project?: AssignedTaskSource | null;
     service?: AssignedTaskSource | null;
+    task_category?: { id: number; name: string } | null;
     assigned_employee?: {
         id: number;
         name: string;
@@ -123,40 +144,17 @@ export default function MyTasksIndex({
     const [selectedService, setSelectedService] = useState(filters?.service_id || '');
     const [updatingTaskId, setUpdatingTaskId] = useState<number | null>(null);
 
-    // Task Conversation State
-    const [conversationTask, setConversationTask] = useState<ConversationTaskInfo | null>(null);
-    const [isConversationOpen, setIsConversationOpen] = useState(false);
-
-    const openTaskConversation = (t: MyTaskItem) => {
-        const isService = t.source_type === 'service';
-        const sourceTitle = isService
-            ? t.service?.service_name || 'Client Service'
-            : t.website_project?.project_name || 'Website Project';
-        const sourceId = isService ? (t.client_service_id || t.service?.id) : (t.website_project_id || t.website_project?.id);
-        const sourceClient = isService ? t.service?.client : t.website_project?.client;
-
-        setConversationTask({
-            id: t.id,
-            task_title: t.task_title,
-            priority: t.priority,
-            status: t.status,
-            start_date: t.start_date,
-            due_date: t.due_date,
-            completed_at: t.completed_at,
-            description: t.description,
-            source_type: t.source_type || 'project',
-            source_id: sourceId,
-            source_title: sourceTitle,
-            client: sourceClient ? {
-                id: sourceClient.id,
-                name: sourceClient.name,
-                company_name: sourceClient.company_name,
-                client_code: sourceClient.client_code,
-            } : null,
-            assigned_employee: t.assigned_employee,
-        });
-        setIsConversationOpen(true);
-    };
+    // Detail Popups / Modals State
+    const [viewingTask, setViewingTask] = useState<MyTaskItem | null>(null);
+    const [viewingGeneralTask, setViewingGeneralTask] = useState<MyTaskItem | null>(null);
+    const [viewingProjectTask, setViewingProjectTask] = useState<MyTaskItem | null>(null);
+    const [viewingServiceTask, setViewingServiceTask] = useState<MyTaskItem | null>(null);
+    const [previewFile, setPreviewFile] = useState<{
+        url: string;
+        name?: string;
+        type?: string;
+        size?: number;
+    } | null>(null);
 
     const isFirstRender = useRef(true);
 
@@ -206,10 +204,12 @@ export default function MyTasksIndex({
         if (task.status === newStatus || updatingTaskId === task.id) return;
 
         setUpdatingTaskId(task.id);
-        const endpoint =
-            task.source_type === 'service' || task.client_service_id
-                ? `/my-tasks/service-task/${task.id}/status`
-                : `/my-tasks/${task.id}/status`;
+        let endpoint = `/my-tasks/${task.id}/status`;
+        if (task.source_type === 'general' || task.task_category) {
+            endpoint = `/my-tasks/general-task/${task.id}/status`;
+        } else if (task.source_type === 'service' || task.client_service_id) {
+            endpoint = `/my-tasks/service-task/${task.id}/status`;
+        }
 
         router.post(
             endpoint,
@@ -460,6 +460,10 @@ export default function MyTasksIndex({
                                         setSelectedSourceType(e.target.value);
                                         if (e.target.value === 'project') setSelectedService('');
                                         if (e.target.value === 'service') setSelectedProject('');
+                                        if (e.target.value === 'general') {
+                                            setSelectedProject('');
+                                            setSelectedService('');
+                                        }
                                     }}
                                     aria-label="Filter by Source"
                                     className="w-full h-10 px-3 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-xs font-semibold text-slate-700 dark:text-slate-300 focus:outline-none focus:ring-2 focus:ring-blue-600/20 cursor-pointer"
@@ -467,11 +471,12 @@ export default function MyTasksIndex({
                                     <option value="">All Sources</option>
                                     <option value="project">Projects Only</option>
                                     <option value="service">Services Only</option>
+                                    <option value="general">General Tasks Only</option>
                                 </select>
                             </div>
 
                             {/* Project Filter */}
-                            {selectedSourceType !== 'service' && projects.length > 0 && (
+                            {selectedSourceType !== 'service' && selectedSourceType !== 'general' && projects.length > 0 && (
                                 <div className="min-w-[150px]">
                                     <select
                                         value={selectedProject}
@@ -490,7 +495,7 @@ export default function MyTasksIndex({
                             )}
 
                             {/* Service Filter */}
-                            {selectedSourceType !== 'project' && services.length > 0 && (
+                            {selectedSourceType !== 'project' && selectedSourceType !== 'general' && services.length > 0 && (
                                 <div className="min-w-[150px]">
                                     <select
                                         value={selectedService}
@@ -588,16 +593,28 @@ export default function MyTasksIndex({
                                     tasks.data.map((task) => {
                                         const dueInfo = getDueDateStatus(task.due_date, task.status);
                                         const isUpdating = updatingTaskId === task.id;
-                                        const isService = task.source_type === 'service' || Boolean(task.client_service_id);
-                                        const sourceTitle = isService
-                                            ? task.service?.service_name || 'Client Service'
-                                            : task.website_project?.project_name || 'Website Project';
-                                        const sourceClient = isService
-                                            ? task.service?.client
-                                            : task.website_project?.client;
-                                        const targetUrl = isService
-                                            ? `/client-portal/services/${task.client_service_id || task.service?.id}?tab=tasks`
-                                            : `/client-portal/projects/${task.website_project_id || task.website_project?.id}?tab=tasks`;
+                                        const isGeneral = task.source_type === 'general' || Boolean(task.task_category);
+                                        const isService = !isGeneral && (task.source_type === 'service' || Boolean(task.client_service_id));
+                                        const sourceTitle = isGeneral
+                                            ? task.task_category?.name || 'General Task'
+                                            : isService
+                                                ? task.service?.service_name || 'Client Service'
+                                                : task.website_project?.project_name || 'Website Project';
+                                        const sourceClient = isGeneral
+                                            ? null
+                                            : isService
+                                                ? task.service?.client
+                                                : task.website_project?.client;
+
+                                        const handleOpenModal = () => {
+                                            if (isGeneral) {
+                                                setViewingGeneralTask(task);
+                                            } else if (isService) {
+                                                setViewingServiceTask(task);
+                                            } else {
+                                                setViewingProjectTask(task);
+                                            }
+                                        };
 
                                         return (
                                             <tr
@@ -605,22 +622,69 @@ export default function MyTasksIndex({
                                                 className={`hover:bg-blue-50/20 dark:hover:bg-slate-800/40 transition-colors ${task.status === 'completed' ? 'opacity-75' : ''
                                                     }`}
                                             >
-                                                {/* Task Title */}
-                                                <td className="py-4 px-4 align-top max-w-[280px]">
-                                                    <Link
-                                                        href={`/tasks/detail/${task.source_type || 'project'}/${task.id}`}
-                                                        className="text-left font-black text-slate-900 dark:text-white hover:text-blue-600 dark:hover:text-blue-400 transition-colors text-xs block leading-snug"
-                                                        title="View Task Details & Discussion Page"
-                                                    >
-                                                        {task.task_title}
-                                                    </Link>
+                                                {/* Task Title & Details */}
+                                                <td className="py-4 px-4 align-top max-w-[320px]">
+                                                    <div className="space-y-1.5">
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => setViewingTask(task)}
+                                                            className="text-left font-black text-slate-900 dark:text-white hover:text-blue-600 dark:hover:text-blue-400 transition-colors text-xs block leading-snug cursor-pointer"
+                                                            title="Click to view full task details"
+                                                        >
+                                                            {task.task_title}
+                                                        </button>
+                                                        <div className="flex items-center gap-1.5 flex-wrap">
+                                                            {task.task_code && (
+                                                                <span className="inline-block text-[10px] font-mono font-bold px-1.5 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400">
+                                                                    #{task.task_code}
+                                                                </span>
+                                                            )}
+                                                            {task.attachment && (
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() => setPreviewFile({
+                                                                        url: task.attachment!,
+                                                                        name: task.attachment_name || task.task_title,
+                                                                    })}
+                                                                    className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400 hover:underline text-[10px] font-bold border border-blue-200/60 cursor-pointer"
+                                                                    title="Preview Attached Document"
+                                                                >
+                                                                    <Paperclip className="size-2.5" />
+                                                                    <span>Doc</span>
+                                                                </button>
+                                                            )}
+                                                        </div>
+                                                        {/* Task Description / Instructions Snippet */}
+                                                        {task.description ? (
+                                                            <p
+                                                                onClick={() => setViewingTask(task)}
+                                                                className="text-[11px] text-slate-500 dark:text-slate-400 line-clamp-2 leading-relaxed cursor-pointer hover:text-slate-700 dark:hover:text-slate-200 transition-colors"
+                                                                title="Click to view full description in popup"
+                                                            >
+                                                                {task.description}
+                                                            </p>
+                                                        ) : (
+                                                            <span className="text-[10px] text-slate-400 italic">
+                                                                No description
+                                                            </span>
+                                                        )}
+                                                    </div>
                                                 </td>
 
                                                 {/* Source & Client */}
                                                 <td className="py-4 px-4 align-top">
                                                     <div className="space-y-1">
-                                                        <div className="flex items-center gap-1.5">
-                                                            {isService ? (
+                                                        <button
+                                                            type="button"
+                                                            onClick={handleOpenModal}
+                                                            className="flex items-center gap-1.5 flex-wrap text-left hover:opacity-85 transition-opacity cursor-pointer"
+                                                            title="Click to view details in popup"
+                                                        >
+                                                            {isGeneral ? (
+                                                                <span className="px-1.5 py-0.5 rounded-md text-[9px] font-black uppercase tracking-wider bg-emerald-50 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300 border border-emerald-200/50">
+                                                                    General
+                                                                </span>
+                                                            ) : isService ? (
                                                                 <span className="px-1.5 py-0.5 rounded-md text-[9px] font-black uppercase tracking-wider bg-purple-50 text-purple-700 dark:bg-purple-950/60 dark:text-purple-300 border border-purple-200/50">
                                                                     Service
                                                                 </span>
@@ -632,7 +696,7 @@ export default function MyTasksIndex({
                                                             <span className="font-bold text-slate-800 dark:text-slate-200 text-xs">
                                                                 {sourceTitle}
                                                             </span>
-                                                        </div>
+                                                        </button>
                                                         {sourceClient && (
                                                             <div className="flex items-center gap-1.5 text-[11px] text-slate-400 font-medium">
                                                                 <Globe className="size-3 text-cyan-500 shrink-0" />
@@ -700,25 +764,40 @@ export default function MyTasksIndex({
 
                                                 {/* Action Link to Workspace & Conversation */}
                                                 <td className="py-4 px-4 align-top text-right whitespace-nowrap">
-                                                    <div className="inline-flex items-center gap-2">
-                                                        {/* CONVERSATION / QUERY BUTTON */}
+                                                    <div className="inline-flex items-center gap-1.5">
+                                                        {/* CONVERSATION / QUERY BUTTON (DIRECT LINK TO DEDICATED PAGE) */}
                                                         <Link
-                                                            href={`/tasks/detail/${task.source_type || 'project'}/${task.id}`}
+                                                            href={`/tasks/detail/${isGeneral ? 'general' : isService ? 'service' : 'project'}/${task.id}`}
                                                             className="h-8 px-2.5 rounded-xl bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400 hover:bg-gradient-to-r hover:from-[#003796] hover:via-[#0052D4] hover:to-[#1d4ed8] hover:text-white font-bold text-xs inline-flex items-center gap-1.5 cursor-pointer shadow-2xs transition-all border border-blue-200/50 hover:border-transparent"
-                                                            title="Open Task Details & Discussion Page"
+                                                            title="Open Task Discussion & Details Page"
                                                         >
                                                             <MessageSquare className="size-3.5" />
                                                             <span>{task.messages_count || 0}</span>
                                                         </Link>
 
-                                                        <Link
-                                                            href={targetUrl}
-                                                            className="px-3 py-1.5 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-gradient-to-r hover:from-[#003796] hover:via-[#0052D4] hover:to-[#1d4ed8] hover:text-white dark:hover:text-white hover:shadow-md hover:shadow-blue-600/20 active:scale-[0.99] transition-all inline-flex items-center gap-1.5 text-xs font-bold"
-                                                            title={isService ? 'Open Service Workspace' : 'Open Project Workspace'}
+                                                        {/* TASK DETAILS POPUP BUTTON */}
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => setViewingTask(task)}
+                                                            className="px-2.5 py-1.5 rounded-xl bg-blue-600 text-white hover:bg-blue-700 active:scale-[0.99] transition-all inline-flex items-center gap-1 text-xs font-bold cursor-pointer shadow-2xs"
+                                                            title="View Full Task Details & Instructions"
                                                         >
-                                                            <span>{isService ? 'View Service' : 'View Project'}</span>
-                                                            <ArrowRight className="size-3.5" />
-                                                        </Link>
+                                                            <FileText className="size-3.5" />
+                                                            <span>Task Detail</span>
+                                                        </button>
+
+                                                        {/* PROJECT / SERVICE POPUP BUTTON */}
+                                                        {!isGeneral && (
+                                                            <button
+                                                                type="button"
+                                                                onClick={handleOpenModal}
+                                                                className="px-2 py-1.5 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 transition-all inline-flex items-center gap-1 text-xs font-bold cursor-pointer"
+                                                                title={isService ? 'View Service Scope Popup' : 'View Project Scope Popup'}
+                                                            >
+                                                                <Eye className="size-3" />
+                                                                <span>{isService ? 'Service' : 'Project'}</span>
+                                                            </button>
+                                                        )}
                                                     </div>
                                                 </td>
                                             </tr>
@@ -737,7 +816,7 @@ export default function MyTasksIndex({
                                                 <p className="text-xs text-slate-400 font-medium">
                                                     {hasActiveFilters
                                                         ? 'Try adjusting your search criteria or resetting filters.'
-                                                        : 'You currently have no project or service deliverables assigned to you.'}
+                                                        : 'You currently have no project, service, or general deliverables assigned to you.'}
                                                 </p>
                                                 {hasActiveFilters && (
                                                     <button
@@ -760,20 +839,787 @@ export default function MyTasksIndex({
                 {/* 4. Pagination */}
                 <Pagination meta={tasks} />
 
-                {/* TASK CONVERSATION & QUERY MODAL */}
-                <TaskConversationModal
-                    isOpen={isConversationOpen}
-                    onClose={() => setIsConversationOpen(false)}
-                    task={conversationTask}
-                    currentUserId={user?.id}
-                    onMessageCountChange={(taskId, newCount) => {
-                        if (tasks?.data) {
-                            const target = tasks.data.find((t) => t.id === taskId);
-                            if (target) {
-                                target.messages_count = newCount;
-                            }
-                        }
-                    }}
+                {/* 5. DEDICATED TASK DETAILS POPUP MODAL */}
+                {viewingTask && (
+                    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-900/60 backdrop-blur-xs overflow-y-auto animate-in fade-in duration-200">
+                        <div className="w-full max-w-2xl max-h-[92vh] my-auto overflow-y-auto rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-5 sm:p-6 shadow-2xl space-y-4 text-left">
+                            {/* Header */}
+                            <div className="flex items-start justify-between border-b border-slate-100 dark:border-slate-800 pb-3 gap-3">
+                                <div className="space-y-1.5 min-w-0">
+                                    <div className="flex items-center gap-2 flex-wrap">
+                                        {viewingTask.source_type === 'general' || viewingTask.task_category ? (
+                                            <span className="px-2 py-0.5 rounded-md bg-emerald-50 dark:bg-emerald-950/60 text-[10px] font-black uppercase tracking-wider text-emerald-700 dark:text-emerald-300 border border-emerald-200/60">
+                                                General Task
+                                            </span>
+                                        ) : viewingTask.source_type === 'service' || viewingTask.client_service_id ? (
+                                            <span className="px-2 py-0.5 rounded-md bg-purple-50 dark:bg-purple-950/60 text-[10px] font-black uppercase tracking-wider text-purple-700 dark:text-purple-300 border border-purple-200/60">
+                                                Client Service
+                                            </span>
+                                        ) : (
+                                            <span className="px-2 py-0.5 rounded-md bg-blue-50 dark:bg-blue-950/60 text-[10px] font-black uppercase tracking-wider text-blue-700 dark:text-blue-300 border border-blue-200/60">
+                                                Website Project
+                                            </span>
+                                        )}
+                                        {viewingTask.task_code && (
+                                            <span className="px-2 py-0.5 rounded-md bg-slate-100 dark:bg-slate-800 text-[10px] font-mono font-extrabold text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700">
+                                                #{viewingTask.task_code}
+                                            </span>
+                                        )}
+                                        {getPriorityBadge(viewingTask.priority)}
+                                        <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-extrabold uppercase border ${getStatusOptionClass(viewingTask.status)}`}>
+                                            {viewingTask.status.replace('_', ' ')}
+                                        </span>
+                                    </div>
+                                    <h2 className="text-base sm:text-xl font-black text-slate-900 dark:text-white leading-snug">
+                                        {viewingTask.task_title}
+                                    </h2>
+                                </div>
+                                <button
+                                    type="button"
+                                    onClick={() => setViewingTask(null)}
+                                    className="p-1.5 rounded-xl text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-all shrink-0 cursor-pointer"
+                                >
+                                    <X className="size-4" />
+                                </button>
+                            </div>
+
+                            {/* Source Information & Client Context Card */}
+                            <div className="p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-950 border border-slate-200/80 dark:border-slate-800 flex items-center justify-between gap-3 flex-wrap sm:flex-nowrap">
+                                <div className="flex items-center gap-3 min-w-0">
+                                    <div className="size-10 rounded-xl bg-blue-50 dark:bg-blue-950/80 text-blue-600 dark:text-blue-400 border border-blue-200/60 flex items-center justify-center shrink-0">
+                                        {viewingTask.source_type === 'general' ? <Briefcase className="size-5" /> : <Globe className="size-5" />}
+                                    </div>
+                                    <div className="min-w-0">
+                                        <div className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                                            {viewingTask.source_type === 'general' ? 'Task Category' : viewingTask.source_type === 'service' ? 'Associated Service' : 'Associated Project'}
+                                        </div>
+                                        <div className="text-xs sm:text-sm font-extrabold text-slate-900 dark:text-white truncate">
+                                            {viewingTask.source_type === 'general'
+                                                ? viewingTask.task_category?.name || 'General Operations'
+                                                : viewingTask.source_type === 'service'
+                                                    ? viewingTask.service?.service_name || 'Client Service'
+                                                    : viewingTask.website_project?.project_name || 'Website Project'}
+                                        </div>
+                                        {((viewingTask.website_project?.client) || (viewingTask.service?.client)) && (
+                                            <div className="text-[11px] text-slate-500 dark:text-slate-400 font-medium truncate">
+                                                Client: {(viewingTask.website_project?.client?.company_name || viewingTask.website_project?.client?.name || viewingTask.service?.client?.company_name || viewingTask.service?.client?.name)}
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+
+                                {/* Quick Link to Project/Service Modal */}
+                                {viewingTask.source_type === 'project' && viewingTask.website_project && (
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            const p = viewingTask;
+                                            setViewingTask(null);
+                                            setViewingProjectTask(p);
+                                        }}
+                                        className="px-3 py-1.5 rounded-xl bg-blue-50 hover:bg-blue-100 dark:bg-blue-950/60 dark:hover:bg-blue-900/60 text-blue-700 dark:text-blue-300 text-xs font-bold transition-all inline-flex items-center gap-1.5 shrink-0 border border-blue-200/60 cursor-pointer"
+                                    >
+                                        <Eye className="size-3.5" />
+                                        <span>View Project Details</span>
+                                    </button>
+                                )}
+                                {viewingTask.source_type === 'service' && viewingTask.service && (
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            const s = viewingTask;
+                                            setViewingTask(null);
+                                            setViewingServiceTask(s);
+                                        }}
+                                        className="px-3 py-1.5 rounded-xl bg-purple-50 hover:bg-purple-100 dark:bg-purple-950/60 dark:hover:bg-purple-900/60 text-purple-700 dark:text-purple-300 text-xs font-bold transition-all inline-flex items-center gap-1.5 shrink-0 border border-purple-200/60 cursor-pointer"
+                                    >
+                                        <Eye className="size-3.5" />
+                                        <span>View Service Details</span>
+                                    </button>
+                                )}
+                            </div>
+
+                            {/* Quick Metrics Grid */}
+                            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+                                <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200/80 dark:border-slate-800 space-y-0.5">
+                                    <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Assigned Staff</span>
+                                    <p className="text-xs font-bold text-slate-900 dark:text-white truncate">
+                                        {viewingTask.assigned_employee?.name || employee?.name || 'Assigned Staff'}
+                                    </p>
+                                </div>
+                                <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200/80 dark:border-slate-800 space-y-0.5">
+                                    <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Start Date</span>
+                                    <p className="text-xs font-bold text-slate-900 dark:text-white">
+                                        {viewingTask.start_date ? formatDate(viewingTask.start_date) : 'Not specified'}
+                                    </p>
+                                </div>
+                                <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200/80 dark:border-slate-800 space-y-0.5">
+                                    <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Due Date (Deadline)</span>
+                                    <p className="text-xs font-black text-rose-600 dark:text-rose-400">
+                                        {viewingTask.due_date ? formatDate(viewingTask.due_date) : 'No deadline'}
+                                    </p>
+                                </div>
+                                <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200/80 dark:border-slate-800 space-y-0.5">
+                                    <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Priority Level</span>
+                                    <p className="text-xs font-black uppercase text-slate-800 dark:text-slate-200">
+                                        {viewingTask.priority}
+                                    </p>
+                                </div>
+                            </div>
+
+                            {/* Description & Detailed Instructions */}
+                            <div className="space-y-1.5">
+                                <span className="text-[11px] font-extrabold text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
+                                    <FileText className="size-3.5 text-blue-600" />
+                                    Task Description & Instructions
+                                </span>
+                                <div className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-950 border border-slate-200/80 dark:border-slate-800 text-xs font-medium text-slate-700 dark:text-slate-300 whitespace-pre-wrap max-h-56 overflow-y-auto leading-relaxed">
+                                    {viewingTask.description || (
+                                        <span className="text-slate-400 italic">No description or instructions provided for this task.</span>
+                                    )}
+                                </div>
+                            </div>
+
+                            {/* Attachment Box */}
+                            {viewingTask.attachment && (
+                                <div className="p-3.5 rounded-2xl bg-blue-50/50 dark:bg-blue-950/40 border border-blue-200/80 dark:border-blue-900/60 flex items-center justify-between gap-3">
+                                    <div className="flex items-center gap-2.5 min-w-0">
+                                        <div className="size-9 rounded-xl bg-blue-100 dark:bg-blue-900/60 text-blue-600 dark:text-blue-400 flex items-center justify-center shrink-0">
+                                            <Paperclip className="size-4" />
+                                        </div>
+                                        <div className="min-w-0">
+                                            <p className="text-xs font-extrabold text-slate-900 dark:text-white truncate">
+                                                {viewingTask.attachment_name || 'Task Attachment Document'}
+                                            </p>
+                                            <span className="text-[10px] text-blue-600 dark:text-blue-400 font-bold">
+                                                Attached Deliverable Document
+                                            </span>
+                                        </div>
+                                    </div>
+                                    <div className="flex items-center gap-1.5 shrink-0">
+                                        <button
+                                            type="button"
+                                            onClick={() => setPreviewFile({
+                                                url: viewingTask.attachment!,
+                                                name: viewingTask.attachment_name || viewingTask.task_title,
+                                            })}
+                                            className="h-8 px-3 rounded-xl bg-blue-600 text-white text-xs font-bold hover:bg-blue-700 transition-all inline-flex items-center gap-1.5 cursor-pointer shadow-xs"
+                                        >
+                                            <Eye className="size-3.5" />
+                                            <span>Preview</span>
+                                        </button>
+                                        <a
+                                            href={viewingTask.attachment}
+                                            download
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="size-8 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 flex items-center justify-center transition-all cursor-pointer"
+                                            title="Download File"
+                                        >
+                                            <Download className="size-3.5" />
+                                        </a>
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* Modal Footer */}
+                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-3 border-t border-slate-100 dark:border-slate-800">
+                                <div className="flex items-center gap-2">
+                                    <span className="text-[11px] font-bold text-slate-500">Status:</span>
+                                    <select
+                                        value={viewingTask.status}
+                                        onChange={(e) => {
+                                            const newSt = e.target.value;
+                                            handleStatusChange(viewingTask, newSt);
+                                            setViewingTask({ ...viewingTask, status: newSt as any });
+                                        }}
+                                        className={`h-8 px-2.5 rounded-xl text-xs font-black uppercase tracking-wider border focus:outline-none cursor-pointer ${getStatusOptionClass(viewingTask.status)}`}
+                                    >
+                                        <option value="todo">To Do</option>
+                                        <option value="in_progress">In Progress</option>
+                                        <option value="in_review">In Review</option>
+                                        <option value="completed">Completed</option>
+                                        <option value="cancelled">Cancelled</option>
+                                    </select>
+                                </div>
+
+                                <div className="flex items-center gap-2 justify-end">
+                                    <Link
+                                        href={`/tasks/detail/${viewingTask.source_type || 'project'}/${viewingTask.id}`}
+                                        className="h-9 px-3.5 rounded-xl bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400 hover:bg-blue-100 dark:hover:bg-blue-900/60 text-xs font-bold transition-all inline-flex items-center gap-1.5 cursor-pointer border border-blue-200/60 dark:border-blue-800/60"
+                                    >
+                                        <MessageSquare className="size-3.5" />
+                                        <span>Discussion ({viewingTask.messages_count || 0})</span>
+                                    </Link>
+                                    <button
+                                        type="button"
+                                        onClick={() => setViewingTask(null)}
+                                        className="h-9 px-4 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 text-xs font-bold transition-all cursor-pointer"
+                                    >
+                                        Close
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                )}
+
+                {/* 6. GENERAL TASK DETAILS MODAL */}
+                {viewingGeneralTask && (
+                    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-900/60 backdrop-blur-xs overflow-y-auto animate-in fade-in duration-200">
+                        <div className="w-full max-w-xl max-h-[92vh] my-auto overflow-y-auto rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-5 sm:p-6 shadow-2xl space-y-4 text-left">
+                            {/* Header */}
+                            <div className="flex items-start justify-between border-b border-slate-100 dark:border-slate-800 pb-3 gap-3">
+                                <div className="space-y-1 min-w-0">
+                                    <div className="flex items-center gap-2 flex-wrap">
+                                        <span className="px-2 py-0.5 rounded-md bg-emerald-50 dark:bg-emerald-950/60 text-[10px] font-black uppercase tracking-wider text-emerald-700 dark:text-emerald-300 border border-emerald-200/60">
+                                            General Task
+                                        </span>
+                                        {viewingGeneralTask.task_code && (
+                                            <span className="px-2 py-0.5 rounded-md bg-blue-50 dark:bg-blue-950/60 text-[10px] font-mono font-extrabold text-blue-600 dark:text-blue-400 border border-blue-200 dark:border-blue-800">
+                                                #{viewingGeneralTask.task_code}
+                                            </span>
+                                        )}
+                                        {getPriorityBadge(viewingGeneralTask.priority)}
+                                        <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-extrabold uppercase border ${getStatusOptionClass(viewingGeneralTask.status)}`}>
+                                            {viewingGeneralTask.status.replace('_', ' ')}
+                                        </span>
+                                    </div>
+                                    <h2 className="text-base sm:text-lg font-black text-slate-900 dark:text-white pt-1 leading-snug">
+                                        {viewingGeneralTask.task_title}
+                                    </h2>
+                                </div>
+                                <button
+                                    type="button"
+                                    onClick={() => setViewingGeneralTask(null)}
+                                    className="p-1.5 rounded-xl text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-all shrink-0 cursor-pointer"
+                                >
+                                    <X className="size-4" />
+                                </button>
+                            </div>
+
+                            {/* Quick Details Grid */}
+                            <div className="grid grid-cols-2 gap-2.5">
+                                <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200/80 dark:border-slate-800 space-y-0.5">
+                                    <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Category</span>
+                                    <p className="text-xs font-bold text-slate-900 dark:text-white truncate">
+                                        {viewingGeneralTask.task_category?.name || 'General Operations'}
+                                    </p>
+                                </div>
+                                <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200/80 dark:border-slate-800 space-y-0.5">
+                                    <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Assigned Staff</span>
+                                    <p className="text-xs font-bold text-slate-900 dark:text-white truncate">
+                                        {viewingGeneralTask.assigned_employee?.name || employee?.name || 'Assigned Staff'}
+                                    </p>
+                                </div>
+                                <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200/80 dark:border-slate-800 space-y-0.5">
+                                    <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Start Date</span>
+                                    <p className="text-xs font-bold text-slate-900 dark:text-white">
+                                        {viewingGeneralTask.start_date ? formatDate(viewingGeneralTask.start_date) : 'Not specified'}
+                                    </p>
+                                </div>
+                                <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200/80 dark:border-slate-800 space-y-0.5">
+                                    <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Due Date (Deadline)</span>
+                                    <p className="text-xs font-black text-rose-600 dark:text-rose-400">
+                                        {viewingGeneralTask.due_date ? formatDate(viewingGeneralTask.due_date) : 'No deadline'}
+                                    </p>
+                                </div>
+                            </div>
+
+                            {/* Description & Scope */}
+                            <div className="space-y-1">
+                                <span className="text-[11px] font-extrabold text-slate-700 dark:text-slate-300">
+                                    Description & Instructions
+                                </span>
+                                <div className="p-3.5 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200/80 dark:border-slate-800 text-xs font-medium text-slate-700 dark:text-slate-300 whitespace-pre-wrap max-h-44 overflow-y-auto leading-relaxed">
+                                    {viewingGeneralTask.description || (
+                                        <span className="text-slate-400 italic">No description provided for this task.</span>
+                                    )}
+                                </div>
+                            </div>
+
+                            {/* Attachment Box */}
+                            {viewingGeneralTask.attachment && (
+                                <div className="p-3.5 rounded-2xl bg-blue-50/50 dark:bg-blue-950/40 border border-blue-200/80 dark:border-blue-900/60 flex items-center justify-between gap-3">
+                                    <div className="flex items-center gap-2.5 min-w-0">
+                                        <div className="size-9 rounded-xl bg-blue-100 dark:bg-blue-900/60 text-blue-600 dark:text-blue-400 flex items-center justify-center shrink-0">
+                                            <Paperclip className="size-4" />
+                                        </div>
+                                        <div className="min-w-0">
+                                            <p className="text-xs font-extrabold text-slate-900 dark:text-white truncate">
+                                                {viewingGeneralTask.attachment_name || 'Task Attachment Document'}
+                                            </p>
+                                            <span className="text-[10px] text-blue-600 dark:text-blue-400 font-bold">
+                                                Attached Deliverable Document
+                                            </span>
+                                        </div>
+                                    </div>
+                                    <div className="flex items-center gap-1.5 shrink-0">
+                                        <button
+                                            type="button"
+                                            onClick={() => setPreviewFile({
+                                                url: viewingGeneralTask.attachment!,
+                                                name: viewingGeneralTask.attachment_name || viewingGeneralTask.task_title,
+                                            })}
+                                            className="h-8 px-3 rounded-xl bg-blue-600 text-white text-xs font-bold hover:bg-blue-700 transition-all inline-flex items-center gap-1.5 cursor-pointer shadow-xs"
+                                        >
+                                            <Eye className="size-3.5" />
+                                            <span>Preview</span>
+                                        </button>
+                                        <a
+                                            href={viewingGeneralTask.attachment}
+                                            download
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="size-8 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 flex items-center justify-center transition-all cursor-pointer"
+                                            title="Download File"
+                                        >
+                                            <Download className="size-3.5" />
+                                        </a>
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* Modal Footer */}
+                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-3 border-t border-slate-100 dark:border-slate-800">
+                                <div className="flex items-center gap-2">
+                                    <span className="text-[11px] font-bold text-slate-500">Status:</span>
+                                    <select
+                                        value={viewingGeneralTask.status}
+                                        onChange={(e) => {
+                                            const newSt = e.target.value;
+                                            handleStatusChange(viewingGeneralTask, newSt);
+                                            setViewingGeneralTask({ ...viewingGeneralTask, status: newSt as any });
+                                        }}
+                                        className={`h-8 px-2.5 rounded-xl text-xs font-black uppercase tracking-wider border focus:outline-none cursor-pointer ${getStatusOptionClass(viewingGeneralTask.status)}`}
+                                    >
+                                        <option value="todo">To Do</option>
+                                        <option value="in_progress">In Progress</option>
+                                        <option value="in_review">In Review</option>
+                                        <option value="completed">Completed</option>
+                                        <option value="cancelled">Cancelled</option>
+                                    </select>
+                                </div>
+
+                                <div className="flex items-center gap-2 justify-end">
+                                    <Link
+                                        href={`/tasks/detail/general/${viewingGeneralTask.id}`}
+                                        className="h-9 px-3.5 rounded-xl bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400 hover:bg-blue-100 dark:hover:bg-blue-900/60 text-xs font-bold transition-all inline-flex items-center gap-1.5 cursor-pointer border border-blue-200/60 dark:border-blue-800/60"
+                                    >
+                                        <MessageSquare className="size-3.5" />
+                                        <span>Discussion ({viewingGeneralTask.messages_count || 0})</span>
+                                    </Link>
+                                    <button
+                                        type="button"
+                                        onClick={() => setViewingGeneralTask(null)}
+                                        className="h-9 px-4 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 text-xs font-bold transition-all cursor-pointer"
+                                    >
+                                        Close
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                )}
+
+                {/* 6. PROJECT DETAILS MODAL */}
+                {viewingProjectTask && viewingProjectTask.website_project && (
+                    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-900/60 backdrop-blur-xs overflow-y-auto animate-in fade-in duration-200">
+                        <div className="w-full max-w-2xl max-h-[92vh] my-auto overflow-y-auto rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-5 sm:p-6 shadow-2xl space-y-4 text-left">
+                            {/* Header */}
+                            <div className="flex items-start justify-between border-b border-slate-100 dark:border-slate-800 pb-3 gap-3">
+                                <div className="space-y-1 min-w-0">
+                                    <div className="flex items-center gap-2 flex-wrap">
+                                        <span className="px-2.5 py-0.5 rounded-md bg-blue-50 dark:bg-blue-950/60 text-[10px] font-black uppercase tracking-wider text-blue-700 dark:text-blue-300 border border-blue-200/60">
+                                            Website Project
+                                        </span>
+                                        {viewingProjectTask.website_project.category && (
+                                            <span className="px-2 py-0.5 rounded-md bg-slate-100 dark:bg-slate-800 text-[10px] font-bold text-slate-600 dark:text-slate-400">
+                                                {viewingProjectTask.website_project.category.name}
+                                            </span>
+                                        )}
+                                        <span className="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold uppercase border bg-emerald-50 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300 border-emerald-200/60">
+                                            {viewingProjectTask.website_project.status || 'Active'}
+                                        </span>
+                                    </div>
+                                    <h2 className="text-base sm:text-xl font-black text-slate-900 dark:text-white pt-1 leading-snug">
+                                        {viewingProjectTask.website_project.project_name}
+                                    </h2>
+                                </div>
+                                <button
+                                    type="button"
+                                    onClick={() => setViewingProjectTask(null)}
+                                    className="p-1.5 rounded-xl text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-all shrink-0 cursor-pointer"
+                                >
+                                    <X className="size-4" />
+                                </button>
+                            </div>
+
+                            {/* Client Info Card */}
+                            {viewingProjectTask.website_project.client && (
+                                <div className="p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-950 border border-slate-200/80 dark:border-slate-800 flex items-center justify-between gap-3">
+                                    <div className="flex items-center gap-3 min-w-0">
+                                        <div className="size-10 rounded-xl bg-blue-50 dark:bg-blue-950/80 text-blue-600 dark:text-blue-400 border border-blue-200/60 flex items-center justify-center shrink-0">
+                                            <Globe className="size-5" />
+                                        </div>
+                                        <div className="min-w-0">
+                                            <div className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Client / Company</div>
+                                            <div className="text-xs sm:text-sm font-extrabold text-slate-900 dark:text-white truncate">
+                                                {viewingProjectTask.website_project.client.company_name || viewingProjectTask.website_project.client.name}
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div className="text-right shrink-0">
+                                        <span className="text-[10px] font-mono font-bold px-2 py-1 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-300 block">
+                                            {viewingProjectTask.website_project.client.client_code}
+                                        </span>
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* Project Metrics Grid (Operational info only - no budget) */}
+                            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
+                                <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200/80 dark:border-slate-800 space-y-0.5">
+                                    <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Start Date</span>
+                                    <p className="text-xs font-bold text-slate-900 dark:text-white">
+                                        {viewingProjectTask.website_project.start_date ? formatDate(viewingProjectTask.website_project.start_date) : '-'}
+                                    </p>
+                                </div>
+                                <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200/80 dark:border-slate-800 space-y-0.5">
+                                    <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Deadline</span>
+                                    <p className="text-xs font-black text-rose-600 dark:text-rose-400">
+                                        {viewingProjectTask.website_project.deadline ? formatDate(viewingProjectTask.website_project.deadline) : 'Ongoing'}
+                                    </p>
+                                </div>
+                                <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200/80 dark:border-slate-800 space-y-0.5">
+                                    <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Progress</span>
+                                    <p className="text-xs font-black text-blue-600 dark:text-blue-400 font-mono">
+                                        {viewingProjectTask.website_project.progress_percentage ?? 0}%
+                                    </p>
+                                </div>
+                            </div>
+
+                            {/* Current Deliverable Section */}
+                            <div className="p-4 rounded-2xl bg-blue-50/40 dark:bg-blue-950/30 border border-blue-200/60 dark:border-blue-900/50 space-y-2">
+                                <div className="flex items-center justify-between">
+                                    <span className="text-[11px] font-extrabold uppercase tracking-wider text-blue-800 dark:text-blue-300 flex items-center gap-1.5">
+                                        <CheckSquare className="size-3.5" />
+                                        Your Assigned Deliverable
+                                    </span>
+                                    <div className="flex items-center gap-1.5">
+                                        {getPriorityBadge(viewingProjectTask.priority)}
+                                        <span className={`px-2 py-0.5 rounded-full text-[10px] font-black uppercase border ${getStatusOptionClass(viewingProjectTask.status)}`}>
+                                            {viewingProjectTask.status.replace('_', ' ')}
+                                        </span>
+                                    </div>
+                                </div>
+                                <h4 className="text-sm font-extrabold text-slate-900 dark:text-white">
+                                    {viewingProjectTask.task_title}
+                                </h4>
+                                {viewingProjectTask.description && (
+                                    <p className="text-xs text-slate-600 dark:text-slate-400 whitespace-pre-wrap leading-relaxed">
+                                        {viewingProjectTask.description}
+                                    </p>
+                                )}
+                            </div>
+
+                            {/* Project Notes (if any) */}
+                            {viewingProjectTask.website_project.notes && (
+                                <div className="space-y-1">
+                                    <span className="text-[11px] font-extrabold text-slate-700 dark:text-slate-300">Project Notes & Brief</span>
+                                    <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200/80 dark:border-slate-800 text-xs text-slate-600 dark:text-slate-400 whitespace-pre-wrap max-h-32 overflow-y-auto">
+                                        {viewingProjectTask.website_project.notes}
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* Task Attachment if any */}
+                            {viewingProjectTask.attachment && (
+                                <div className="p-3.5 rounded-2xl bg-blue-50/50 dark:bg-blue-950/40 border border-blue-200/80 dark:border-blue-900/60 flex items-center justify-between gap-3">
+                                    <div className="flex items-center gap-2.5 min-w-0">
+                                        <div className="size-9 rounded-xl bg-blue-100 dark:bg-blue-900/60 text-blue-600 dark:text-blue-400 flex items-center justify-center shrink-0">
+                                            <Paperclip className="size-4" />
+                                        </div>
+                                        <div className="min-w-0">
+                                            <p className="text-xs font-extrabold text-slate-900 dark:text-white truncate">
+                                                {viewingProjectTask.attachment_name || 'Deliverable Attachment'}
+                                            </p>
+                                            <span className="text-[10px] text-blue-600 dark:text-blue-400 font-bold">
+                                                Attached Deliverable Document
+                                            </span>
+                                        </div>
+                                    </div>
+                                    <div className="flex items-center gap-1.5 shrink-0">
+                                        <button
+                                            type="button"
+                                            onClick={() => setPreviewFile({
+                                                url: viewingProjectTask.attachment!,
+                                                name: viewingProjectTask.attachment_name || viewingProjectTask.task_title,
+                                            })}
+                                            className="h-8 px-3 rounded-xl bg-blue-600 text-white text-xs font-bold hover:bg-blue-700 transition-all inline-flex items-center gap-1.5 cursor-pointer shadow-xs"
+                                        >
+                                            <Eye className="size-3.5" />
+                                            <span>Preview</span>
+                                        </button>
+                                        <a
+                                            href={viewingProjectTask.attachment}
+                                            download
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="size-8 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 flex items-center justify-center transition-all cursor-pointer"
+                                            title="Download File"
+                                        >
+                                            <Download className="size-3.5" />
+                                        </a>
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* Modal Footer */}
+                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-3 border-t border-slate-100 dark:border-slate-800">
+                                <div className="flex items-center gap-2">
+                                    <span className="text-[11px] font-bold text-slate-500">Status:</span>
+                                    <select
+                                        value={viewingProjectTask.status}
+                                        onChange={(e) => {
+                                            const newSt = e.target.value;
+                                            handleStatusChange(viewingProjectTask, newSt);
+                                            setViewingProjectTask({ ...viewingProjectTask, status: newSt as any });
+                                        }}
+                                        className={`h-8 px-2.5 rounded-xl text-xs font-black uppercase tracking-wider border focus:outline-none cursor-pointer ${getStatusOptionClass(viewingProjectTask.status)}`}
+                                    >
+                                        <option value="todo">To Do</option>
+                                        <option value="in_progress">In Progress</option>
+                                        <option value="in_review">In Review</option>
+                                        <option value="completed">Completed</option>
+                                        <option value="cancelled">Cancelled</option>
+                                    </select>
+                                </div>
+
+                                <div className="flex items-center gap-2 justify-end">
+                                    <Link
+                                        href={`/tasks/detail/project/${viewingProjectTask.id}`}
+                                        className="h-9 px-3.5 rounded-xl bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400 hover:bg-blue-100 dark:hover:bg-blue-900/60 text-xs font-bold transition-all inline-flex items-center gap-1.5 cursor-pointer border border-blue-200/60 dark:border-blue-800/60"
+                                    >
+                                        <MessageSquare className="size-3.5" />
+                                        <span>Discussion ({viewingProjectTask.messages_count || 0})</span>
+                                    </Link>
+                                    <button
+                                        type="button"
+                                        onClick={() => setViewingProjectTask(null)}
+                                        className="h-9 px-4 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 text-xs font-bold transition-all cursor-pointer"
+                                    >
+                                        Close
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                )}
+
+                {/* 7. SERVICE DETAILS MODAL */}
+                {viewingServiceTask && viewingServiceTask.service && (
+                    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-900/60 backdrop-blur-xs overflow-y-auto animate-in fade-in duration-200">
+                        <div className="w-full max-w-2xl max-h-[92vh] my-auto overflow-y-auto rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-5 sm:p-6 shadow-2xl space-y-4 text-left">
+                            {/* Header */}
+                            <div className="flex items-start justify-between border-b border-slate-100 dark:border-slate-800 pb-3 gap-3">
+                                <div className="space-y-1 min-w-0">
+                                    <div className="flex items-center gap-2 flex-wrap">
+                                        <span className="px-2.5 py-0.5 rounded-md bg-purple-50 dark:bg-purple-950/60 text-[10px] font-black uppercase tracking-wider text-purple-700 dark:text-purple-300 border border-purple-200/60">
+                                            Client Service
+                                        </span>
+                                        {viewingServiceTask.service.category && (
+                                            <span className="px-2 py-0.5 rounded-md bg-slate-100 dark:bg-slate-800 text-[10px] font-bold text-slate-600 dark:text-slate-400">
+                                                {viewingServiceTask.service.category.name}
+                                            </span>
+                                        )}
+                                        <span className="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold uppercase border bg-emerald-50 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300 border-emerald-200/60">
+                                            {viewingServiceTask.service.status || 'Active'}
+                                        </span>
+                                    </div>
+                                    <h2 className="text-base sm:text-xl font-black text-slate-900 dark:text-white pt-1 leading-snug">
+                                        {viewingServiceTask.service.service_name}
+                                    </h2>
+                                </div>
+                                <button
+                                    type="button"
+                                    onClick={() => setViewingServiceTask(null)}
+                                    className="p-1.5 rounded-xl text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-all shrink-0 cursor-pointer"
+                                >
+                                    <X className="size-4" />
+                                </button>
+                            </div>
+
+                            {/* Client Info Card */}
+                            {viewingServiceTask.service.client && (
+                                <div className="p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-950 border border-slate-200/80 dark:border-slate-800 flex items-center justify-between gap-3">
+                                    <div className="flex items-center gap-3 min-w-0">
+                                        <div className="size-10 rounded-xl bg-purple-50 dark:bg-purple-950/80 text-purple-600 dark:text-purple-400 border border-purple-200/60 flex items-center justify-center shrink-0">
+                                            <Globe className="size-5" />
+                                        </div>
+                                        <div className="min-w-0">
+                                            <div className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Client / Company</div>
+                                            <div className="text-xs sm:text-sm font-extrabold text-slate-900 dark:text-white truncate">
+                                                {viewingServiceTask.service.client.company_name || viewingServiceTask.service.client.name}
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div className="text-right shrink-0">
+                                        <span className="text-[10px] font-mono font-bold px-2 py-1 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-300 block">
+                                            {viewingServiceTask.service.client.client_code}
+                                        </span>
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* Service Metrics Grid (Operational info only - no fee) */}
+                            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
+                                <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200/80 dark:border-slate-800 space-y-0.5">
+                                    <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Billing Day</span>
+                                    <p className="text-xs font-bold text-slate-900 dark:text-white">
+                                        {viewingServiceTask.service.billing_day ? `Day ${viewingServiceTask.service.billing_day}` : 'Monthly'}
+                                    </p>
+                                </div>
+                                <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200/80 dark:border-slate-800 space-y-0.5">
+                                    <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Contract</span>
+                                    <p className="text-xs font-bold text-slate-900 dark:text-white">
+                                        {viewingServiceTask.service.contract_months ? `${viewingServiceTask.service.contract_months} Months` : 'Recurring'}
+                                    </p>
+                                </div>
+                                <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200/80 dark:border-slate-800 space-y-0.5">
+                                    <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Start Date</span>
+                                    <p className="text-xs font-bold text-slate-900 dark:text-white">
+                                        {viewingServiceTask.service.start_date ? formatDate(viewingServiceTask.service.start_date) : '-'}
+                                    </p>
+                                </div>
+                            </div>
+
+                            {/* Current Deliverable Section */}
+                            <div className="p-4 rounded-2xl bg-purple-50/40 dark:bg-purple-950/30 border border-purple-200/60 dark:border-purple-900/50 space-y-2">
+                                <div className="flex items-center justify-between">
+                                    <span className="text-[11px] font-extrabold uppercase tracking-wider text-purple-800 dark:text-purple-300 flex items-center gap-1.5">
+                                        <CheckSquare className="size-3.5" />
+                                        Your Assigned Deliverable
+                                    </span>
+                                    <div className="flex items-center gap-1.5">
+                                        {getPriorityBadge(viewingServiceTask.priority)}
+                                        <span className={`px-2 py-0.5 rounded-full text-[10px] font-black uppercase border ${getStatusOptionClass(viewingServiceTask.status)}`}>
+                                            {viewingServiceTask.status.replace('_', ' ')}
+                                        </span>
+                                    </div>
+                                </div>
+                                <h4 className="text-sm font-extrabold text-slate-900 dark:text-white">
+                                    {viewingServiceTask.task_title}
+                                </h4>
+                                {viewingServiceTask.description && (
+                                    <p className="text-xs text-slate-600 dark:text-slate-400 whitespace-pre-wrap leading-relaxed">
+                                        {viewingServiceTask.description}
+                                    </p>
+                                )}
+                            </div>
+
+                            {/* Service Notes & Scope (if any) */}
+                            {viewingServiceTask.service.notes && (
+                                <div className="space-y-1">
+                                    <span className="text-[11px] font-extrabold text-slate-700 dark:text-slate-300">Service Notes & Scope</span>
+                                    <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200/80 dark:border-slate-800 text-xs text-slate-600 dark:text-slate-400 whitespace-pre-wrap max-h-32 overflow-y-auto">
+                                        {viewingServiceTask.service.notes}
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* Task Attachment if any */}
+                            {viewingServiceTask.attachment && (
+                                <div className="p-3.5 rounded-2xl bg-purple-50/50 dark:bg-purple-950/40 border border-purple-200/80 dark:border-purple-900/60 flex items-center justify-between gap-3">
+                                    <div className="flex items-center gap-2.5 min-w-0">
+                                        <div className="size-9 rounded-xl bg-purple-100 dark:bg-purple-900/60 text-purple-600 dark:text-purple-400 flex items-center justify-center shrink-0">
+                                            <Paperclip className="size-4" />
+                                        </div>
+                                        <div className="min-w-0">
+                                            <p className="text-xs font-extrabold text-slate-900 dark:text-white truncate">
+                                                {viewingServiceTask.attachment_name || 'Deliverable Attachment'}
+                                            </p>
+                                            <span className="text-[10px] text-purple-600 dark:text-purple-400 font-bold">
+                                                Attached Deliverable Document
+                                            </span>
+                                        </div>
+                                    </div>
+                                    <div className="flex items-center gap-1.5 shrink-0">
+                                        <button
+                                            type="button"
+                                            onClick={() => setPreviewFile({
+                                                url: viewingServiceTask.attachment!,
+                                                name: viewingServiceTask.attachment_name || viewingServiceTask.task_title,
+                                            })}
+                                            className="h-8 px-3 rounded-xl bg-purple-600 text-white text-xs font-bold hover:bg-purple-700 transition-all inline-flex items-center gap-1.5 cursor-pointer shadow-xs"
+                                        >
+                                            <Eye className="size-3.5" />
+                                            <span>Preview</span>
+                                        </button>
+                                        <a
+                                            href={viewingServiceTask.attachment}
+                                            download
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="size-8 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 flex items-center justify-center transition-all cursor-pointer"
+                                            title="Download File"
+                                        >
+                                            <Download className="size-3.5" />
+                                        </a>
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* Modal Footer */}
+                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-3 border-t border-slate-100 dark:border-slate-800">
+                                <div className="flex items-center gap-2">
+                                    <span className="text-[11px] font-bold text-slate-500">Status:</span>
+                                    <select
+                                        value={viewingServiceTask.status}
+                                        onChange={(e) => {
+                                            const newSt = e.target.value;
+                                            handleStatusChange(viewingServiceTask, newSt);
+                                            setViewingServiceTask({ ...viewingServiceTask, status: newSt as any });
+                                        }}
+                                        className={`h-8 px-2.5 rounded-xl text-xs font-black uppercase tracking-wider border focus:outline-none cursor-pointer ${getStatusOptionClass(viewingServiceTask.status)}`}
+                                    >
+                                        <option value="todo">To Do</option>
+                                        <option value="in_progress">In Progress</option>
+                                        <option value="in_review">In Review</option>
+                                        <option value="completed">Completed</option>
+                                        <option value="cancelled">Cancelled</option>
+                                    </select>
+                                </div>
+
+                                <div className="flex items-center gap-2 justify-end">
+                                    <Link
+                                        href={`/tasks/detail/service/${viewingServiceTask.id}`}
+                                        className="h-9 px-3.5 rounded-xl bg-purple-50 dark:bg-purple-950/60 text-purple-600 dark:text-purple-400 hover:bg-purple-100 dark:hover:bg-purple-900/60 text-xs font-bold transition-all inline-flex items-center gap-1.5 cursor-pointer border border-purple-200/60 dark:border-purple-800/60"
+                                    >
+                                        <MessageSquare className="size-3.5" />
+                                        <span>Discussion ({viewingServiceTask.messages_count || 0})</span>
+                                    </Link>
+                                    <button
+                                        type="button"
+                                        onClick={() => setViewingServiceTask(null)}
+                                        className="h-9 px-4 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 text-xs font-bold transition-all cursor-pointer"
+                                    >
+                                        Close
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                )}
+
+                {/* 8. FILE PREVIEW MODAL */}
+                <FilePreviewModal
+                    isOpen={!!previewFile}
+                    onClose={() => setPreviewFile(null)}
+                    fileUrl={previewFile?.url || null}
+                    fileName={previewFile?.name || null}
+                    fileType={previewFile?.type || null}
+                    fileSize={previewFile?.size || null}
                 />
             </div>
         </AppLayout>

@@ -187,9 +187,8 @@ export default function InvoicesShow({ invoice, companyInfo }: InvoicesShowProps
                                 <tr>
                                     <th className="px-6 py-3.5">#</th>
                                     <th className="px-6 py-3.5">Item Description</th>
-                                    <th className="px-6 py-3.5 text-center">Qty</th>
-                                    <th className="px-6 py-3.5 text-right">Unit Price</th>
-                                    <th className="px-6 py-3.5 text-right">Total Amount</th>
+                                    <th className="px-6 py-3.5 text-right">Amount</th>
+                                    <th className="px-6 py-3.5 text-right">Remaining Cost</th>
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
@@ -206,14 +205,11 @@ export default function InvoicesShow({ invoice, companyInfo }: InvoicesShowProps
                                                 </span>
                                             )}
                                         </td>
-                                        <td className="px-6 py-4 text-center font-bold text-slate-700 dark:text-slate-300">
-                                            {item.quantity}
-                                        </td>
-                                        <td className="px-6 py-4 text-right font-bold text-slate-700 dark:text-slate-300">
-                                            {formatCurrency(item.unit_price)}
-                                        </td>
                                         <td className="px-6 py-4 text-right font-black text-slate-900 dark:text-white">
                                             {formatCurrency(item.amount)}
+                                        </td>
+                                        <td className="px-6 py-4 text-right font-bold text-slate-600 dark:text-slate-400">
+                                            {formatCurrency(item.remaining_cost ?? 0)}
                                         </td>
                                     </tr>
                                 ))}

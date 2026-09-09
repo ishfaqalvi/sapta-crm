@@ -1,5 +1,6 @@
 import SearchableSelect from '@/components/searchable-select';
 import DocumentsTab, { type ClientDocumentItem } from '@/components/documents-tab';
+import FilePreviewModal from '@/components/file-preview-modal';
 import TaskConversationModal, { type ConversationTaskInfo } from '@/components/task-conversation-modal';
 import ClientPortalLayout from '@/layouts/client-portal-layout';
 import { type BreadcrumbItem, type SharedData } from '@/types';
@@ -17,6 +18,7 @@ import {
     Clock,
     Copy,
     DollarSign,
+    Download,
     Edit2,
     Eye,
     EyeOff,
@@ -28,12 +30,14 @@ import {
     ListTodo,
     LoaderCircle,
     MessageSquare,
+    Paperclip,
     Plus,
     Printer,
     Receipt,
     ShieldCheck,
     Sparkles,
     Trash2,
+    UploadCloud,
     User,
     X,
     Zap,
@@ -43,8 +47,8 @@ import { useState } from 'react';
 interface TaskEmployee {
     id: number;
     name: string;
-    employee_code: string;
-    avatar?: string;
+    employee_code?: string;
+    avatar?: string | null;
 }
 
 interface ProjectTaskItem {
@@ -55,6 +59,8 @@ interface ProjectTaskItem {
     due_date?: string;
     start_date?: string;
     description?: string;
+    attachment?: string | null;
+    attachment_name?: string | null;
     assigned_employee_id?: number | null;
     assigned_employee?: TaskEmployee;
     messages_count?: number;
@@ -217,6 +223,16 @@ export default function ClientPortalProjectsShow({
         setIsConversationOpen(true);
     };
 
+    const [previewFile, setPreviewFile] = useState<{
+        url: string;
+        name?: string;
+        type?: string;
+        size?: number;
+    } | null>(null);
+
+    const [taskAttachment, setTaskAttachment] = useState<File | null>(null);
+    const [removeTaskAttachment, setRemoveTaskAttachment] = useState(false);
+
     const [taskFormData, setTaskFormData] = useState({
         assigned_employee_id: '' as string | number,
         task_title: '',
@@ -298,20 +314,39 @@ export default function ClientPortalProjectsShow({
     ];
 
     const formatDateOnly = (dateStr?: string | null) => {
-        if (!dateStr) return '-';
-        const cleanDate = dateStr.includes('T') ? dateStr.split('T')[0] : dateStr.split(' ')[0];
-        const parts = cleanDate.split('-');
-        if (parts.length === 3) {
-            const year = parseInt(parts[0], 10);
-            const month = parseInt(parts[1], 10) - 1;
-            const day = parseInt(parts[2], 10);
-            if (!isNaN(year) && !isNaN(month) && !isNaN(day) && month >= 0 && month < 12) {
-                const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-                const formattedDay = day < 10 ? `0${day}` : `${day}`;
-                return `${formattedDay} ${months[month]} ${year}`;
-            }
+        if (!dateStr || dateStr.trim() === '' || dateStr === '-') return '—';
+
+        const alreadyFormattedRegex = /^\d{1,2}\s+(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\s+\d{4}$/i;
+        if (alreadyFormattedRegex.test(dateStr.trim())) {
+            return dateStr.trim();
         }
-        return cleanDate;
+
+        try {
+            const isoMatch = dateStr.match(/^(\d{4})-(\d{2})-(\d{2})/);
+            if (isoMatch) {
+                const year = parseInt(isoMatch[1], 10);
+                const month = parseInt(isoMatch[2], 10) - 1;
+                const day = parseInt(isoMatch[3], 10);
+                const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+                if (month >= 0 && month < 12 && !isNaN(day) && !isNaN(year)) {
+                    const formattedDay = day < 10 ? `0${day}` : `${day}`;
+                    return `${formattedDay} ${months[month]} ${year}`;
+                }
+            }
+
+            const date = new Date(dateStr);
+            if (!isNaN(date.getTime())) {
+                return date.toLocaleDateString('en-GB', {
+                    day: '2-digit',
+                    month: 'short',
+                    year: 'numeric',
+                });
+            }
+        } catch {
+            // fallback
+        }
+
+        return dateStr;
     };
 
     const formatCurrency = (val: number | string) => {
@@ -464,6 +499,8 @@ export default function ClientPortalProjectsShow({
             due_date: new Date().toISOString().split('T')[0],
             description: '',
         });
+        setTaskAttachment(null);
+        setRemoveTaskAttachment(false);
         setTaskErrors({});
         setIsTaskModalOpen(true);
     };
@@ -478,6 +515,8 @@ export default function ClientPortalProjectsShow({
             due_date: t.due_date ? t.due_date.split('T')[0].split(' ')[0] : '',
             description: t.description || '',
         });
+        setTaskAttachment(null);
+        setRemoveTaskAttachment(false);
         setTaskErrors({});
         setIsTaskModalOpen(true);
     };
@@ -487,38 +526,47 @@ export default function ClientPortalProjectsShow({
         setIsTaskSubmitting(true);
         setTaskErrors({});
 
-        const payload = {
-            website_project_id: project.id,
-            ...taskFormData,
-        };
-
-        if (editingTask) {
-            router.post(`/client-portal/projects/tasks/update/${editingTask.id}`, payload, {
-                preserveScroll: true,
-                onSuccess: () => {
-                    setIsTaskModalOpen(false);
-                    setIsTaskSubmitting(false);
-                    setTaskErrors({});
-                },
-                onError: (errs) => {
-                    setIsTaskSubmitting(false);
-                    setTaskErrors(errs || {});
-                },
-            });
-        } else {
-            router.post('/client-portal/projects/tasks/store', payload, {
-                preserveScroll: true,
-                onSuccess: () => {
-                    setIsTaskModalOpen(false);
-                    setIsTaskSubmitting(false);
-                    setTaskErrors({});
-                },
-                onError: (errs) => {
-                    setIsTaskSubmitting(false);
-                    setTaskErrors(errs || {});
-                },
-            });
+        const formData = new FormData();
+        formData.append('website_project_id', String(project.id));
+        formData.append('task_title', taskFormData.task_title);
+        formData.append('priority', taskFormData.priority);
+        formData.append('status', taskFormData.status);
+        if (taskFormData.assigned_employee_id) {
+            formData.append('assigned_employee_id', String(taskFormData.assigned_employee_id));
         }
+        if (taskFormData.due_date) {
+            formData.append('due_date', taskFormData.due_date);
+        }
+        if (taskFormData.description) {
+            formData.append('description', taskFormData.description);
+        }
+        if (taskAttachment) {
+            formData.append('attachment', taskAttachment);
+        }
+        if (removeTaskAttachment) {
+            formData.append('remove_attachment', '1');
+        }
+
+        const endpoint = editingTask
+            ? `/client-portal/projects/tasks/update/${editingTask.id}`
+            : '/client-portal/projects/tasks/store';
+
+        router.post(endpoint, formData, {
+            forceFormData: true,
+            preserveScroll: true,
+            onSuccess: () => {
+                setIsTaskModalOpen(false);
+                setIsTaskSubmitting(false);
+                setTaskAttachment(null);
+                setRemoveTaskAttachment(false);
+                setTaskErrors({});
+            },
+            onError: (errs) => {
+                setIsTaskSubmitting(false);
+                setTaskErrors(errs || {});
+            },
+            onFinish: () => setIsTaskSubmitting(false),
+        });
     };
 
     const handleTaskStatusQuickChange = (task: ProjectTaskItem, newStatus: string) => {
@@ -1163,18 +1211,47 @@ export default function ClientPortalProjectsShow({
                                             project.tasks.map((task) => (
                                                 <tr key={task.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/40 transition-colors">
                                                     <td className="px-3 py-3.5 font-bold text-slate-900 dark:text-white">
-                                                        <Link
-                                                            href={`/tasks/detail/project/${task.id}`}
-                                                            className="text-left font-bold text-slate-900 dark:text-white hover:text-blue-600 dark:hover:text-blue-400 transition-colors block leading-snug"
-                                                            title="View Task Details & Discussion Page"
-                                                        >
-                                                            {task.task_title}
-                                                        </Link>
+                                                        <div className="space-y-1">
+                                                            <Link
+                                                                href={`/tasks/detail/project/${task.id}`}
+                                                                className="text-left font-bold text-slate-900 dark:text-white hover:text-blue-600 dark:hover:text-blue-400 transition-colors block leading-snug"
+                                                                title="View Task Details & Discussion Page"
+                                                            >
+                                                                {task.task_title}
+                                                            </Link>
+                                                            {task.attachment && (
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() =>
+                                                                        setPreviewFile({
+                                                                            url: task.attachment!,
+                                                                            name: task.attachment_name || task.task_title,
+                                                                        })
+                                                                    }
+                                                                    className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-lg bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400 hover:bg-blue-100 dark:hover:bg-blue-900/60 text-[10px] font-bold border border-blue-200/60 dark:border-blue-800/60 cursor-pointer transition-colors max-w-full"
+                                                                    title="Click to Preview Attachment"
+                                                                >
+                                                                    <Paperclip className="size-3 shrink-0" />
+                                                                    <span className="truncate max-w-[160px]">
+                                                                        {task.attachment_name || 'Attachment'}
+                                                                    </span>
+                                                                    <Eye className="size-2.5 shrink-0 opacity-70" />
+                                                                </button>
+                                                            )}
+                                                        </div>
                                                     </td>
                                                     <td className="px-3 py-3.5 whitespace-nowrap">
                                                         {task.assigned_employee ? (
                                                             <div className="flex items-center gap-2">
-                                                                <User className="size-3.5 text-slate-400" />
+                                                                {task.assigned_employee.avatar ? (
+                                                                    <img
+                                                                        src={task.assigned_employee.avatar}
+                                                                        alt={task.assigned_employee.name}
+                                                                        className="size-6 rounded-full object-cover border border-slate-200 dark:border-slate-700"
+                                                                    />
+                                                                ) : (
+                                                                    <User className="size-3.5 text-slate-400" />
+                                                                )}
                                                                 <span className="font-semibold text-slate-800 dark:text-slate-200 text-xs">
                                                                     {task.assigned_employee.name}
                                                                 </span>
@@ -1630,7 +1707,7 @@ export default function ClientPortalProjectsShow({
                 {/* TASK MODAL (Create / Edit) */}
                 {isTaskModalOpen && (
                     <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-900/60 backdrop-blur-xs overflow-y-auto">
-                        <div className="w-full max-w-lg max-h-[90vh] my-auto overflow-y-auto rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-4 sm:p-6 shadow-2xl space-y-4 animate-in fade-in zoom-in-95 duration-200">
+                        <div className="w-full max-w-2xl sm:max-w-3xl my-auto rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-5 sm:p-6 shadow-2xl space-y-4 animate-in fade-in zoom-in-95 duration-200">
                             <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-3">
                                 <div className="flex items-center gap-2.5">
                                     <div className="p-2.5 rounded-xl bg-blue-50 dark:bg-blue-950 text-blue-600 dark:text-blue-400">
@@ -1652,43 +1729,47 @@ export default function ClientPortalProjectsShow({
                                 </button>
                             </div>
 
-                            <form noValidate onSubmit={handleTaskSubmit} className="space-y-4">
-                                <div className="space-y-1.5">
-                                    <label className="text-xs font-bold text-slate-700 dark:text-slate-300">Task Title *</label>
-                                    <input
-                                        type="text"
-                                        value={taskFormData.task_title}
-                                        onChange={(e) => {
-                                            setTaskFormData({ ...taskFormData, task_title: e.target.value });
-                                            if (taskErrors.task_title) setTaskErrors({ ...taskErrors, task_title: '' });
-                                        }}
-                                        placeholder="e.g. Design Homepage Wireframe"
-                                        className={`w-full h-11 px-4 rounded-xl bg-slate-50 dark:bg-slate-950 border text-xs font-medium focus:ring-2 focus:ring-blue-500 focus:outline-none ${taskErrors.task_title ? 'border-rose-500 text-rose-600' : 'border-slate-200 dark:border-slate-800'
-                                            }`}
-                                    />
-                                    {taskErrors.task_title && (
-                                        <p className="text-[11px] font-bold text-rose-600 dark:text-rose-400 mt-1">{taskErrors.task_title}</p>
-                                    )}
+                            <form noValidate onSubmit={handleTaskSubmit} className="space-y-3.5">
+                                {/* ROW 1: TASK TITLE & ASSIGNED EMPLOYEE (2 COLUMNS) */}
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                                    <div className="space-y-1.5">
+                                        <label className="text-xs font-bold text-slate-700 dark:text-slate-300">Task Title *</label>
+                                        <input
+                                            type="text"
+                                            value={taskFormData.task_title}
+                                            onChange={(e) => {
+                                                setTaskFormData({ ...taskFormData, task_title: e.target.value });
+                                                if (taskErrors.task_title) setTaskErrors({ ...taskErrors, task_title: '' });
+                                            }}
+                                            placeholder="e.g. Design Homepage Wireframe"
+                                            className={`w-full h-10 px-3.5 rounded-xl bg-slate-50 dark:bg-slate-950 border text-xs font-medium focus:ring-2 focus:ring-blue-500 focus:outline-none ${taskErrors.task_title ? 'border-rose-500 text-rose-600' : 'border-slate-200 dark:border-slate-800'
+                                                }`}
+                                        />
+                                        {taskErrors.task_title && (
+                                            <p className="text-[11px] font-bold text-rose-600 dark:text-rose-400 mt-1">{taskErrors.task_title}</p>
+                                        )}
+                                    </div>
+
+                                    <div className="space-y-1.5">
+                                        <label className="text-xs font-bold text-slate-700 dark:text-slate-300">Assigned Employee</label>
+                                        <SearchableSelect
+                                            options={employeeOptions}
+                                            value={taskFormData.assigned_employee_id}
+                                            onChange={(val) => {
+                                                setTaskFormData({ ...taskFormData, assigned_employee_id: val });
+                                                if (taskErrors.assigned_employee_id) setTaskErrors({ ...taskErrors, assigned_employee_id: '' });
+                                            }}
+                                            placeholder="Unassigned (Select Employee...)"
+                                            searchPlaceholder="Type employee name or code..."
+                                        />
+                                        {taskErrors.assigned_employee_id && (
+                                            <p className="text-[11px] font-bold text-rose-600 dark:text-rose-400 mt-1">{taskErrors.assigned_employee_id}</p>
+                                        )}
+                                    </div>
                                 </div>
 
-                                <div className="space-y-1.5">
-                                    <label className="text-xs font-bold text-slate-700 dark:text-slate-300">Assigned Employee</label>
-                                    <SearchableSelect
-                                        options={employeeOptions}
-                                        value={taskFormData.assigned_employee_id}
-                                        onChange={(val) => {
-                                            setTaskFormData({ ...taskFormData, assigned_employee_id: val });
-                                            if (taskErrors.assigned_employee_id) setTaskErrors({ ...taskErrors, assigned_employee_id: '' });
-                                        }}
-                                        placeholder="Unassigned (Select Employee...)"
-                                        searchPlaceholder="Type employee name or code..."
-                                    />
-                                    {taskErrors.assigned_employee_id && (
-                                        <p className="text-[11px] font-bold text-rose-600 dark:text-rose-400 mt-1">{taskErrors.assigned_employee_id}</p>
-                                    )}
-                                </div>
-
-                                <div className="grid grid-cols-2 gap-4">
+                                {/* ROW 2: PRIORITY, STATUS, DUE DATE (3 COLUMNS) */}
+                                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5">
                                     <div className="space-y-1.5">
                                         <label className="text-xs font-bold text-slate-700 dark:text-slate-300">Priority</label>
                                         <select
@@ -1697,7 +1778,7 @@ export default function ClientPortalProjectsShow({
                                                 setTaskFormData({ ...taskFormData, priority: e.target.value as any });
                                                 if (taskErrors.priority) setTaskErrors({ ...taskErrors, priority: '' });
                                             }}
-                                            className={`w-full h-11 px-3 rounded-xl bg-slate-50 dark:bg-slate-950 border text-xs font-semibold focus:ring-2 focus:ring-blue-500 focus:outline-none ${taskErrors.priority ? 'border-rose-500 text-rose-600' : 'border-slate-200 dark:border-slate-800'
+                                            className={`w-full h-10 px-3 rounded-xl bg-slate-50 dark:bg-slate-950 border text-xs font-semibold focus:ring-2 focus:ring-blue-500 focus:outline-none ${taskErrors.priority ? 'border-rose-500 text-rose-600' : 'border-slate-200 dark:border-slate-800'
                                                 }`}
                                         >
                                             <option value="low">Low</option>
@@ -1718,7 +1799,7 @@ export default function ClientPortalProjectsShow({
                                                 setTaskFormData({ ...taskFormData, status: e.target.value as any });
                                                 if (taskErrors.status) setTaskErrors({ ...taskErrors, status: '' });
                                             }}
-                                            className={`w-full h-11 px-3 rounded-xl bg-slate-50 dark:bg-slate-950 border text-xs font-semibold focus:ring-2 focus:ring-blue-500 focus:outline-none ${taskErrors.status ? 'border-rose-500 text-rose-600' : 'border-slate-200 dark:border-slate-800'
+                                            className={`w-full h-10 px-3 rounded-xl bg-slate-50 dark:bg-slate-950 border text-xs font-semibold focus:ring-2 focus:ring-blue-500 focus:outline-none ${taskErrors.status ? 'border-rose-500 text-rose-600' : 'border-slate-200 dark:border-slate-800'
                                                 }`}
                                         >
                                             <option value="todo">To Do</option>
@@ -1731,40 +1812,167 @@ export default function ClientPortalProjectsShow({
                                             <p className="text-[11px] font-bold text-rose-600 dark:text-rose-400 mt-1">{taskErrors.status}</p>
                                         )}
                                     </div>
+
+                                    <div className="space-y-1.5">
+                                        <label className="text-xs font-bold text-slate-700 dark:text-slate-300">Due Date</label>
+                                        <input
+                                            type="date"
+                                            value={taskFormData.due_date}
+                                            onChange={(e) => {
+                                                setTaskFormData({ ...taskFormData, due_date: e.target.value });
+                                                if (taskErrors.due_date) setTaskErrors({ ...taskErrors, due_date: '' });
+                                            }}
+                                            className={`w-full h-10 px-3.5 rounded-xl bg-slate-50 dark:bg-slate-950 border text-xs font-medium focus:ring-2 focus:ring-blue-500 focus:outline-none ${taskErrors.due_date ? 'border-rose-500 text-rose-600' : 'border-slate-200 dark:border-slate-800'
+                                                }`}
+                                        />
+                                        {taskErrors.due_date && (
+                                            <p className="text-[11px] font-bold text-rose-600 dark:text-rose-400 mt-1">{taskErrors.due_date}</p>
+                                        )}
+                                    </div>
                                 </div>
 
-                                <div className="space-y-1.5">
-                                    <label className="text-xs font-bold text-slate-700 dark:text-slate-300">Due Date</label>
-                                    <input
-                                        type="date"
-                                        value={taskFormData.due_date}
-                                        onChange={(e) => {
-                                            setTaskFormData({ ...taskFormData, due_date: e.target.value });
-                                            if (taskErrors.due_date) setTaskErrors({ ...taskErrors, due_date: '' });
-                                        }}
-                                        className={`w-full h-11 px-4 rounded-xl bg-slate-50 dark:bg-slate-950 border text-xs font-medium focus:ring-2 focus:ring-blue-500 focus:outline-none ${taskErrors.due_date ? 'border-rose-500 text-rose-600' : 'border-slate-200 dark:border-slate-800'
-                                            }`}
-                                    />
-                                    {taskErrors.due_date && (
-                                        <p className="text-[11px] font-bold text-rose-600 dark:text-rose-400 mt-1">{taskErrors.due_date}</p>
-                                    )}
-                                </div>
-
+                                {/* ROW 3: DESCRIPTION / INSTRUCTIONS (FULL WIDTH) */}
                                 <div className="space-y-1.5">
                                     <label className="text-xs font-bold text-slate-700 dark:text-slate-300">Description / Instructions</label>
                                     <textarea
-                                        rows={3}
+                                        rows={2}
                                         value={taskFormData.description}
                                         onChange={(e) => {
                                             setTaskFormData({ ...taskFormData, description: e.target.value });
                                             if (taskErrors.description) setTaskErrors({ ...taskErrors, description: '' });
                                         }}
                                         placeholder="Task details..."
-                                        className={`w-full p-3 rounded-xl bg-slate-50 dark:bg-slate-950 border text-xs font-medium focus:ring-2 focus:ring-blue-500 focus:outline-none ${taskErrors.description ? 'border-rose-500 text-rose-600' : 'border-slate-200 dark:border-slate-800'
+                                        className={`w-full p-2.5 rounded-xl bg-slate-50 dark:bg-slate-950 border text-xs font-medium focus:ring-2 focus:ring-blue-500 focus:outline-none ${taskErrors.description ? 'border-rose-500 text-rose-600' : 'border-slate-200 dark:border-slate-800'
                                             }`}
                                     />
                                     {taskErrors.description && (
                                         <p className="text-[11px] font-bold text-rose-600 dark:text-rose-400 mt-1">{taskErrors.description}</p>
+                                    )}
+                                </div>
+
+                                {/* Attachment Upload Field */}
+                                <div className="space-y-1.5">
+                                    <label className="text-xs font-bold text-slate-700 dark:text-slate-300 flex items-center justify-between">
+                                        <span className="flex items-center gap-1.5">
+                                            <Paperclip className="size-3.5 text-blue-600" />
+                                            <span>Task Attachment (Optional)</span>
+                                        </span>
+                                        <span className="text-[10px] text-slate-400 font-normal">Images, PDFs, Docs up to 10MB</span>
+                                    </label>
+
+                                    {/* Existing Attachment in Edit Mode */}
+                                    {editingTask?.attachment && !removeTaskAttachment && !taskAttachment && (
+                                        <div className="flex items-center justify-between p-2.5 sm:p-3 rounded-2xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800">
+                                            <div className="flex items-center gap-2.5 min-w-0">
+                                                <div className="p-2 rounded-xl bg-blue-50 dark:bg-blue-950 text-blue-600 dark:text-blue-400 shrink-0">
+                                                    <FileText className="size-4" />
+                                                </div>
+                                                <div className="min-w-0">
+                                                    <p className="text-xs font-extrabold text-slate-900 dark:text-white truncate">
+                                                        {editingTask.attachment_name || 'Task Attachment'}
+                                                    </p>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() =>
+                                                            setPreviewFile({
+                                                                url: editingTask.attachment!,
+                                                                name: editingTask.attachment_name || editingTask.task_title,
+                                                            })
+                                                        }
+                                                        className="text-[11px] font-bold text-blue-600 dark:text-blue-400 hover:underline inline-flex items-center gap-1 mt-0.5 cursor-pointer"
+                                                    >
+                                                        <Eye className="size-3" />
+                                                        <span>Preview File</span>
+                                                    </button>
+                                                </div>
+                                            </div>
+
+                                            <div className="flex items-center gap-1.5 shrink-0">
+                                                <label className="h-8 px-2.5 rounded-xl bg-slate-100 dark:bg-slate-800 text-xs font-bold text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 transition-all cursor-pointer inline-flex items-center gap-1">
+                                                    <UploadCloud className="size-3.5" />
+                                                    <span>Replace</span>
+                                                    <input
+                                                        type="file"
+                                                        className="hidden"
+                                                        accept=".jpeg,.png,.jpg,.webp,.pdf,.doc,.docx,.xls,.xlsx,.zip,.txt"
+                                                        onChange={(e) => {
+                                                            if (e.target.files?.[0]) {
+                                                                setTaskAttachment(e.target.files[0]);
+                                                                setRemoveTaskAttachment(false);
+                                                            }
+                                                        }}
+                                                    />
+                                                </label>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setRemoveTaskAttachment(true)}
+                                                    className="size-8 rounded-xl bg-rose-50 text-rose-600 dark:bg-rose-950/60 dark:text-rose-400 hover:bg-rose-600 hover:text-white transition-all flex items-center justify-center cursor-pointer"
+                                                    title="Remove Attachment"
+                                                >
+                                                    <Trash2 className="size-3.5" />
+                                                </button>
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    {/* Newly Selected File */}
+                                    {taskAttachment && (
+                                        <div className="flex items-center justify-between p-2.5 sm:p-3 rounded-2xl bg-blue-50/60 dark:bg-blue-950/40 border border-blue-200 dark:border-blue-900">
+                                            <div className="flex items-center gap-2.5 min-w-0">
+                                                <div className="p-2 rounded-xl bg-blue-100 dark:bg-blue-900/60 text-blue-700 dark:text-blue-300 shrink-0">
+                                                    <FileText className="size-4" />
+                                                </div>
+                                                <div className="min-w-0">
+                                                    <p className="text-xs font-extrabold text-blue-900 dark:text-blue-100 truncate">
+                                                        {taskAttachment.name}
+                                                    </p>
+                                                    <p className="text-[10px] text-blue-600 dark:text-blue-400">
+                                                        {(taskAttachment.size / 1024).toFixed(1)} KB • New file selected
+                                                    </p>
+                                                </div>
+                                            </div>
+                                            <button
+                                                type="button"
+                                                onClick={() => setTaskAttachment(null)}
+                                                className="size-8 rounded-xl text-slate-400 hover:text-rose-600 hover:bg-white dark:hover:bg-slate-800 transition-all flex items-center justify-center cursor-pointer"
+                                            >
+                                                <X className="size-4" />
+                                            </button>
+                                        </div>
+                                    )}
+
+                                    {/* File Input Box */}
+                                    {(!editingTask?.attachment || removeTaskAttachment) && !taskAttachment && (
+                                        <label
+                                            className={`flex flex-col items-center justify-center w-full h-16 sm:h-18 border-2 border-dashed rounded-2xl transition-all cursor-pointer ${
+                                                taskErrors.attachment
+                                                    ? 'border-rose-300 bg-rose-50/50'
+                                                    : 'border-slate-200 dark:border-slate-800 hover:border-blue-400 bg-slate-50/50 dark:bg-slate-950 hover:bg-blue-50/20'
+                                            }`}
+                                        >
+                                            <div className="flex items-center justify-center gap-2 px-3 py-1.5 text-center">
+                                                <UploadCloud className="size-5 text-slate-400 shrink-0" />
+                                                <p className="text-xs font-bold text-slate-700 dark:text-slate-300">
+                                                    Click to upload <span className="font-normal text-slate-400">or drag and drop</span>
+                                                </p>
+                                                <span className="text-[10px] text-slate-400 hidden sm:inline">• PDF, Word, Excel, Images, Zip (Max 10MB)</span>
+                                            </div>
+                                            <input
+                                                type="file"
+                                                className="hidden"
+                                                accept=".jpeg,.png,.jpg,.webp,.pdf,.doc,.docx,.xls,.xlsx,.zip,.txt"
+                                                onChange={(e) => {
+                                                    if (e.target.files?.[0]) {
+                                                        setTaskAttachment(e.target.files[0]);
+                                                        setRemoveTaskAttachment(false);
+                                                    }
+                                                }}
+                                            />
+                                        </label>
+                                    )}
+
+                                    {taskErrors.attachment && (
+                                        <p className="text-[11px] font-bold text-rose-600 dark:text-rose-400 mt-1">{taskErrors.attachment}</p>
                                     )}
                                 </div>
 
@@ -2042,6 +2250,16 @@ export default function ClientPortalProjectsShow({
                             }
                         }
                     }}
+                />
+
+                {/* FILE & DOCUMENT PREVIEW MODAL */}
+                <FilePreviewModal
+                    isOpen={!!previewFile}
+                    onClose={() => setPreviewFile(null)}
+                    fileUrl={previewFile?.url || null}
+                    fileName={previewFile?.name}
+                    fileType={previewFile?.type}
+                    fileSize={previewFile?.size}
                 />
             </div>
         </ClientPortalLayout>

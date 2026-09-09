@@ -21,6 +21,19 @@ class PermissionRegistry
                 'edit-clients',
                 'delete-clients',
             ],
+            'Projects Directory' => [
+                'view-projects',
+                'view-project-milestones',
+                'view-project-tasks',
+                'view-project-credentials',
+                'view-project-documents',
+            ],
+            'Services Directory' => [
+                'view-services',
+                'view-service-tasks',
+                'view-service-credentials',
+                'view-service-documents',
+            ],
             'Credentials Vault' => [
                 'view-credentials',
             ],
@@ -157,77 +170,77 @@ class PermissionRegistry
             ],
 
             // 2. Projects & Sub-tabs
-            'Projects Directory' => [
+            'Portal Projects' => [
                 'view-client-portal-projects',
                 'create-client-portal-projects',
                 'edit-client-portal-projects',
                 'delete-client-portal-projects',
                 'view-client-portal-project-budget',
             ],
-            'Project Milestones & Billing' => [
+            'Portal Project Milestones & Billing' => [
                 'view-client-portal-project-milestones',
                 'create-client-portal-project-milestones',
                 'edit-client-portal-project-milestones',
                 'delete-client-portal-project-milestones',
             ],
-            'Project Tasks & Timeline' => [
+            'Portal Project Tasks & Timeline' => [
                 'view-client-portal-project-tasks',
                 'create-client-portal-project-tasks',
                 'edit-client-portal-project-tasks',
                 'delete-client-portal-project-tasks',
             ],
-            'Project Credentials' => [
+            'Portal Project Credentials' => [
                 'view-client-portal-project-credentials',
                 'create-client-portal-project-credentials',
                 'edit-client-portal-project-credentials',
                 'delete-client-portal-project-credentials',
             ],
-            'Project Documents' => [
+            'Portal Project Documents' => [
                 'view-client-portal-project-documents',
                 'create-client-portal-project-documents',
                 'delete-client-portal-project-documents',
             ],
 
             // 5. Services & Sub-tabs
-            'Services Directory' => [
+            'Portal Services' => [
                 'view-client-portal-services',
                 'create-client-portal-services',
                 'edit-client-portal-services',
                 'delete-client-portal-services',
                 'view-client-portal-service-budget',
             ],
-            'Service Tasks & Timeline' => [
+            'Portal Service Tasks & Timeline' => [
                 'view-client-portal-service-tasks',
                 'create-client-portal-service-tasks',
                 'edit-client-portal-service-tasks',
                 'delete-client-portal-service-tasks',
             ],
-            'Service Credentials' => [
+            'Portal Service Credentials' => [
                 'view-client-portal-service-credentials',
                 'create-client-portal-service-credentials',
                 'edit-client-portal-service-credentials',
                 'delete-client-portal-service-credentials',
             ],
-            'Service Payments & Retainers' => [
+            'Portal Service Payments & Retainers' => [
                 'view-client-portal-service-payments',
                 'create-client-portal-service-payments',
                 'edit-client-portal-service-payments',
                 'delete-client-portal-service-payments',
             ],
-            'Service Documents' => [
+            'Portal Service Documents' => [
                 'view-client-portal-service-documents',
                 'create-client-portal-service-documents',
                 'delete-client-portal-service-documents',
             ],
 
             // 3. Domains & Sub-tabs
-            'Domains Directory' => [
+            'Portal Domains' => [
                 'view-client-portal-domains',
                 'create-client-portal-domains',
                 'edit-client-portal-domains',
                 'delete-client-portal-domains',
             ],
-            'Domain Payments & Renewals' => [
+            'Portal Domain Payments & Renewals' => [
                 'view-client-portal-domain-payments',
                 'create-client-portal-domain-payments',
                 'edit-client-portal-domain-payments',
@@ -235,13 +248,13 @@ class PermissionRegistry
             ],
 
             // 4. Web Hosting & Sub-tabs
-            'Web Hosting Directory' => [
+            'Portal Web Hosting' => [
                 'view-client-portal-hostings',
                 'create-client-portal-hostings',
                 'edit-client-portal-hostings',
                 'delete-client-portal-hostings',
             ],
-            'Hosting Payments & Renewals' => [
+            'Portal Hosting Payments & Renewals' => [
                 'view-client-portal-hosting-payments',
                 'create-client-portal-hosting-payments',
                 'edit-client-portal-hosting-payments',
@@ -249,7 +262,7 @@ class PermissionRegistry
             ],
 
             // 6. Invoices & Billing
-            'Invoices & Statements' => [
+            'Portal Invoices & Billing' => [
                 'view-client-portal-invoices',
                 'create-client-portal-invoices',
                 'edit-client-portal-invoices',
@@ -258,7 +271,7 @@ class PermissionRegistry
             ],
 
             // 7. Quotations & Estimates
-            'Quotations & Estimates' => [
+            'Portal Quotations & Estimates' => [
                 'view-client-portal-quotations',
                 'create-client-portal-quotations',
                 'edit-client-portal-quotations',
@@ -267,7 +280,7 @@ class PermissionRegistry
             ],
 
             // 7. General Logins & Credentials Vault
-            'General Credentials Vault' => [
+            'Portal General Credentials Vault' => [
                 'view-client-portal-credentials',
                 'create-client-portal-credentials',
                 'edit-client-portal-credentials',
@@ -275,10 +288,10 @@ class PermissionRegistry
             ],
 
             // 8. Reports & Account Settings
-            'Reports & Analytics' => [
+            'Portal Reports & Analytics' => [
                 'view-client-portal-reports',
             ],
-            'Account Profile & Security' => [
+            'Portal Account Profile & Security' => [
                 'view-client-portal-profile',
                 'edit-client-portal-profile',
                 'manage-client-portal-account',
@@ -321,7 +334,12 @@ class PermissionRegistry
     public static function getAllPermissions(): array
     {
         $all = [];
-        foreach (self::getPermissionsByModule() as $perms) {
+        foreach (self::getAdminPermissions() as $perms) {
+            foreach ($perms as $p) {
+                $all[] = $p;
+            }
+        }
+        foreach (self::getClientPortalPermissions() as $perms) {
             foreach ($perms as $p) {
                 $all[] = $p;
             }

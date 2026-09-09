@@ -1,18 +1,23 @@
 import ClientPortalLayout from '@/layouts/client-portal-layout';
 import { type BreadcrumbItem, type SharedData } from '@/types';
-import { Head, Link, usePage } from '@inertiajs/react';
+import { hasPermission } from '@/utils/permissions';
+import { Head, Link, router, usePage } from '@inertiajs/react';
 import {
+    AlertTriangle,
     ArrowLeft,
     Calendar,
     CheckCircle2,
     Clock,
     FileText,
     FolderKanban,
+    LoaderCircle,
     Pencil,
     Printer,
     Receipt,
+    Trash2,
     User,
 } from 'lucide-react';
+import { useState } from 'react';
 
 interface InvoiceItem {
     id: number;
@@ -20,6 +25,7 @@ interface InvoiceItem {
     quantity: number;
     unit_price: number;
     amount: number;
+    remaining_cost?: number;
 }
 
 interface InvoiceDetail {
@@ -76,6 +82,24 @@ export default function ClientPortalInvoiceShow({
     invoice,
     company,
 }: ClientPortalInvoiceShowProps) {
+    const { auth } = usePage<SharedData>().props;
+    const user = auth?.user;
+
+    const [showDeleteModal, setShowDeleteModal] = useState(false);
+    const [isDeleting, setIsDeleting] = useState(false);
+
+    const handleDelete = () => {
+        setIsDeleting(true);
+        router.delete(`/client-portal/invoices/destroy/${invoice.id}`, {
+            onSuccess: () => {
+                setIsDeleting(false);
+                setShowDeleteModal(false);
+            },
+            onError: () => setIsDeleting(false),
+            onFinish: () => setIsDeleting(false),
+        });
+    };
+
     const companyInfo = company || {
         name: 'Sapta Technologies',
         email: 'contact@saptatechnologies.com',
@@ -187,7 +211,7 @@ export default function ClientPortalInvoiceShow({
                             <span>Back to Invoices</span>
                         </Link>
 
-                        {invoice.status !== 'paid' && (
+                        {invoice.status !== 'paid' && hasPermission(user, 'edit-client-portal-invoices') && (
                             <Link
                                 href={`/client-portal/invoices/${invoice.id}/edit`}
                                 className="h-10 px-4 text-xs font-bold rounded-xl bg-blue-50 dark:bg-blue-950/60 border border-blue-200/60 dark:border-blue-800/60 text-blue-600 dark:text-blue-400 hover:bg-blue-100 dark:hover:bg-blue-900/60 transition-all inline-flex items-center gap-2 shadow-2xs"
@@ -195,6 +219,17 @@ export default function ClientPortalInvoiceShow({
                                 <Pencil className="size-4" />
                                 <span>Edit Invoice</span>
                             </Link>
+                        )}
+
+                        {hasPermission(user, 'delete-client-portal-invoices') && (
+                            <button
+                                type="button"
+                                onClick={() => setShowDeleteModal(true)}
+                                className="h-10 px-4 text-xs font-bold rounded-xl bg-rose-50 dark:bg-rose-950/40 border border-rose-200/60 dark:border-rose-800/60 text-rose-600 dark:text-rose-400 hover:bg-rose-100 dark:hover:bg-rose-900/40 transition-all inline-flex items-center gap-2 shadow-2xs cursor-pointer"
+                            >
+                                <Trash2 className="size-4" />
+                                <span>Delete Invoice</span>
+                            </button>
                         )}
                     </div>
 
@@ -313,9 +348,8 @@ export default function ClientPortalInvoiceShow({
                                 <tr>
                                     <th className="px-4 py-3">#</th>
                                     <th className="px-4 py-3">Description</th>
-                                    <th className="px-4 py-3 text-center">Qty</th>
-                                    <th className="px-4 py-3 text-right">Unit Price</th>
-                                    <th className="px-4 py-3 text-right">Total Amount</th>
+                                    <th className="px-4 py-3 text-right">Amount</th>
+                                    <th className="px-4 py-3 text-right">Remaining Cost</th>
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
@@ -326,18 +360,17 @@ export default function ClientPortalInvoiceShow({
                                             <td className="px-4 py-3.5 font-bold text-slate-900 dark:text-white">
                                                 {item.description}
                                             </td>
-                                            <td className="px-4 py-3.5 text-center font-semibold">{item.quantity}</td>
-                                            <td className="px-4 py-3.5 text-right font-semibold">
-                                                {formatCurrency(item.unit_price)}
-                                            </td>
                                             <td className="px-4 py-3.5 text-right font-extrabold text-slate-900 dark:text-white">
                                                 {formatCurrency(item.amount)}
+                                            </td>
+                                            <td className="px-4 py-3.5 text-right font-semibold text-slate-600 dark:text-slate-400">
+                                                {formatCurrency(item.remaining_cost ?? 0)}
                                             </td>
                                         </tr>
                                     ))
                                 ) : (
                                     <tr>
-                                        <td colSpan={5} className="px-4 py-6 text-center text-slate-400 italic">
+                                        <td colSpan={4} className="px-4 py-6 text-center text-slate-400 italic">
                                             No line items attached.
                                         </td>
                                     </tr>
@@ -404,6 +437,53 @@ export default function ClientPortalInvoiceShow({
                         Thank you for your business! This is an official system-generated billing invoice.
                     </div>
                 </div>
+
+                {/* Delete Invoice Modal */}
+                {showDeleteModal && (
+                    <div className="fixed inset-0 z-50 bg-slate-950/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 overflow-y-auto no-print">
+                        <div className="bg-white dark:bg-slate-900 rounded-3xl p-4 sm:p-6 max-w-md w-full max-h-[90vh] my-auto overflow-y-auto border border-slate-200 dark:border-slate-800 shadow-2xl space-y-4">
+                            <div className="flex items-center gap-3 text-rose-600 dark:text-rose-400">
+                                <div className="p-2.5 rounded-2xl bg-rose-50 dark:bg-rose-950">
+                                    <AlertTriangle className="size-6" />
+                                </div>
+                                <div>
+                                    <h3 className="font-extrabold text-slate-900 dark:text-white text-base">Delete Invoice</h3>
+                                    <p className="text-xs text-slate-500 dark:text-slate-400">This action cannot be undone.</p>
+                                </div>
+                            </div>
+
+                            <p className="text-xs text-slate-600 dark:text-slate-300 font-medium">
+                                Are you sure you want to delete invoice statement <strong className="text-slate-900 dark:text-white">{invoice.invoice_number}</strong>? All associated line items (project milestones, services, domain/hosting renewals) will be automatically reverted to unpaid/due.
+                            </p>
+
+                            <div className="flex items-center justify-end gap-3 pt-2">
+                                <button
+                                    type="button"
+                                    onClick={() => setShowDeleteModal(false)}
+                                    disabled={isDeleting}
+                                    className="px-4 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 text-slate-700 dark:text-slate-300 text-xs font-bold transition-all disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none cursor-pointer"
+                                >
+                                    Cancel
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={handleDelete}
+                                    disabled={isDeleting}
+                                    className="px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold transition-all shadow-md shadow-rose-600/20 active:scale-[0.99] disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none inline-flex items-center gap-2 cursor-pointer"
+                                >
+                                    {isDeleting ? (
+                                        <>
+                                            <LoaderCircle className="size-4 animate-spin" />
+                                            <span>Deleting...</span>
+                                        </>
+                                    ) : (
+                                        <span>Yes, Delete Invoice</span>
+                                    )}
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                )}
             </div>
         </ClientPortalLayout>
     );

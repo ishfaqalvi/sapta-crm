@@ -179,6 +179,10 @@ class PayrollController extends Controller
             abort(403, 'Unauthorized. You do not have permission to edit or adjust monthly payroll records.');
         }
 
+        if ($payroll->payment_status === 'paid') {
+            return redirect()->back()->with('error', 'Paid payroll records are locked and cannot be modified.');
+        }
+
         $validated = $request->validate([
             'total_working_days' => ['required', 'integer', 'min:1', 'max:31'],
             'leaves_taken' => ['required', 'numeric', 'min:0', 'max:31'],

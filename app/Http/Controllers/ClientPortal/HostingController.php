@@ -378,6 +378,7 @@ class HostingController extends Controller
             'quantity' => 1.00,
             'unit_price' => $amount,
             'amount' => $amount,
+            'remaining_cost' => 0.00,
             'invoiceable_type' => HostingPayment::class,
             'invoiceable_id' => $payment->id,
         ]);
@@ -474,6 +475,7 @@ class HostingController extends Controller
             'quantity' => 1.00,
             'unit_price' => $amount,
             'amount' => $amount,
+            'remaining_cost' => 0.00,
             'invoiceable_type' => ClientHosting::class,
             'invoiceable_id' => $hosting->id,
         ]);

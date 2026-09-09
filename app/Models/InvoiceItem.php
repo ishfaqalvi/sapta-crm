@@ -17,6 +17,7 @@ class InvoiceItem extends Model
         'quantity',
         'unit_price',
         'amount',
+        'remaining_cost',
         'invoiceable_type',
         'invoiceable_id',
     ];
@@ -25,6 +26,7 @@ class InvoiceItem extends Model
         'quantity' => 'float',
         'unit_price' => 'float',
         'amount' => 'float',
+        'remaining_cost' => 'float',
     ];
 
     /**

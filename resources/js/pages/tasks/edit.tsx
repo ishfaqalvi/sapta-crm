@@ -1,3 +1,4 @@
+import FilePreviewModal from '@/components/file-preview-modal';
 import SearchableSelect from '@/components/searchable-select';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -11,6 +12,7 @@ import {
     CheckSquare,
     Clock,
     Download,
+    Eye,
     FileText,
     LoaderCircle,
     Paperclip,
@@ -75,6 +77,12 @@ export default function TasksEdit({ task, categories = [], employees = [] }: Tas
 
     const [newFile, setNewFile] = useState<File | null>(null);
     const [removeAttachment, setRemoveAttachment] = useState(false);
+    const [previewFile, setPreviewFile] = useState<{
+        url: string;
+        name?: string;
+        type?: string;
+        size?: number;
+    } | null>(null);
 
     const formatDateForInput = (dateStr: string | null | undefined): string => {
         if (!dateStr) return '';
@@ -386,15 +394,17 @@ export default function TasksEdit({ task, categories = [], employees = [] }: Tas
                                                 <p className="text-xs font-extrabold text-slate-900 dark:text-white">
                                                     {task.attachment_name || 'Task Attachment'}
                                                 </p>
-                                                <a
-                                                    href={route('tasks.download-attachment', task.id)}
-                                                    target="_blank"
-                                                    rel="noopener noreferrer"
-                                                    className="text-[11px] font-bold text-blue-600 dark:text-blue-400 hover:underline inline-flex items-center gap-1 mt-0.5"
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setPreviewFile({
+                                                        url: task.attachment!,
+                                                        name: task.attachment_name || task.task_title,
+                                                    })}
+                                                    className="text-[11px] font-bold text-blue-600 dark:text-blue-400 hover:underline inline-flex items-center gap-1 mt-0.5 cursor-pointer"
                                                 >
-                                                    <Download className="size-3" />
-                                                    <span>Download Current File</span>
-                                                </a>
+                                                    <Eye className="size-3" />
+                                                    <span>Preview Current File</span>
+                                                </button>
                                             </div>
                                         </div>
 
@@ -556,6 +566,15 @@ export default function TasksEdit({ task, categories = [], employees = [] }: Tas
                         </Button>
                     </div>
                 </form>
+                {/* FILE PREVIEW MODAL */}
+                <FilePreviewModal
+                    isOpen={!!previewFile}
+                    onClose={() => setPreviewFile(null)}
+                    fileUrl={previewFile?.url || null}
+                    fileName={previewFile?.name}
+                    fileType={previewFile?.type}
+                    fileSize={previewFile?.size}
+                />
             </div>
         </AppLayout>
     );

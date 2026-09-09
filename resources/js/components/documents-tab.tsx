@@ -2,6 +2,7 @@ import { router } from '@inertiajs/react';
 import {
     AlertTriangle,
     Download,
+    Eye,
     File,
     FileImage,
     FileSpreadsheet,
@@ -13,6 +14,7 @@ import {
     X,
 } from 'lucide-react';
 import React, { FormEvent, useState } from 'react';
+import FilePreviewModal from './file-preview-modal';
 
 export interface ClientDocumentItem {
     id: number;
@@ -25,6 +27,7 @@ export interface ClientDocumentItem {
     file_type: string;
     file_size: number;
     created_at?: string;
+    updated_at?: string;
 }
 
 interface DocumentsTabProps {
@@ -33,6 +36,46 @@ interface DocumentsTabProps {
     deleteUrlPrefix: string;
     canUpload?: boolean;
     canDelete?: boolean;
+}
+
+export function formatDateTime(dateStr?: string | null): string {
+    if (!dateStr) return '—';
+    try {
+        const date = new Date(dateStr);
+        if (isNaN(date.getTime())) return dateStr;
+        return (
+            date.toLocaleDateString('en-US', {
+                day: '2-digit',
+                month: 'short',
+                year: 'numeric',
+            }) +
+            ', ' +
+            date.toLocaleTimeString('en-US', {
+                hour: '2-digit',
+                minute: '2-digit',
+                hour12: true,
+            })
+        );
+    } catch {
+        return dateStr;
+    }
+}
+
+export function resolveDocumentUrl(filePath?: string | null): string {
+    if (!filePath) return '';
+    if (filePath.startsWith('http://') || filePath.startsWith('https://')) {
+        return filePath;
+    }
+    if (filePath.startsWith('/')) {
+        return filePath;
+    }
+    if (filePath.startsWith('uploads/')) {
+        return `/${filePath}`;
+    }
+    if (filePath.startsWith('storage/')) {
+        return `/${filePath}`;
+    }
+    return `/storage/${filePath}`;
 }
 
 export function formatFileSize(bytes: number): string {
@@ -90,6 +133,7 @@ export default function DocumentsTab({
     const [isUploading, setIsUploading] = useState(false);
     const [errors, setErrors] = useState<Record<string, string>>({});
 
+    const [previewDoc, setPreviewDoc] = useState<ClientDocumentItem | null>(null);
     const [deletingDoc, setDeletingDoc] = useState<ClientDocumentItem | null>(null);
     const [isDeleting, setIsDeleting] = useState(false);
 
@@ -174,12 +218,15 @@ export default function DocumentsTab({
                         >
                             <div className="space-y-3">
                                 <div className="flex items-start justify-between gap-3 border-b border-slate-100 dark:border-slate-800 pb-3">
-                                    <div className="flex items-center gap-3">
-                                        <div className="p-2.5 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-100 dark:border-slate-700 shrink-0">
+                                    <div
+                                        onClick={() => setPreviewDoc(doc)}
+                                        className="flex items-center gap-3 cursor-pointer group min-w-0"
+                                    >
+                                        <div className="p-2.5 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-100 dark:border-slate-700 shrink-0 group-hover:bg-blue-50 dark:group-hover:bg-blue-950/60 transition-colors">
                                             {getFileIcon(doc.file_type)}
                                         </div>
                                         <div className="space-y-1 min-w-0">
-                                            <h4 className="font-extrabold text-slate-900 dark:text-white text-sm truncate" title={doc.title}>
+                                            <h4 className="font-extrabold text-slate-900 dark:text-white text-sm truncate group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors" title={doc.title}>
                                                 {doc.title}
                                             </h4>
                                             <span className={`px-2 py-0.5 rounded-md font-mono text-[9px] font-black uppercase tracking-wider border ${getFileBadgeClass(doc.file_type)}`}>
@@ -195,9 +242,9 @@ export default function DocumentsTab({
                                     </p>
                                     <div className="flex items-center justify-between text-[11px] text-slate-400">
                                         <span>Size: {formatFileSize(doc.file_size)}</span>
-                                        {doc.created_at && (
+                                        {(doc.updated_at || doc.created_at) && (
                                             <span>
-                                                Uploaded: {new Date(doc.created_at).toLocaleDateString()}
+                                                Updated: {formatDateTime(doc.updated_at || doc.created_at)}
                                             </span>
                                         )}
                                     </div>
@@ -206,16 +253,28 @@ export default function DocumentsTab({
 
                             {/* Action Buttons */}
                             <div className="flex items-center justify-between gap-2 pt-3 border-t border-slate-100 dark:border-slate-800">
-                                <a
-                                    href={doc.file_path}
-                                    download={doc.file_name}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    className="h-8 px-3 rounded-xl bg-blue-50 dark:bg-blue-950/60 text-blue-700 dark:text-blue-300 hover:bg-gradient-to-r hover:from-[#003796] hover:via-[#0052D4] hover:to-[#1d4ed8] hover:text-white hover:shadow-md hover:shadow-blue-600/20 active:scale-[0.99] transition-all font-bold text-[11px] inline-flex items-center gap-1.5 cursor-pointer border border-blue-200/60 dark:border-blue-900/40"
-                                >
-                                    <Download className="size-3.5" />
-                                    <span>Download</span>
-                                </a>
+                                <div className="flex items-center gap-1.5">
+                                    <button
+                                        type="button"
+                                        onClick={() => setPreviewDoc(doc)}
+                                        className="h-8 px-3 rounded-xl bg-blue-50 dark:bg-blue-950/60 text-blue-700 dark:text-blue-300 hover:bg-gradient-to-r hover:from-[#003796] hover:via-[#0052D4] hover:to-[#1d4ed8] hover:text-white hover:shadow-md hover:shadow-blue-600/20 active:scale-[0.99] transition-all font-bold text-[11px] inline-flex items-center gap-1.5 cursor-pointer border border-blue-200/60 dark:border-blue-900/40"
+                                        title="Preview Document"
+                                    >
+                                        <Eye className="size-3.5" />
+                                        <span>Preview</span>
+                                    </button>
+
+                                    <a
+                                        href={resolveDocumentUrl(doc.file_path)}
+                                        download={doc.file_name}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="h-8 px-2.5 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 transition-all font-bold text-[11px] inline-flex items-center gap-1 cursor-pointer"
+                                        title="Direct Download"
+                                    >
+                                        <Download className="size-3.5" />
+                                    </a>
+                                </div>
 
                                 {canDelete && (
                                     <button
@@ -387,6 +446,16 @@ export default function DocumentsTab({
                     </div>
                 </div>
             )}
+
+            {/* DOCUMENT PREVIEW MODAL */}
+            <FilePreviewModal
+                isOpen={!!previewDoc}
+                onClose={() => setPreviewDoc(null)}
+                fileUrl={previewDoc ? resolveDocumentUrl(previewDoc.file_path) : null}
+                fileName={previewDoc?.file_name || previewDoc?.title}
+                fileType={previewDoc?.file_type}
+                fileSize={previewDoc?.file_size}
+            />
         </div>
     );
 }

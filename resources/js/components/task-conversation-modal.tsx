@@ -1,3 +1,4 @@
+import FilePreviewModal from '@/components/file-preview-modal';
 import { useState, useEffect, useRef } from 'react';
 import {
     X,
@@ -5,6 +6,7 @@ import {
     Paperclip,
     FileText,
     Download,
+    Eye,
     Trash2,
     Loader2,
     MessageSquare,
@@ -100,6 +102,12 @@ export default function TaskConversationModal({
     const [selectedFile, setSelectedFile] = useState<File | null>(null);
     const [errorMessage, setErrorMessage] = useState<string | null>(null);
     const [activeTab, setActiveTab] = useState<'all' | 'details' | 'chat'>('all');
+    const [previewFile, setPreviewFile] = useState<{
+        url: string;
+        name?: string;
+        type?: string;
+        size?: number;
+    } | null>(null);
 
     const messagesEndRef = useRef<HTMLDivElement | null>(null);
     const fileInputRef = useRef<HTMLInputElement | null>(null);
@@ -644,11 +652,13 @@ export default function TaskConversationModal({
                                                     {/* Attachment */}
                                                     {msg.attachment && (
                                                         <div className="mt-2 pt-2 border-t border-white/20 dark:border-slate-800">
-                                                            <a
-                                                                href={msg.attachment}
-                                                                target="_blank"
-                                                                rel="noopener noreferrer"
-                                                                className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${isMe
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => setPreviewFile({
+                                                                    url: msg.attachment!,
+                                                                    name: msg.attachment_name || 'Discussion Attachment',
+                                                                })}
+                                                                className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${isMe
                                                                     ? 'bg-white/20 hover:bg-white/30 text-white'
                                                                     : 'bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400 hover:bg-blue-100'
                                                                     }`}
@@ -657,8 +667,8 @@ export default function TaskConversationModal({
                                                                 <span className="truncate max-w-[180px]">
                                                                     {msg.attachment_name || 'View Attachment'}
                                                                 </span>
-                                                                <Download className="size-3 shrink-0 ml-1" />
-                                                            </a>
+                                                                <Eye className="size-3 shrink-0 ml-1" />
+                                                            </button>
                                                         </div>
                                                     )}
 
@@ -857,6 +867,16 @@ export default function TaskConversationModal({
                     </div>
                 </div>
             )}
+
+            {/* FILE PREVIEW MODAL */}
+            <FilePreviewModal
+                isOpen={!!previewFile}
+                onClose={() => setPreviewFile(null)}
+                fileUrl={previewFile?.url || null}
+                fileName={previewFile?.name}
+                fileType={previewFile?.type}
+                fileSize={previewFile?.size}
+            />
         </div>
     );
 }

@@ -267,12 +267,125 @@ class Invoice extends Model
         }
     }
 
+    /**
+     * Revert all linked items when an invoice is deleted or cancelled.
+     * Restores project payments, service payments, domain payments, hosting payments
+     * back to unpaid/due status so they can be invoiced again.
+     */
+    public function revertLinkedItems(): void
+    {
+        foreach ($this->items as $item) {
+            if (!$item->invoiceable_type || !$item->invoiceable_id) {
+                continue;
+            }
+
+            $type = $item->invoiceable_type;
+            $id = $item->invoiceable_id;
+
+            if (!class_exists($type)) {
+                $namespaced = 'App\\Models\\' . class_basename($type);
+                if (class_exists($namespaced)) {
+                    $type = $namespaced;
+                }
+            }
+
+            if ($type === ProjectPayment::class || is_a($type, ProjectPayment::class, true)) {
+                $payment = ProjectPayment::find($id);
+                if ($payment) {
+                    $payment->update([
+                        'status' => 'pending',
+                        'paid_at' => null,
+                    ]);
+                }
+            } elseif ($type === ServicePayment::class || is_a($type, ServicePayment::class, true)) {
+                $servicePayment = ServicePayment::find($id);
+                if ($servicePayment) {
+                    $servicePayment->update([
+                        'status' => 'due',
+                        'amount_paid' => 0.00,
+                        'amount_paid_pkr' => 0.00,
+                        'payment_date' => null,
+                    ]);
+                }
+            } elseif ($type === DomainPayment::class || is_a($type, DomainPayment::class, true)) {
+                $domainPayment = DomainPayment::find($id);
+                if ($domainPayment) {
+                    if ($domainPayment->status === 'paid' && $domainPayment->domain && $domainPayment->domain->expiry_date) {
+                        $domain = $domainPayment->domain;
+                        $revertedExpiry = \Carbon\Carbon::parse($domain->expiry_date)->subYear();
+                        $domain->update([
+                            'expiry_date' => $revertedExpiry->format('Y-m-d'),
+                        ]);
+                    }
+
+                    $domainPayment->update([
+                        'status' => 'pending',
+                        'paid_at' => null,
+                    ]);
+                }
+            } elseif ($type === HostingPayment::class || is_a($type, HostingPayment::class, true)) {
+                $hostingPayment = HostingPayment::find($id);
+                if ($hostingPayment) {
+                    if ($hostingPayment->status === 'paid' && $hostingPayment->hosting && $hostingPayment->hosting->expiry_date) {
+                        $hosting = $hostingPayment->hosting;
+                        $currentExpiry = \Carbon\Carbon::parse($hosting->expiry_date);
+                        $revertedExpiry = match ($hosting->billing_cycle) {
+                            'monthly' => $currentExpiry->subMonth(),
+                            'quarterly' => $currentExpiry->subMonths(3),
+                            'semi_annual' => $currentExpiry->subMonths(6),
+                            'biennial' => $currentExpiry->subYears(2),
+                            'triennial' => $currentExpiry->subYears(3),
+                            default => $currentExpiry->subYear(),
+                        };
+                        $hosting->update([
+                            'expiry_date' => $revertedExpiry->format('Y-m-d'),
+                        ]);
+                    }
+
+                    $hostingPayment->update([
+                        'status' => 'pending',
+                        'paid_at' => null,
+                    ]);
+                }
+            } elseif ($type === ClientDomain::class || is_a($type, ClientDomain::class, true)) {
+                $domain = ClientDomain::find($id);
+                if ($domain && $this->status === 'paid' && $domain->expiry_date) {
+                    $revertedExpiry = \Carbon\Carbon::parse($domain->expiry_date)->subYear();
+                    $domain->update([
+                        'expiry_date' => $revertedExpiry->format('Y-m-d'),
+                    ]);
+                }
+            } elseif ($type === ClientHosting::class || is_a($type, ClientHosting::class, true)) {
+                $hosting = ClientHosting::find($id);
+                if ($hosting && $this->status === 'paid' && $hosting->expiry_date) {
+                    $currentExpiry = \Carbon\Carbon::parse($hosting->expiry_date);
+                    $revertedExpiry = match ($hosting->billing_cycle) {
+                        'monthly' => $currentExpiry->subMonth(),
+                        'quarterly' => $currentExpiry->subMonths(3),
+                        'semi_annual' => $currentExpiry->subMonths(6),
+                        'biennial' => $currentExpiry->subYears(2),
+                        'triennial' => $currentExpiry->subYears(3),
+                        default => $currentExpiry->subYear(),
+                    };
+                    $hosting->update([
+                        'expiry_date' => $revertedExpiry->format('Y-m-d'),
+                    ]);
+                }
+            }
+        }
+    }
+
     protected static function booted(): void
     {
         static::saved(function (Invoice $invoice) {
             if ($invoice->status === 'paid') {
                 $invoice->syncPaidStatusForItems();
             }
+        });
+
+        static::deleting(function (Invoice $invoice) {
+            $invoice->revertLinkedItems();
+            $invoice->items()->delete();
         });
     }
 

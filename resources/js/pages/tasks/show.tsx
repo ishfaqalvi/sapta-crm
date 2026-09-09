@@ -1,3 +1,4 @@
+import FilePreviewModal from '@/components/file-preview-modal';
 import AppLayout from '@/layouts/app-layout';
 import ClientPortalLayout from '@/layouts/client-portal-layout';
 import { type BreadcrumbItem, type SharedData } from '@/types';
@@ -13,6 +14,7 @@ import {
     Clock,
     Download,
     ExternalLink,
+    Eye,
     FileText,
     FolderKanban,
     Globe,
@@ -63,6 +65,8 @@ export interface TaskDetailPageData {
     completed_at?: string | null;
     created_at?: string | null;
     description?: string | null;
+    attachment?: string | null;
+    attachment_name?: string | null;
     source_type: 'project' | 'service' | 'general';
     source_id?: number | null;
     source_title?: string | null;
@@ -116,12 +120,20 @@ export default function TaskShowPage({ client, task }: TaskShowPageProps) {
     const [inputText, setInputText] = useState('');
     const [selectedFile, setSelectedFile] = useState<File | null>(null);
     const [errorMessage, setErrorMessage] = useState<string | null>(null);
+    const [previewFile, setPreviewFile] = useState<{
+        url: string;
+        name?: string;
+        type?: string;
+        size?: number;
+    } | null>(null);
 
     const messagesEndRef = useRef<HTMLDivElement | null>(null);
     const fileInputRef = useRef<HTMLInputElement | null>(null);
     const textareaRef = useRef<HTMLTextAreaElement | null>(null);
 
     // Client Context Resolution
+    const isClientUser = auth?.user?.type === 'client';
+
     const activeClient = client || (task.client ? {
         id: task.client.id || 0,
         client_code: task.client.client_code || '',
@@ -131,29 +143,43 @@ export default function TaskShowPage({ client, task }: TaskShowPageProps) {
         currency: task.client.currency || 'USD',
     } : null);
 
-    const breadcrumbs: BreadcrumbItem[] = task.source_type === 'general' ? [
-        { title: 'Dashboard', href: '/dashboard' },
-        { title: 'Client Operations', href: '/tasks' },
-        { title: 'General Tasks', href: '/tasks' },
-        {
-            title: task.task_title || `Task #${task.id}`,
-            href: `/tasks/detail/general/${task.id}`,
-        },
-    ] : [
-        { title: 'Overview', href: '/client-portal/overview' },
-        {
-            title: task.source_type === 'service' ? 'Services' : 'Projects',
-            href: task.source_type === 'service' ? '/client-portal/services' : '/client-portal/projects',
-        },
-        {
-            title: task.source_title || 'Workspace',
-            href: task.source_url || (task.source_type === 'service' ? '/client-portal/services' : '/client-portal/projects'),
-        },
-        {
-            title: `Task #${task.id}`,
-            href: `/tasks/detail/${task.source_type}/${task.id}`,
-        },
-    ];
+    const breadcrumbs: BreadcrumbItem[] = isClientUser ? (
+        task.source_type === 'general' ? [
+            { title: 'Overview', href: '/client-portal/overview' },
+            { title: 'Tasks', href: '/tasks' },
+            { title: task.task_title || `Task #${task.id}`, href: `/tasks/detail/general/${task.id}` },
+        ] : [
+            { title: 'Overview', href: '/client-portal/overview' },
+            {
+                title: task.source_type === 'service' ? 'Services' : 'Projects',
+                href: task.source_type === 'service' ? '/client-portal/services' : '/client-portal/projects',
+            },
+            {
+                title: task.source_title || 'Workspace',
+                href: task.source_url || (task.source_type === 'service' ? '/client-portal/services' : '/client-portal/projects'),
+            },
+            {
+                title: `Task #${task.id}`,
+                href: `/tasks/detail/${task.source_type}/${task.id}`,
+            },
+        ]
+    ) : (
+        task.source_type === 'project' ? [
+            { title: 'Dashboard', href: '/dashboard' },
+            { title: 'Projects Directory', href: '/projects' },
+            { title: task.source_title || 'Project Details', href: task.source_url || '/projects' },
+            { title: task.task_title || `Task #${task.id}`, href: `/tasks/detail/project/${task.id}` },
+        ] : task.source_type === 'service' ? [
+            { title: 'Dashboard', href: '/dashboard' },
+            { title: 'Services Directory', href: '/services' },
+            { title: task.source_title || 'Service Details', href: task.source_url || '/services' },
+            { title: task.task_title || `Task #${task.id}`, href: `/tasks/detail/service/${task.id}` },
+        ] : [
+            { title: 'Dashboard', href: '/dashboard' },
+            { title: 'General Tasks', href: '/tasks' },
+            { title: task.task_title || `Task #${task.id}`, href: `/tasks/detail/general/${task.id}` },
+        ]
+    );
 
     const getXsrfToken = () => {
         const match = document.cookie.match(/(?:^|;\s*)XSRF-TOKEN=([^;]+)/);
@@ -375,11 +401,13 @@ export default function TaskShowPage({ client, task }: TaskShowPageProps) {
     const priorityBadge = getPriorityBadge(task.priority);
     const statusBadge = getStatusBadge(currentStatus);
 
-    const backUrl = task.source_type === 'general' ? '/tasks' : (task.source_url || (task.source_type === 'service' ? '/client-portal/services' : '/client-portal/projects'));
+    const backUrl = isClientUser
+        ? (task.source_type === 'general' ? '/tasks' : (task.source_url || (task.source_type === 'service' ? '/client-portal/services' : '/client-portal/projects')))
+        : (task.source_type === 'project' ? (task.source_url || '/projects') : task.source_type === 'service' ? (task.source_url || '/services') : '/tasks');
 
     const PageContent = (
         <div className="p-2 sm:p-6 w-full space-y-6 bg-slate-50/50 dark:bg-slate-950">
-            <Head title={`Task: ${task.task_title} | ${task.source_type === 'general' ? 'General Tasks' : 'Client Portal'}`} />
+            <Head title={`Task: ${task.task_title} | ${task.source_type === 'general' ? 'General Tasks' : (isClientUser ? 'Client Portal' : 'Task Details')}`} />
 
             {/* 1. TOP HEADER BAR: TABS & TITLE ON LEFT, ACTION BUTTONS ON RIGHT */}
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-2.5 rounded-xl bg-white dark:bg-slate-900 border border-slate-200/90 dark:border-slate-800 shadow-xs">
@@ -612,11 +640,13 @@ export default function TaskShowPage({ client, task }: TaskShowPageProps) {
                                                     {/* Attachment */}
                                                     {msg.attachment && (
                                                         <div className="mt-2.5 pt-2.5 border-t border-white/20 dark:border-slate-800">
-                                                            <a
-                                                                href={msg.attachment}
-                                                                target="_blank"
-                                                                rel="noopener noreferrer"
-                                                                className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => setPreviewFile({
+                                                                    url: msg.attachment!,
+                                                                    name: msg.attachment_name || 'Discussion Attachment',
+                                                                })}
+                                                                className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
                                                                     isMe
                                                                         ? 'bg-white/20 hover:bg-white/30 text-white'
                                                                         : 'bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400 hover:bg-blue-100'
@@ -626,8 +656,8 @@ export default function TaskShowPage({ client, task }: TaskShowPageProps) {
                                                                 <span className="truncate max-w-[200px]">
                                                                     {msg.attachment_name || 'View Attachment'}
                                                                 </span>
-                                                                <Download className="size-3 shrink-0 ml-1" />
-                                                            </a>
+                                                                <Eye className="size-3 shrink-0 ml-1" />
+                                                            </button>
                                                         </div>
                                                     )}
 
@@ -867,6 +897,49 @@ export default function TaskShowPage({ client, task }: TaskShowPageProps) {
                         </div>
                     </div>
 
+                    {/* 3.5 ATTACHED DOCUMENT CARD */}
+                    {task.attachment && (
+                        <div className="bg-white dark:bg-slate-900 rounded-xl p-5 border border-slate-200/80 dark:border-slate-800 shadow-xs space-y-3">
+                            <h4 className="text-xs font-black uppercase text-slate-400 tracking-wider">
+                                Attached Document
+                            </h4>
+                            <div className="p-3 rounded-2xl bg-slate-50 dark:bg-slate-950/70 border border-slate-200/80 dark:border-slate-800 flex items-center justify-between gap-3">
+                                <div className="flex items-center gap-2.5 min-w-0">
+                                    <div className="size-9 rounded-xl bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400 border border-blue-200/60 dark:border-blue-800/60 flex items-center justify-center shrink-0">
+                                        <Paperclip className="size-4" />
+                                    </div>
+                                    <div className="min-w-0">
+                                        <p className="text-xs font-extrabold text-slate-900 dark:text-white truncate">
+                                            {task.attachment_name || 'Task Attachment'}
+                                        </p>
+                                        <button
+                                            type="button"
+                                            onClick={() => setPreviewFile({
+                                                url: task.attachment!,
+                                                name: task.attachment_name || task.task_title,
+                                            })}
+                                            className="text-[11px] font-bold text-blue-600 dark:text-blue-400 hover:underline inline-flex items-center gap-1 mt-0.5 cursor-pointer"
+                                        >
+                                            <Eye className="size-3" />
+                                            <span>Preview File</span>
+                                        </button>
+                                    </div>
+                                </div>
+                                <button
+                                    type="button"
+                                    onClick={() => setPreviewFile({
+                                        url: task.attachment!,
+                                        name: task.attachment_name || task.task_title,
+                                    })}
+                                    className="h-8 px-3 rounded-xl bg-gradient-to-r from-[#003796] via-[#0052D4] to-[#1d4ed8] hover:opacity-95 text-white text-xs font-bold transition-all shadow-md shadow-blue-500/20 flex items-center gap-1.5 cursor-pointer shrink-0"
+                                >
+                                    <Eye className="size-3.5" />
+                                    <span>Preview</span>
+                                </button>
+                            </div>
+                        </div>
+                    )}
+
                     {/* 4. CLIENT & SOURCE CARD */}
                     <div className="bg-white dark:bg-slate-900 rounded-xl p-5 border border-slate-200/80 dark:border-slate-800 shadow-xs space-y-3">
                         <h4 className="text-xs font-black uppercase text-slate-400 tracking-wider">
@@ -998,10 +1071,19 @@ export default function TaskShowPage({ client, task }: TaskShowPageProps) {
                     </div>
                 </div>
             )}
+            {/* FILE PREVIEW MODAL */}
+            <FilePreviewModal
+                isOpen={!!previewFile}
+                onClose={() => setPreviewFile(null)}
+                fileUrl={previewFile?.url || null}
+                fileName={previewFile?.name}
+                fileType={previewFile?.type}
+                fileSize={previewFile?.size}
+            />
         </div>
     );
 
-    if (activeClient) {
+    if (isClientUser && activeClient) {
         return (
             <ClientPortalLayout
                 client={activeClient}

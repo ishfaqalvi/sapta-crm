@@ -171,12 +171,26 @@
             border-bottom: 1px solid #f1f5f9;
             font-size: 11px;
             color: #334155;
+            vertical-align: middle;
         }
         .items-table tr:nth-child(even) td {
             background-color: #f8fafc;
         }
-        .text-right { text-align: right; }
-        .text-center { text-align: center; }
+        .items-table th.text-right,
+        .items-table td.text-right,
+        .text-right {
+            text-align: right !important;
+        }
+        .items-table th.text-left,
+        .items-table td.text-left,
+        .text-left {
+            text-align: left !important;
+        }
+        .items-table th.text-center,
+        .items-table td.text-center,
+        .text-center {
+            text-align: center !important;
+        }
 
         /* Totals Area */
         .totals-wrapper {
@@ -345,20 +359,20 @@
     <table class="items-table">
         <thead>
             <tr>
-                <th style="width: 48%;">Item Description</th>
-                <th class="text-center" style="width: 14%;">Qty</th>
-                <th class="text-right" style="width: 18%;">Unit Price</th>
-                <th class="text-right" style="width: 20%;">Total Amount</th>
+                <th class="text-left" style="width: 50%; text-align: left;">Item Description</th>
+                <th class="text-right" style="width: 25%; text-align: right;">Amount</th>
+                <th class="text-right" style="width: 25%; text-align: right;">Remaining Cost</th>
             </tr>
         </thead>
         <tbody>
             @foreach($invoice->items as $item)
                 <tr>
-                    <td style="font-weight: 600;">{{ $item->description }}</td>
-                    <td class="text-center">{{ number_format($item->quantity, 2) }}</td>
-                    <td class="text-right">{{ $invoice->currency_code }} {{ number_format($item->unit_price, 2) }}</td>
-                    <td class="text-right" style="font-weight: 800; color: #0f172a;">
+                    <td class="text-left" style="font-weight: 600; text-align: left;">{{ $item->description }}</td>
+                    <td class="text-right" style="font-weight: 800; color: #0f172a; text-align: right;">
                         {{ $invoice->currency_code }} {{ number_format($item->amount, 2) }}
+                    </td>
+                    <td class="text-right" style="font-weight: 600; color: #64748b; text-align: right;">
+                        {{ $invoice->currency_code }} {{ number_format($item->remaining_cost ?? 0, 2) }}
                     </td>
                 </tr>
             @endforeach

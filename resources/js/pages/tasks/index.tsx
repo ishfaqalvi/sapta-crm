@@ -1,3 +1,4 @@
+import FilePreviewModal from '@/components/file-preview-modal';
 import Pagination, { type PaginatedData } from '@/components/pagination';
 import SearchableSelect, { type SelectOption } from '@/components/searchable-select';
 import { Button } from '@/components/ui/button';
@@ -120,6 +121,12 @@ export default function TasksIndex({ tasks, stats, categories = [], employees = 
     const [viewingTask, setViewingTask] = useState<TaskItem | null>(null);
     const [deletingTask, setDeletingTask] = useState<TaskItem | null>(null);
     const [isDeleting, setIsDeleting] = useState(false);
+    const [previewFile, setPreviewFile] = useState<{
+        url: string;
+        name?: string;
+        type?: string;
+        size?: number;
+    } | null>(null);
 
     const isFirstRender = useRef(true);
 
@@ -441,6 +448,21 @@ export default function TasksIndex({ tasks, stats, categories = [], employees = 
                                                         >
                                                             {task.task_title}
                                                         </button>
+
+                                                        {task.attachment && (
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => setPreviewFile({
+                                                                    url: task.attachment!,
+                                                                    name: task.attachment_name || task.task_title,
+                                                                })}
+                                                                className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400 hover:bg-blue-100 hover:underline text-[10px] font-bold border border-blue-200/60 cursor-pointer"
+                                                                title="Preview Attached Document"
+                                                            >
+                                                                <Paperclip className="size-2.5" />
+                                                                <span>Document</span>
+                                                            </button>
+                                                        )}
                                                     </div>
 
                                                     {task.description && (
@@ -648,7 +670,7 @@ export default function TasksIndex({ tasks, stats, categories = [], employees = 
 
                             {/* Attachment Section */}
                             {viewingTask.attachment && (
-                                <div className="p-3 rounded-2xl bg-slate-50 dark:bg-slate-950/70 border border-slate-200/80 dark:border-slate-800 flex items-center justify-between gap-3">
+                                <div className="p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-950/70 border border-slate-200/80 dark:border-slate-800 flex items-center justify-between gap-3">
                                     <div className="flex items-center gap-2.5 min-w-0">
                                         <div className="size-9 rounded-xl bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400 border border-blue-200/60 dark:border-blue-800/60 flex items-center justify-center shrink-0">
                                             <Paperclip className="size-4" />
@@ -657,19 +679,42 @@ export default function TasksIndex({ tasks, stats, categories = [], employees = 
                                             <p className="text-xs font-extrabold text-slate-900 dark:text-white truncate">
                                                 {viewingTask.attachment_name || 'Task Attachment Document'}
                                             </p>
-                                            <span className="text-[10px] font-bold text-slate-400">Attached Document</span>
+                                            <button
+                                                type="button"
+                                                onClick={() => setPreviewFile({
+                                                    url: viewingTask.attachment!,
+                                                    name: viewingTask.attachment_name || viewingTask.task_title,
+                                                })}
+                                                className="text-[11px] font-bold text-blue-600 dark:text-blue-400 hover:underline inline-flex items-center gap-1 mt-0.5 cursor-pointer"
+                                            >
+                                                <Eye className="size-3" />
+                                                <span>Preview File</span>
+                                            </button>
                                         </div>
                                     </div>
 
-                                    <a
-                                        href={route('tasks.download-attachment', viewingTask.id)}
-                                        target="_blank"
-                                        rel="noopener noreferrer"
-                                        className="h-9 px-3.5 rounded-xl bg-gradient-to-r from-[#003796] via-[#0052D4] to-[#1d4ed8] hover:opacity-95 text-white text-xs font-bold transition-all shadow-md shadow-blue-500/20 flex items-center gap-1.5 shrink-0 cursor-pointer"
-                                    >
-                                        <Download className="size-3.5" />
-                                        <span>Download File</span>
-                                    </a>
+                                    <div className="flex items-center gap-1.5 shrink-0">
+                                        <button
+                                            type="button"
+                                            onClick={() => setPreviewFile({
+                                                url: viewingTask.attachment!,
+                                                name: viewingTask.attachment_name || viewingTask.task_title,
+                                            })}
+                                            className="h-8 px-3 rounded-xl bg-gradient-to-r from-[#003796] via-[#0052D4] to-[#1d4ed8] hover:opacity-95 text-white text-xs font-bold transition-all shadow-md shadow-blue-500/20 flex items-center gap-1.5 cursor-pointer"
+                                        >
+                                            <Eye className="size-3.5" />
+                                            <span>Preview</span>
+                                        </button>
+                                        <a
+                                            href={route('tasks.download-attachment', viewingTask.id)}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="size-8 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 flex items-center justify-center transition-all cursor-pointer"
+                                            title="Download Original File"
+                                        >
+                                            <Download className="size-3.5" />
+                                        </a>
+                                    </div>
                                 </div>
                             )}
 
@@ -760,6 +805,15 @@ export default function TasksIndex({ tasks, stats, categories = [], employees = 
                         </div>
                     </div>
                 )}
+                {/* FILE PREVIEW MODAL */}
+                <FilePreviewModal
+                    isOpen={!!previewFile}
+                    onClose={() => setPreviewFile(null)}
+                    fileUrl={previewFile?.url || null}
+                    fileName={previewFile?.name}
+                    fileType={previewFile?.type}
+                    fileSize={previewFile?.size}
+                />
             </div>
         </AppLayout>
     );

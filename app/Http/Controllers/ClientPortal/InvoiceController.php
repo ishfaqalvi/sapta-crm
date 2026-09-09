@@ -91,16 +91,23 @@ class InvoiceController extends Controller
         $pendingProjects = ProjectPayment::where('client_id', $clientId)
             ->where('status', '!=', 'paid')
             ->whereDoesntHave('invoiceItems')
-            ->with('websiteProject:id,project_name')
+            ->with(['websiteProject:id,project_name,total_budget,currency'])
             ->get()
             ->map(function ($item) {
                 $projName = $item->websiteProject?->project_name ?? 'Website Project';
+                $totalBudget = (float) ($item->websiteProject?->total_budget ?? 0);
+                $paidSum = (float) ProjectPayment::where('website_project_id', $item->website_project_id)
+                    ->where('status', 'paid')
+                    ->sum('amount');
+                $remainingBudget = max(0, round($totalBudget - ($paidSum + (float) $item->amount), 2));
+
                 return [
                     'id' => $item->id,
                     'title' => "Project: {$projName} - {$item->milestone_title}",
                     'subtitle' => $projName,
                     'amount' => (float) $item->amount,
                     'amount_pkr' => (float) $item->amount_pkr,
+                    'remaining_cost' => $remainingBudget,
                     'due_date' => $item->due_date ?? $item->paid_at ?? null,
                     'category' => 'project',
                     'category_label' => 'Project Milestone',
@@ -112,17 +119,31 @@ class InvoiceController extends Controller
         $pendingServices = ServicePayment::where('client_id', $clientId)
             ->where('status', '!=', 'paid')
             ->whereDoesntHave('invoiceItems')
-            ->with('service:id,service_name')
+            ->with(['service:id,service_name,monthly_fee,contract_months,currency'])
             ->get()
             ->map(function ($item) {
                 $serviceName = $item->service?->service_name ?? 'Service';
                 $period = $item->billing_period ?: ($item->billing_month ? date('M Y', strtotime($item->billing_month)) : 'Monthly Retainer');
+                $itemAmount = (float) ($item->amount_due ?: $item->amount_paid ?: $item->amount);
+
+                $remainingCost = 0.00;
+                if ($item->service && $item->service->contract_months > 0 && $item->service->monthly_fee > 0) {
+                    $totalContract = (float) $item->service->monthly_fee * (int) $item->service->contract_months;
+                    $paidSum = (float) ServicePayment::where('client_service_id', $item->client_service_id)
+                        ->where('status', 'paid')
+                        ->sum('amount_paid');
+                    $remainingCost = max(0, round($totalContract - ($paidSum + $itemAmount), 2));
+                } elseif ($item->amount_due && $item->amount_paid) {
+                    $remainingCost = max(0, round((float) $item->amount_due - (float) $item->amount_paid, 2));
+                }
+
                 return [
                     'id' => $item->id,
                     'title' => "Service: {$serviceName} ({$period})",
                     'subtitle' => $serviceName,
-                    'amount' => (float) ($item->amount_due ?: $item->amount_paid ?: $item->amount),
+                    'amount' => $itemAmount,
                     'amount_pkr' => (float) ($item->amount_paid_pkr ?: $item->amount_pkr),
+                    'remaining_cost' => $remainingCost,
                     'due_date' => $item->payment_date ?? $item->due_date ?? null,
                     'category' => 'service',
                     'category_label' => 'Monthly Recurring Service',
@@ -151,6 +172,7 @@ class InvoiceController extends Controller
                     'subtitle' => $domainName,
                     'amount' => (float) $item->amount,
                     'amount_pkr' => (float) $item->amount_pkr,
+                    'remaining_cost' => 0.00,
                     'due_date' => $item->due_date ?? null,
                     'category' => 'domain',
                     'category_label' => 'Domain Registration/Renewal',
@@ -194,6 +216,7 @@ class InvoiceController extends Controller
                     'subtitle' => $hostingTitle,
                     'amount' => (float) $item->amount,
                     'amount_pkr' => (float) $item->amount_pkr,
+                    'remaining_cost' => 0.00,
                     'due_date' => $item->due_date ?? null,
                     'category' => 'hosting',
                     'category_label' => 'Hosting Subscription/Renewal',
@@ -304,16 +327,23 @@ class InvoiceController extends Controller
                 $q->whereDoesntHave('invoiceItems')
                     ->orWhereHas('invoiceItems', fn($iq) => $iq->where('invoice_id', $invoice->id));
             })
-            ->with('websiteProject:id,project_name')
+            ->with(['websiteProject:id,project_name,total_budget,currency'])
             ->get()
             ->map(function ($item) {
                 $projName = $item->websiteProject?->project_name ?? 'Website Project';
+                $totalBudget = (float) ($item->websiteProject?->total_budget ?? 0);
+                $paidSum = (float) ProjectPayment::where('website_project_id', $item->website_project_id)
+                    ->where('status', 'paid')
+                    ->sum('amount');
+                $remainingBudget = max(0, round($totalBudget - ($paidSum + (float) $item->amount), 2));
+
                 return [
                     'id' => $item->id,
                     'title' => "Project: {$projName} - {$item->milestone_title}",
                     'subtitle' => $projName,
                     'amount' => (float) $item->amount,
                     'amount_pkr' => (float) $item->amount_pkr,
+                    'remaining_cost' => $remainingBudget,
                     'due_date' => $item->due_date ?? null,
                     'category' => 'project',
                     'category_label' => 'Project Milestone',
@@ -328,17 +358,31 @@ class InvoiceController extends Controller
                 $q->whereDoesntHave('invoiceItems')
                     ->orWhereHas('invoiceItems', fn($iq) => $iq->where('invoice_id', $invoice->id));
             })
-            ->with('service:id,service_name')
+            ->with(['service:id,service_name,monthly_fee,contract_months,currency'])
             ->get()
             ->map(function ($item) {
                 $serviceName = $item->service?->service_name ?? 'Service';
                 $period = $item->billing_period ?: ($item->billing_month ? date('M Y', strtotime($item->billing_month)) : 'Monthly Retainer');
+                $itemAmount = (float) ($item->amount_due ?: $item->amount_paid ?: $item->amount);
+
+                $remainingCost = 0.00;
+                if ($item->service && $item->service->contract_months > 0 && $item->service->monthly_fee > 0) {
+                    $totalContract = (float) $item->service->monthly_fee * (int) $item->service->contract_months;
+                    $paidSum = (float) ServicePayment::where('client_service_id', $item->client_service_id)
+                        ->where('status', 'paid')
+                        ->sum('amount_paid');
+                    $remainingCost = max(0, round($totalContract - ($paidSum + $itemAmount), 2));
+                } elseif ($item->amount_due && $item->amount_paid) {
+                    $remainingCost = max(0, round((float) $item->amount_due - (float) $item->amount_paid, 2));
+                }
+
                 return [
                     'id' => $item->id,
                     'title' => "Service: {$serviceName} ({$period})",
                     'subtitle' => $serviceName,
-                    'amount' => (float) ($item->amount_due ?: $item->amount_paid ?: $item->amount),
+                    'amount' => $itemAmount,
                     'amount_pkr' => (float) ($item->amount_paid_pkr ?: $item->amount_pkr),
+                    'remaining_cost' => $remainingCost,
                     'due_date' => $item->due_date ?? null,
                     'category' => 'service',
                     'category_label' => 'Monthly Recurring Service',
@@ -370,6 +414,7 @@ class InvoiceController extends Controller
                     'subtitle' => $domainName,
                     'amount' => (float) $item->amount,
                     'amount_pkr' => (float) $item->amount_pkr,
+                    'remaining_cost' => 0.00,
                     'due_date' => $item->due_date ?? null,
                     'category' => 'domain',
                     'category_label' => 'Domain Registration/Renewal',
@@ -416,6 +461,7 @@ class InvoiceController extends Controller
                     'subtitle' => $hostingTitle,
                     'amount' => (float) $item->amount,
                     'amount_pkr' => (float) $item->amount_pkr,
+                    'remaining_cost' => 0.00,
                     'due_date' => $item->due_date ?? null,
                     'category' => 'hosting',
                     'category_label' => 'Hosting Subscription/Renewal',
@@ -456,8 +502,10 @@ class InvoiceController extends Controller
             'terms' => 'nullable|string',
             'items' => 'required|array|min:1',
             'items.*.description' => 'required|string|max:500',
-            'items.*.quantity' => 'required|numeric|min:0.01',
-            'items.*.unit_price' => 'required|numeric|min:0',
+            'items.*.amount' => 'nullable|numeric|min:0',
+            'items.*.quantity' => 'nullable|numeric|min:0.01',
+            'items.*.unit_price' => 'nullable|numeric|min:0',
+            'items.*.remaining_cost' => 'nullable|numeric|min:0',
             'items.*.invoiceable_type' => 'nullable|string',
             'items.*.invoiceable_id' => 'nullable|integer',
         ]);
@@ -469,7 +517,10 @@ class InvoiceController extends Controller
         DB::transaction(function () use ($validated, $clientId, $currencyCode, $rate, $status, &$invoice) {
             $subtotal = 0;
             foreach ($validated['items'] as $item) {
-                $subtotal += ((float) $item['quantity'] * (float) $item['unit_price']);
+                $qty = isset($item['quantity']) ? (float) $item['quantity'] : 1.00;
+                $unitPrice = isset($item['unit_price']) ? (float) $item['unit_price'] : (isset($item['amount']) ? (float) $item['amount'] : 0.00);
+                $amount = isset($item['amount']) ? (float) $item['amount'] : ($qty * $unitPrice);
+                $subtotal += $amount;
             }
 
             $taxRate = (float) ($validated['tax_rate'] ?? 0);
@@ -498,13 +549,17 @@ class InvoiceController extends Controller
             ]);
 
             foreach ($validated['items'] as $item) {
-                $amount = (float) $item['quantity'] * (float) $item['unit_price'];
+                $qty = isset($item['quantity']) ? (float) $item['quantity'] : 1.00;
+                $unitPrice = isset($item['unit_price']) ? (float) $item['unit_price'] : (isset($item['amount']) ? (float) $item['amount'] : 0.00);
+                $amount = isset($item['amount']) ? (float) $item['amount'] : ($qty * $unitPrice);
+
                 InvoiceItem::create([
                     'invoice_id' => $invoice->id,
                     'description' => $item['description'],
-                    'quantity' => $item['quantity'],
-                    'unit_price' => $item['unit_price'],
+                    'quantity' => $qty,
+                    'unit_price' => $unitPrice,
                     'amount' => $amount,
+                    'remaining_cost' => isset($item['remaining_cost']) ? (float) $item['remaining_cost'] : 0.00,
                     'invoiceable_type' => $item['invoiceable_type'] ?? null,
                     'invoiceable_id' => $item['invoiceable_id'] ?? null,
                 ]);
@@ -547,8 +602,10 @@ class InvoiceController extends Controller
             'terms' => 'nullable|string',
             'items' => 'required|array|min:1',
             'items.*.description' => 'required|string|max:500',
-            'items.*.quantity' => 'required|numeric|min:0.01',
-            'items.*.unit_price' => 'required|numeric|min:0',
+            'items.*.amount' => 'nullable|numeric|min:0',
+            'items.*.quantity' => 'nullable|numeric|min:0.01',
+            'items.*.unit_price' => 'nullable|numeric|min:0',
+            'items.*.remaining_cost' => 'nullable|numeric|min:0',
             'items.*.invoiceable_type' => 'nullable|string',
             'items.*.invoiceable_id' => 'nullable|integer',
         ]);
@@ -560,7 +617,10 @@ class InvoiceController extends Controller
         DB::transaction(function () use ($validated, $invoice, $currencyCode, $rate, $status) {
             $subtotal = 0;
             foreach ($validated['items'] as $item) {
-                $subtotal += ((float) $item['quantity'] * (float) $item['unit_price']);
+                $qty = isset($item['quantity']) ? (float) $item['quantity'] : 1.00;
+                $unitPrice = isset($item['unit_price']) ? (float) $item['unit_price'] : (isset($item['amount']) ? (float) $item['amount'] : 0.00);
+                $amount = isset($item['amount']) ? (float) $item['amount'] : ($qty * $unitPrice);
+                $subtotal += $amount;
             }
 
             $taxRate = (float) ($validated['tax_rate'] ?? 0);
@@ -588,12 +648,16 @@ class InvoiceController extends Controller
 
             $invoice->items()->delete();
             foreach ($validated['items'] as $item) {
-                $amount = (float) $item['quantity'] * (float) $item['unit_price'];
+                $qty = isset($item['quantity']) ? (float) $item['quantity'] : 1.00;
+                $unitPrice = isset($item['unit_price']) ? (float) $item['unit_price'] : (isset($item['amount']) ? (float) $item['amount'] : 0.00);
+                $amount = isset($item['amount']) ? (float) $item['amount'] : ($qty * $unitPrice);
+
                 $invoice->items()->create([
                     'description' => $item['description'],
-                    'quantity' => $item['quantity'],
-                    'unit_price' => $item['unit_price'],
+                    'quantity' => $qty,
+                    'unit_price' => $unitPrice,
                     'amount' => $amount,
+                    'remaining_cost' => isset($item['remaining_cost']) ? (float) $item['remaining_cost'] : 0.00,
                     'invoiceable_type' => $item['invoiceable_type'] ?? null,
                     'invoiceable_id' => $item['invoiceable_id'] ?? null,
                 ]);
@@ -635,6 +699,7 @@ class InvoiceController extends Controller
 
     /**
      * Remove the specified Invoice from storage.
+     * Automatically reverts all linked items (milestones, monthly services, domains, hosting) to unpaid/open.
      */
     public function destroy(Invoice $invoice): RedirectResponse
     {
@@ -646,14 +711,13 @@ class InvoiceController extends Controller
             abort(403, 'Unauthorized access to Invoice');
         }
 
-        if ($invoice->status === 'paid') {
-            return redirect()->back()->with('error', 'Paid invoices cannot be deleted.');
-        }
+        DB::transaction(function () use ($invoice) {
+            $invoice->revertLinkedItems();
+            $invoice->items()->delete();
+            $invoice->delete();
+        });
 
-        $invoice->items()->delete();
-        $invoice->delete();
-
-        return redirect()->route('client-portal.invoices.index')->with('success', 'Invoice deleted successfully.');
+        return redirect()->route('client-portal.invoices.index')->with('success', 'Invoice deleted successfully and all linked items reverted to unpaid.');
     }
 
     /**

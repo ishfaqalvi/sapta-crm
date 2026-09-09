@@ -21,6 +21,8 @@ use App\Http\Controllers\ClientPortal\{
 use App\Http\Controllers\{
     DashboardController,
     ClientController,
+    ProjectController as AdminProjectController,
+    ServiceController as AdminServiceController,
     CredentialController,
     EmployeeController,
     PayrollController,
@@ -100,6 +102,8 @@ Route::middleware(['web', 'auth'])->group(function () {
         Route::put('{task}/status', 'updateStatus');
         Route::post('service-task/{task}/status', 'updateServiceTaskStatus')->name('service-task.status');
         Route::put('service-task/{task}/status', 'updateServiceTaskStatus');
+        Route::post('general-task/{task}/status', 'updateGeneralTaskStatus')->name('general-task.status');
+        Route::put('general-task/{task}/status', 'updateGeneralTaskStatus');
     });
 
     // Dedicated Task Detail & Discussion Page
@@ -248,6 +252,7 @@ Route::group(['prefix' => 'client-portal', 'as' => 'client-portal.', 'middleware
         Route::delete('{quotation}', 'destroy');
         Route::delete('destroy/{quotation}', 'destroy')->name('destroy');
         Route::get('{quotation}/pdf', 'pdf')->name('pdf');
+        Route::get('{quotation}/print', 'print')->name('print');
     });
 
     /*
@@ -366,6 +371,26 @@ Route::middleware(['web', 'admin.access'])->group(function () {
 
     /*
     |--------------------------------------------------------------------------
+    | Projects Directory Routes (Admin Portal - Read-Only)
+    |--------------------------------------------------------------------------
+    */
+    Route::controller(AdminProjectController::class)->prefix('projects')->as('projects.')->group(function () {
+        Route::get('/', 'index')->name('index');
+        Route::get('{project}', 'show')->name('show');
+    });
+
+    /*
+    |--------------------------------------------------------------------------
+    | Services Directory Routes (Admin Portal - Read-Only)
+    |--------------------------------------------------------------------------
+    */
+    Route::controller(AdminServiceController::class)->prefix('services')->as('services.')->group(function () {
+        Route::get('/', 'index')->name('index');
+        Route::get('{service}', 'show')->name('show');
+    });
+
+    /*
+    |--------------------------------------------------------------------------
     | Credentials Directory Routes (Read-Only Directory Listing & Full CRUD)
     |--------------------------------------------------------------------------
     */
@@ -384,6 +409,7 @@ Route::middleware(['web', 'admin.access'])->group(function () {
     Route::controller(InvoiceController::class)->prefix('invoices')->as('invoices.')->group(function () {
         Route::get('/', 'index')->name('index');
         Route::get('{invoice}', 'show')->name('show');
+        Route::delete('{invoice}', 'destroy')->name('destroy');
         Route::get('{invoice}/pdf', 'downloadPdf')->name('pdf');
     });
 

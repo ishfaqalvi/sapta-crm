@@ -34,18 +34,6 @@ class TaskMessageController extends Controller
             abort(404, 'Task not found');
         }
 
-        // Auto sync client context if accessing project/service task
-        $clientId = null;
-        if ($type === 'project' && $task->websiteProject) {
-            $clientId = $task->websiteProject->client_id;
-        } elseif ($type === 'service' && $task->service) {
-            $clientId = $task->service->client_id;
-        }
-
-        if ($clientId && $user->client_id !== $clientId && ($user->type === 'admin' || $user->type === 'employee')) {
-            $user->updateQuietly(['client_id' => $clientId]);
-        }
-
         $task->load([
             'messages.user:id,name,email,avatar,type,employee_id',
             'assignedEmployee.designation:id,name',
@@ -56,11 +44,14 @@ class TaskMessageController extends Controller
         $sourceTitle = 'General Task';
         $sourceId = null;
         $sourceUrl = null;
+        $isClient = $user->type === 'client';
 
         if ($type === 'project' && $task->websiteProject) {
             $sourceTitle = $task->websiteProject->project_name ?? 'Website Project';
             $sourceId = $task->websiteProject->id;
-            $sourceUrl = "/client-portal/projects/{$task->websiteProject->id}?tab=tasks";
+            $sourceUrl = $isClient
+                ? "/client-portal/projects/{$task->websiteProject->id}?tab=tasks"
+                : "/projects/{$task->websiteProject->id}";
             if ($task->websiteProject->client) {
                 $clientData = [
                     'id' => $task->websiteProject->client->id,
@@ -73,7 +64,9 @@ class TaskMessageController extends Controller
         } elseif ($type === 'service' && $task->service) {
             $sourceTitle = $task->service->service_name ?? 'Client Service';
             $sourceId = $task->service->id;
-            $sourceUrl = "/client-portal/services/{$task->service->id}?tab=tasks";
+            $sourceUrl = $isClient
+                ? "/client-portal/services/{$task->service->id}?tab=tasks"
+                : "/services/{$task->service->id}";
             if ($task->service->client) {
                 $clientData = [
                     'id' => $task->service->client->id,
@@ -99,6 +92,8 @@ class TaskMessageController extends Controller
             'completed_at' => $task->completed_at ? $task->completed_at->toISOString() : null,
             'created_at' => $task->created_at ? $task->created_at->toISOString() : null,
             'description' => $task->description,
+            'attachment' => $task->attachment,
+            'attachment_name' => $task->attachment_name,
             'source_type' => $type,
             'source_id' => $sourceId,
             'source_title' => $sourceTitle,

@@ -34,6 +34,7 @@ export interface PendingBillingItem {
     amount: number;
     amount_pkr?: number;
     due_date?: string | null;
+    remaining_cost?: number;
     category: 'project' | 'service' | 'domain' | 'hosting';
     category_label: string;
     invoiceable_type: string;
@@ -43,8 +44,10 @@ export interface PendingBillingItem {
 export interface InvoiceLineItemInput extends Record<string, any> {
     uid: string;
     description: string;
-    quantity: number | string;
-    unit_price: number | string;
+    amount: number | string;
+    remaining_cost?: number | string;
+    quantity?: number | string;
+    unit_price?: number | string;
     invoiceable_type?: string | null;
     invoiceable_id?: number | null;
     category?: 'project' | 'service' | 'domain' | 'hosting' | 'manual';
@@ -103,8 +106,8 @@ export default function CreateClientInvoice({
 
     // Custom Item Form State (for modal)
     const [customDescription, setCustomDescription] = useState('');
-    const [customQuantity, setCustomQuantity] = useState('1');
-    const [customUnitPrice, setCustomUnitPrice] = useState('');
+    const [customAmount, setCustomAmount] = useState('');
+    const [customRemainingCost, setCustomRemainingCost] = useState('0');
     const [customError, setCustomError] = useState('');
 
     // Pending Items Filter & Search State
@@ -167,8 +170,10 @@ export default function CreateClientInvoice({
             const newItem: InvoiceLineItemInput = {
                 uid: `pending_${item.category}_${item.id}_${Date.now()}`,
                 description: item.title,
+                amount: item.amount,
                 quantity: 1,
                 unit_price: item.amount,
+                remaining_cost: item.remaining_cost ?? 0,
                 invoiceable_type: item.invoiceable_type,
                 invoiceable_id: item.invoiceable_id,
                 category: item.category,
@@ -187,8 +192,10 @@ export default function CreateClientInvoice({
         const newItems: InvoiceLineItemInput[] = toAdd.map((item) => ({
             uid: `pending_${item.category}_${item.id}_${Date.now()}_${Math.random()}`,
             description: item.title,
+            amount: item.amount,
             quantity: 1,
             unit_price: item.amount,
+            remaining_cost: item.remaining_cost ?? 0,
             invoiceable_type: item.invoiceable_type,
             invoiceable_id: item.invoiceable_id,
             category: item.category,
@@ -209,8 +216,8 @@ export default function CreateClientInvoice({
     const handleOpenAddCustomModal = () => {
         setEditingItemIndex(null);
         setCustomDescription('');
-        setCustomQuantity('1');
-        setCustomUnitPrice('');
+        setCustomAmount('');
+        setCustomRemainingCost('0');
         setCustomError('');
         setIsCustomItemModalOpen(true);
     };
@@ -222,8 +229,8 @@ export default function CreateClientInvoice({
         if (!target) return;
         setEditingItemIndex(index);
         setCustomDescription(target.description);
-        setCustomQuantity(String(target.quantity));
-        setCustomUnitPrice(String(target.unit_price));
+        setCustomAmount(String(target.amount ?? target.unit_price ?? ''));
+        setCustomRemainingCost(String(target.remaining_cost ?? '0'));
         setCustomError('');
         setIsCustomItemModalOpen(true);
     };
@@ -235,16 +242,13 @@ export default function CreateClientInvoice({
             setCustomError('Please enter an item description.');
             return;
         }
-        const qty = parseFloat(customQuantity);
-        if (isNaN(qty) || qty <= 0) {
-            setCustomError('Quantity must be greater than 0.');
+        const amt = parseFloat(customAmount);
+        if (isNaN(amt) || amt < 0) {
+            setCustomError('Please enter a valid amount.');
             return;
         }
-        const price = parseFloat(customUnitPrice);
-        if (isNaN(price) || price < 0) {
-            setCustomError('Please enter a valid unit price.');
-            return;
-        }
+        const rem = parseFloat(customRemainingCost);
+        const remainingVal = isNaN(rem) || rem < 0 ? 0 : rem;
 
         const currentItems = form.data.items || [];
 
@@ -254,8 +258,10 @@ export default function CreateClientInvoice({
             updated[editingItemIndex] = {
                 ...updated[editingItemIndex],
                 description: customDescription.trim(),
-                quantity: qty,
-                unit_price: price,
+                amount: amt,
+                unit_price: amt,
+                quantity: 1,
+                remaining_cost: remainingVal,
             };
             form.setData('items', updated);
         } else {
@@ -263,8 +269,10 @@ export default function CreateClientInvoice({
             const newItem: InvoiceLineItemInput = {
                 uid: 'custom_' + Date.now(),
                 description: customDescription.trim(),
-                quantity: qty,
-                unit_price: price,
+                amount: amt,
+                unit_price: amt,
+                quantity: 1,
+                remaining_cost: remainingVal,
                 invoiceable_type: null,
                 invoiceable_id: null,
                 category: 'manual',
@@ -287,9 +295,8 @@ export default function CreateClientInvoice({
     const subtotal = useMemo(() => {
         const currentItems = form.data.items || [];
         return currentItems.reduce((sum, item) => {
-            const qty = Number(item.quantity) || 0;
-            const price = Number(item.unit_price) || 0;
-            return sum + qty * price;
+            const amt = Number(item.amount ?? (Number(item.quantity || 1) * Number(item.unit_price || 0))) || 0;
+            return sum + amt;
         }, 0);
     }, [form.data.items]);
 
@@ -454,7 +461,7 @@ export default function CreateClientInvoice({
                                         <Button
                                             type="button"
                                             onClick={() => setIsPendingModalOpen(true)}
-                                            className="h-9 px-3.5 text-xs font-bold rounded-xl bg-gradient-to-r from-[#003796] via-[#0052D4] to-[#1d4ed8] hover:from-[#002a75] hover:to-[#0040b8] text-white shadow-md shadow-blue-600/20 active:scale-[0.99] transition-all cursor-pointer inline-flex items-center gap-1.5"
+                                            className="h-9 px-3.5 text-xs font-bold rounded-xl bg-gradient-to-r from-[#003796] via-[#0052D4] to-[#1d4ed8] hover:opacity-95 text-white shadow-md shadow-blue-600/20 active:scale-[0.99] transition-all cursor-pointer inline-flex items-center gap-1.5"
                                         >
                                             <Sparkles className="size-3.5" />
                                             <span>Pending Records ({allPendingItems.length})</span>
@@ -481,15 +488,14 @@ export default function CreateClientInvoice({
                                             <tr className="border-b border-slate-100 dark:border-slate-800 text-[10px] font-extrabold uppercase text-slate-400">
                                                 <th className="pb-3 px-2 w-10 text-center">#</th>
                                                 <th className="pb-3 px-3">Description</th>
-                                                <th className="pb-3 px-3 w-20 text-center">Qty</th>
-                                                <th className="pb-3 px-3 w-28 text-right">Unit Price</th>
-                                                <th className="pb-3 px-3 w-28 text-right">Amount</th>
+                                                <th className="pb-3 px-3 w-32 text-right">Amount</th>
+                                                <th className="pb-3 px-3 w-32 text-right">Remaining Cost</th>
                                                 <th className="pb-3 px-2 w-20 text-center">Actions</th>
                                             </tr>
                                         </thead>
                                         <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60">
                                             {(form.data.items || []).map((item, index) => {
-                                                const itemAmount = (Number(item.quantity) || 0) * (Number(item.unit_price) || 0);
+                                                const itemAmount = Number(item.amount ?? (Number(item.quantity || 1) * Number(item.unit_price || 0))) || 0;
                                                 return (
                                                     <tr key={item.uid || index} className="group hover:bg-slate-50/50 dark:hover:bg-slate-800/30 transition-colors">
                                                         {/* Index */}
@@ -514,19 +520,14 @@ export default function CreateClientInvoice({
                                                             </div>
                                                         </td>
 
-                                                        {/* Qty */}
-                                                        <td className="py-3 px-3 text-center font-bold font-mono text-slate-700 dark:text-slate-300">
-                                                            {item.quantity}
-                                                        </td>
-
-                                                        {/* Unit Price */}
-                                                        <td className="py-3 px-3 text-right font-mono font-semibold text-slate-600 dark:text-slate-400">
-                                                            {formatCurrency(Number(item.unit_price) || 0)}
-                                                        </td>
-
-                                                        {/* Row Total */}
+                                                        {/* Amount */}
                                                         <td className="py-3 px-3 text-right font-extrabold text-slate-900 dark:text-white font-mono text-xs">
                                                             {formatCurrency(itemAmount)}
+                                                        </td>
+
+                                                        {/* Remaining Cost */}
+                                                        <td className="py-3 px-3 text-right font-mono font-semibold text-slate-600 dark:text-slate-400 text-xs">
+                                                            {formatCurrency(Number(item.remaining_cost) || 0)}
                                                         </td>
 
                                                         {/* Actions */}
@@ -574,7 +575,7 @@ export default function CreateClientInvoice({
                                             <Button
                                                 type="button"
                                                 onClick={() => setIsPendingModalOpen(true)}
-                                                className="h-8 px-3 text-xs font-bold rounded-xl bg-gradient-to-r from-[#003796] via-[#0052D4] to-[#1d4ed8] hover:from-[#002a75] hover:to-[#0040b8] text-white shadow-md shadow-blue-600/20 active:scale-[0.99] transition-all cursor-pointer inline-flex items-center gap-1.5"
+                                                className="h-8 px-3 text-xs font-bold rounded-xl bg-gradient-to-r from-[#003796] via-[#0052D4] to-[#1d4ed8] hover:opacity-95 text-white shadow-md shadow-blue-600/20 active:scale-[0.99] transition-all cursor-pointer inline-flex items-center gap-1.5"
                                             >
                                                 <Sparkles className="size-3.5" />
                                                 <span>Select Pending Records ({allPendingItems.length})</span>
@@ -714,7 +715,7 @@ export default function CreateClientInvoice({
                         <Button
                             type="submit"
                             disabled={form.processing || (form.data.items || []).length === 0}
-                            className="w-full h-12 rounded-2xl bg-gradient-to-r from-[#003796] via-[#0052D4] to-[#1d4ed8] hover:from-[#002a75] hover:to-[#0040b8] text-white text-sm font-bold shadow-lg shadow-blue-600/25 active:scale-[0.99] transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                            className="w-full h-12 rounded-2xl bg-gradient-to-r from-[#003796] via-[#0052D4] to-[#1d4ed8] hover:opacity-95 text-white text-sm font-bold shadow-lg shadow-blue-600/25 active:scale-[0.99] transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                         >
                             {form.processing ? (
                                 <>
@@ -902,6 +903,11 @@ export default function CreateClientInvoice({
                                                     <span className="text-sm font-black font-mono text-slate-900 dark:text-white block">
                                                         {formatCurrency(item.amount)}
                                                     </span>
+                                                    {item.remaining_cost !== undefined && (
+                                                        <span className="text-[10px] font-semibold text-slate-500 dark:text-slate-400 block font-mono">
+                                                            Rem: {formatCurrency(item.remaining_cost)}
+                                                        </span>
+                                                    )}
                                                     <span
                                                         className={`text-[10px] font-bold ${added ? 'text-emerald-600 dark:text-emerald-400' : 'text-slate-400'
                                                             }`}
@@ -933,7 +939,7 @@ export default function CreateClientInvoice({
                                     <Button
                                         type="button"
                                         onClick={() => setIsPendingModalOpen(false)}
-                                        className="h-10 px-5 text-xs font-bold rounded-xl bg-gradient-to-r from-[#003796] via-[#0052D4] to-[#1d4ed8] hover:from-[#002a75] hover:to-[#0040b8] text-white shadow-md shadow-blue-600/20 active:scale-[0.99] transition-all cursor-pointer"
+                                        className="h-10 px-5 text-xs font-bold rounded-xl bg-gradient-to-r from-[#003796] via-[#0052D4] to-[#1d4ed8] hover:opacity-95 text-white shadow-md shadow-blue-600/20 active:scale-[0.99] transition-all cursor-pointer"
                                     >
                                         Apply Selected Items
                                     </Button>
@@ -958,7 +964,7 @@ export default function CreateClientInvoice({
                                             {editingItemIndex !== null ? 'Edit Invoice Line Item' : 'Add Custom Line Item'}
                                         </h3>
                                         <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-                                            Enter line item details and pricing in {clientCurrency}.
+                                            Enter line item details, remaining cost, and pricing in {clientCurrency}.
                                         </p>
                                     </div>
                                 </div>
@@ -997,48 +1003,40 @@ export default function CreateClientInvoice({
                                     />
                                 </div>
 
-                                {/* Qty & Unit Price Grid */}
-                                <div className="grid grid-cols-2 gap-4">
+                                {/* Amount & Remaining Cost Grid */}
+                                <div className="grid grid-cols-2 gap-3">
                                     <div className="space-y-1.5">
-                                        <Label htmlFor="custom_qty" className="text-xs font-bold text-slate-700 dark:text-slate-300">
-                                            Quantity *
+                                        <Label htmlFor="custom_amount" className="text-xs font-bold text-slate-700 dark:text-slate-300">
+                                            Amount ({clientCurrency}) *
                                         </Label>
                                         <Input
-                                            id="custom_qty"
-                                            type="number"
-                                            step="0.01"
-                                            min="0.01"
-                                            value={customQuantity}
-                                            onChange={(e) => setCustomQuantity(e.target.value)}
-                                            className="h-11 rounded-xl bg-slate-50 dark:bg-slate-950 border-slate-200 text-xs font-bold text-center font-mono"
-                                            required
-                                        />
-                                    </div>
-
-                                    <div className="space-y-1.5">
-                                        <Label htmlFor="custom_price" className="text-xs font-bold text-slate-700 dark:text-slate-300">
-                                            Unit Price ({clientCurrency}) *
-                                        </Label>
-                                        <Input
-                                            id="custom_price"
+                                            id="custom_amount"
                                             type="number"
                                             step="0.01"
                                             min="0"
-                                            value={customUnitPrice}
-                                            onChange={(e) => setCustomUnitPrice(e.target.value)}
+                                            value={customAmount}
+                                            onChange={(e) => setCustomAmount(e.target.value)}
                                             placeholder="0.00"
                                             className="h-11 rounded-xl bg-slate-50 dark:bg-slate-950 border-slate-200 text-xs font-bold font-mono text-right"
                                             required
                                         />
                                     </div>
-                                </div>
 
-                                {/* Calculated Amount Preview */}
-                                <div className="p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-950 border border-slate-200/80 dark:border-slate-800 flex items-center justify-between">
-                                    <span className="text-xs font-bold text-slate-500">Calculated Item Amount</span>
-                                    <span className="text-sm font-black font-mono text-slate-900 dark:text-white">
-                                        {formatCurrency((parseFloat(customQuantity) || 0) * (parseFloat(customUnitPrice) || 0))}
-                                    </span>
+                                    <div className="space-y-1.5">
+                                        <Label htmlFor="custom_remaining" className="text-xs font-bold text-slate-700 dark:text-slate-300">
+                                            Remaining Cost ({clientCurrency})
+                                        </Label>
+                                        <Input
+                                            id="custom_remaining"
+                                            type="number"
+                                            step="0.01"
+                                            min="0"
+                                            value={customRemainingCost}
+                                            onChange={(e) => setCustomRemainingCost(e.target.value)}
+                                            placeholder="0.00"
+                                            className="h-11 rounded-xl bg-slate-50 dark:bg-slate-950 border-slate-200 text-xs font-bold font-mono text-right"
+                                        />
+                                    </div>
                                 </div>
 
                                 {/* Actions */}
@@ -1053,7 +1051,7 @@ export default function CreateClientInvoice({
                                     </Button>
                                     <Button
                                         type="submit"
-                                        className="h-10 px-5 text-xs font-bold rounded-xl bg-gradient-to-r from-[#003796] via-[#0052D4] to-[#1d4ed8] hover:from-[#002a75] hover:to-[#0040b8] text-white shadow-md shadow-blue-600/20 active:scale-[0.99] transition-all cursor-pointer"
+                                        className="h-10 px-5 text-xs font-bold rounded-xl bg-gradient-to-r from-[#003796] via-[#0052D4] to-[#1d4ed8] hover:opacity-95 text-white shadow-md shadow-blue-600/20 active:scale-[0.99] transition-all cursor-pointer"
                                     >
                                         {editingItemIndex !== null ? 'Update Item' : 'Add Item to Invoice'}
                                     </Button>

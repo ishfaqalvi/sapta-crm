@@ -5,10 +5,11 @@ import { Head, Link, router, usePage } from '@inertiajs/react';
 import {
     ArrowLeft,
     CheckCircle2,
-    Clock,
+    DollarSign,
     Download,
     Eye,
     FileSpreadsheet,
+    LoaderCircle,
     Mail,
     Pencil,
     Phone,
@@ -41,6 +42,9 @@ export default function QuotationShow({ client, quotation }: QuotationShowProps)
     const canPrint = hasPermission(authUser, 'print-client-portal-quotations');
 
     const [statusUpdating, setStatusUpdating] = useState(false);
+
+    const isInvoice = quotation.status === 'accepted' || quotation.status === 'paid';
+    const documentTypeLabel = isInvoice ? 'Invoice' : 'Quotation';
 
     const handleStatusChange = (newStatus: string) => {
         setStatusUpdating(true);
@@ -75,15 +79,58 @@ export default function QuotationShow({ client, quotation }: QuotationShowProps)
         return name.slice(0, 2).toUpperCase();
     };
 
+    const getStatusBadge = () => {
+        switch (quotation.status) {
+            case 'paid':
+                return (
+                    <span className="px-2.5 py-0.5 rounded-full text-xs font-bold capitalize bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border border-emerald-500/30 flex items-center gap-1">
+                        <CheckCircle2 className="size-3 text-emerald-600" />
+                        <span>Paid (Invoice Settled)</span>
+                    </span>
+                );
+            case 'accepted':
+                return (
+                    <span className="px-2.5 py-0.5 rounded-full text-xs font-bold capitalize bg-blue-500/15 text-blue-700 dark:text-blue-300 border border-blue-500/30 flex items-center gap-1">
+                        <span>Accepted (Unpaid Invoice)</span>
+                    </span>
+                );
+            case 'sent':
+                return (
+                    <span className="px-2.5 py-0.5 rounded-full text-xs font-bold capitalize bg-cyan-500/15 text-cyan-700 dark:text-cyan-300 border border-cyan-500/30">
+                        Sent (Unpaid)
+                    </span>
+                );
+            case 'rejected':
+                return (
+                    <span className="px-2.5 py-0.5 rounded-full text-xs font-bold capitalize bg-rose-500/15 text-rose-700 dark:text-rose-300 border border-rose-500/30">
+                        Rejected
+                    </span>
+                );
+            case 'expired':
+                return (
+                    <span className="px-2.5 py-0.5 rounded-full text-xs font-bold capitalize bg-amber-500/15 text-amber-700 dark:text-amber-300 border border-amber-500/30">
+                        Expired
+                    </span>
+                );
+            case 'draft':
+            default:
+                return (
+                    <span className="px-2.5 py-0.5 rounded-full text-xs font-bold capitalize bg-slate-500/15 text-slate-700 dark:text-slate-300 border border-slate-500/30">
+                        Draft (Unpaid)
+                    </span>
+                );
+        }
+    };
+
     const breadcrumbs: BreadcrumbItem[] = [
         { title: 'Client Portal', href: '/client-portal/overview' },
         { title: 'Quotations', href: '/client-portal/quotations' },
-        { title: quotation.quotation_number, href: `/client-portal/quotations/${quotation.id}` },
+        { title: `${documentTypeLabel} ${quotation.quotation_number}`, href: `/client-portal/quotations/${quotation.id}` },
     ];
 
     return (
         <ClientPortalLayout client={client} breadcrumbs={breadcrumbs} activeTab="quotations">
-            <Head title={`Quotation ${quotation.quotation_number} - ${client.name}`} />
+            <Head title={`${documentTypeLabel} ${quotation.quotation_number} - ${client.name}`} />
 
             <div className="p-3 sm:p-6 lg:p-8 space-y-6 max-w-4xl mx-auto print:p-0 print:max-w-full">
                 {/* Screen-Only Action Header Bar */}
@@ -96,21 +143,36 @@ export default function QuotationShow({ client, quotation }: QuotationShowProps)
                             <ArrowLeft className="size-4" />
                         </Link>
                         <div>
-                            <div className="flex items-center gap-2">
+                            <div className="flex items-center gap-2 flex-wrap">
                                 <h1 className="text-lg font-black text-slate-900 dark:text-white">
                                     {quotation.quotation_number}
                                 </h1>
-                                <span className="px-2.5 py-0.5 rounded-full text-xs font-bold capitalize bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20">
-                                    {quotation.status}
-                                </span>
+                                {getStatusBadge()}
                             </div>
-                            <p className="text-xs text-slate-400">
+                            <p className="text-xs text-slate-400 mt-0.5">
                                 Created on {formatDate(quotation.date)} for {quotation.customer_name}
                             </p>
                         </div>
                     </div>
 
                     <div className="flex items-center gap-2 flex-wrap">
+                        {/* Mark as Paid button when quotation is accepted */}
+                        {canEdit && quotation.status === 'accepted' && (
+                            <button
+                                type="button"
+                                onClick={() => handleStatusChange('paid')}
+                                disabled={statusUpdating}
+                                className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 active:scale-[0.99] text-white text-xs font-bold shadow-md shadow-emerald-600/20 transition-all cursor-pointer disabled:opacity-50"
+                            >
+                                {statusUpdating ? (
+                                    <LoaderCircle className="size-3.5 animate-spin" />
+                                ) : (
+                                    <CheckCircle2 className="size-3.5" />
+                                )}
+                                <span>Mark as Paid</span>
+                            </button>
+                        )}
+
                         {/* Status Select */}
                         {canEdit && (
                             <select
@@ -119,9 +181,10 @@ export default function QuotationShow({ client, quotation }: QuotationShowProps)
                                 disabled={statusUpdating}
                                 className="px-3 py-2 text-xs font-bold bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer"
                             >
-                                <option value="draft">Draft</option>
-                                <option value="sent">Sent</option>
-                                <option value="accepted">Accepted</option>
+                                <option value="draft">Draft (Unpaid)</option>
+                                <option value="sent">Sent (Unpaid)</option>
+                                <option value="accepted">Accepted (Invoice Ready)</option>
+                                <option value="paid">Paid (Invoice Settled)</option>
                                 <option value="rejected">Rejected</option>
                                 <option value="expired">Expired</option>
                             </select>
@@ -129,13 +192,15 @@ export default function QuotationShow({ client, quotation }: QuotationShowProps)
 
                         {canPrint && (
                             <>
-                                <button
-                                    onClick={handlePrint}
+                                <a
+                                    href={`/client-portal/quotations/${quotation.id}/print`}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
                                     className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 text-xs font-bold transition-all cursor-pointer"
                                 >
                                     <Printer className="size-4" />
                                     <span>Print</span>
-                                </button>
+                                </a>
 
                                 <a
                                     href={`/client-portal/quotations/${quotation.id}/pdf`}
@@ -161,7 +226,7 @@ export default function QuotationShow({ client, quotation }: QuotationShowProps)
                     </div>
                 </div>
 
-                {/* Printable Quotation Paper Card (Exact Layout from Sample Screenshot) */}
+                {/* Printable Document Paper Card (Exact Layout from Sample Screenshot) */}
                 <div
                     id="quotation-print-area"
                     className="bg-white text-slate-900 rounded-2xl sm:rounded-3xl border border-slate-200/90 shadow-xl p-6 sm:p-10 md:p-12 space-y-6 print:border-none print:shadow-none print:p-0 print:rounded-none print:m-0"
@@ -190,7 +255,7 @@ export default function QuotationShow({ client, quotation }: QuotationShowProps)
                                             {quotation.company_name || client.company_name || client.name}
                                         </span>
                                         <span className="text-[9px] font-bold text-blue-700 uppercase tracking-widest block">
-                                            Official Quote
+                                            {isInvoice ? 'Official Invoice' : 'Official Quote'}
                                         </span>
                                     </div>
                                 </div>
@@ -222,10 +287,10 @@ export default function QuotationShow({ client, quotation }: QuotationShowProps)
                             </div>
                         </div>
 
-                        {/* Right: Quotation Title */}
+                        {/* Right: Quotation / Invoice Title */}
                         <div className="w-full sm:w-1/4 text-right">
                             <h1 className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">
-                                Quotation
+                                {documentTypeLabel}
                             </h1>
                         </div>
                     </div>
@@ -252,7 +317,7 @@ export default function QuotationShow({ client, quotation }: QuotationShowProps)
                         {/* Right: Meta */}
                         <div className="text-right text-sm sm:text-base space-y-1">
                             <div>
-                                <span className="font-extrabold">Quotation#</span> &nbsp;{' '}
+                                <span className="font-extrabold">{documentTypeLabel}#</span> &nbsp;{' '}
                                 <span className="font-bold">{quotation.quotation_number}</span>
                             </div>
                             <div>
@@ -277,42 +342,39 @@ export default function QuotationShow({ client, quotation }: QuotationShowProps)
                         </div>
                     </div>
 
-                    {/* Line Items Table */}
+                    {/* Line Items Table (No Qty column) */}
                     <div className="pt-2 overflow-x-auto">
                         <table className="w-full text-left border-collapse text-xs sm:text-sm">
                             <thead>
                                 <tr className="border-t-2 border-b-2 border-[#003796] bg-slate-200/80 text-[#003796] font-black uppercase text-xs">
                                     <th className="py-2.5 px-3 w-12 text-center">#</th>
                                     <th className="py-2.5 px-3">DESCRIPTION</th>
-                                    <th className="py-2.5 px-3 w-20 text-center">QTY</th>
-                                    <th className="py-2.5 px-3 w-32 text-right">PRICE</th>
-                                    <th className="py-2.5 px-3 w-36 text-right">TOTAL</th>
+                                    <th className="py-2.5 px-3 w-44 text-right">AMOUNT</th>
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-slate-200">
                                 {quotation.items && quotation.items.length > 0 ? (
-                                    quotation.items.map((item, index) => (
-                                        <tr key={index} className="text-slate-900 font-bold">
-                                            <td className="py-3 px-3 text-center text-slate-700">{index + 1}</td>
-                                            <td className="py-3 px-3 font-extrabold leading-snug">
-                                                {item.description}
-                                            </td>
-                                            <td className="py-3 px-3 text-center">
-                                                {Number(item.quantity) % 1 === 0 ? Number(item.quantity) : Number(item.quantity).toFixed(2)}
-                                            </td>
-                                            <td className="py-3 px-3 text-right">
-                                                {quotation.currency_code}
-                                                {Number(item.unit_price).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                                            </td>
-                                            <td className="py-3 px-3 text-right font-black">
-                                                {quotation.currency_code}
-                                                {Number(item.amount).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                                            </td>
-                                        </tr>
-                                    ))
+                                    quotation.items.map((item, index) => {
+                                        const cleanAmount = Number(item.amount || item.unit_price || 0);
+                                        return (
+                                            <tr key={index} className="text-slate-900 font-bold">
+                                                <td className="py-3 px-3 text-center text-slate-700">{index + 1}</td>
+                                                <td className="py-3 px-3 font-extrabold leading-snug">
+                                                    {item.description}
+                                                </td>
+                                                <td className="py-3 px-3 text-right font-black">
+                                                    {quotation.currency_code}{' '}
+                                                    {cleanAmount.toLocaleString(undefined, {
+                                                        minimumFractionDigits: 2,
+                                                        maximumFractionDigits: 2,
+                                                    })}
+                                                </td>
+                                            </tr>
+                                        );
+                                    })
                                 ) : (
                                     <tr>
-                                        <td colSpan={5} className="py-4 text-center text-slate-400">
+                                        <td colSpan={3} className="py-4 text-center text-slate-400">
                                             No line items listed.
                                         </td>
                                     </tr>
@@ -322,47 +384,59 @@ export default function QuotationShow({ client, quotation }: QuotationShowProps)
                                 {(Number(quotation.tax_rate) > 0 || Number(quotation.discount) > 0) && (
                                     <>
                                         <tr>
-                                            <td colSpan={4} className="py-2 px-3 text-right font-bold text-slate-600">
+                                            <td colSpan={2} className="py-2 px-3 text-right font-bold text-slate-600">
                                                 Subtotal:
                                             </td>
                                             <td className="py-2 px-3 text-right font-bold text-slate-900">
-                                                {quotation.currency_code}
-                                                {Number(quotation.subtotal).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                                {quotation.currency_code}{' '}
+                                                {Number(quotation.subtotal).toLocaleString(undefined, {
+                                                    minimumFractionDigits: 2,
+                                                    maximumFractionDigits: 2,
+                                                })}
                                             </td>
                                         </tr>
                                         {Number(quotation.tax_rate) > 0 && (
                                             <tr>
-                                                <td colSpan={4} className="py-1.5 px-3 text-right font-bold text-slate-600">
+                                                <td colSpan={2} className="py-1.5 px-3 text-right font-bold text-slate-600">
                                                     Tax ({quotation.tax_rate}%):
                                                 </td>
                                                 <td className="py-1.5 px-3 text-right font-bold text-slate-900">
-                                                    {quotation.currency_code}
-                                                    {Number(quotation.tax_amount).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                                    {quotation.currency_code}{' '}
+                                                    {Number(quotation.tax_amount).toLocaleString(undefined, {
+                                                        minimumFractionDigits: 2,
+                                                        maximumFractionDigits: 2,
+                                                    })}
                                                 </td>
                                             </tr>
                                         )}
                                         {Number(quotation.discount) > 0 && (
                                             <tr>
-                                                <td colSpan={4} className="py-1.5 px-3 text-right font-bold text-emerald-700">
+                                                <td colSpan={2} className="py-1.5 px-3 text-right font-bold text-emerald-700">
                                                     Discount:
                                                 </td>
                                                 <td className="py-1.5 px-3 text-right font-bold text-emerald-700">
-                                                    - {quotation.currency_code}
-                                                    {Number(quotation.discount).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                                    - {quotation.currency_code}{' '}
+                                                    {Number(quotation.discount).toLocaleString(undefined, {
+                                                        minimumFractionDigits: 2,
+                                                        maximumFractionDigits: 2,
+                                                    })}
                                                 </td>
                                             </tr>
                                         )}
                                     </>
                                 )}
 
-                                {/* Grand Total Shaded Row (As in sample screenshot) */}
+                                {/* Grand Total Shaded Row */}
                                 <tr className="border-t-2 border-b-2 border-slate-400 bg-slate-200/90 text-slate-900">
-                                    <td colSpan={4} className="py-3 px-3 text-right font-black text-sm uppercase tracking-wider">
+                                    <td colSpan={2} className="py-3 px-3 text-right font-black text-sm uppercase tracking-wider">
                                         GRAND TOTAL
                                     </td>
                                     <td className="py-3 px-3 text-right font-black text-sm sm:text-base text-slate-900">
-                                        {quotation.currency_code}
-                                        {Number(quotation.total_amount).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                        {quotation.currency_code}{' '}
+                                        {Number(quotation.total_amount).toLocaleString(undefined, {
+                                            minimumFractionDigits: 2,
+                                            maximumFractionDigits: 2,
+                                        })}
                                     </td>
                                 </tr>
                             </tbody>
@@ -390,15 +464,25 @@ export default function QuotationShow({ client, quotation }: QuotationShowProps)
                         </div>
                     )}
 
-                    {/* Signature Block (Empty for actual physical/digital signature) */}
-                    <div className="pt-10 flex justify-end">
+                    {/* Signature Block */}
+                    <div className="pt-8 flex justify-end">
                         <div className="w-64 sm:w-72 text-center space-y-2">
                             <div className="font-black text-xs sm:text-sm text-slate-900 uppercase">
                                 {quotation.authorized_by_text || `For, ${quotation.company_name || 'AL MUSTAFA FURNITURE MOVERS'}`}
                             </div>
 
-                            {/* Blank space for signing */}
-                            <div className="h-16 sm:h-20" />
+                            {/* Signature image or blank space for signing */}
+                            {quotation.signature_image ? (
+                                <div className="h-16 sm:h-20 flex items-center justify-center">
+                                    <img
+                                        src={quotation.signature_image}
+                                        alt="Signature"
+                                        className="max-h-16 max-w-[200px] object-contain"
+                                    />
+                                </div>
+                            ) : (
+                                <div className="h-16 sm:h-20" />
+                            )}
 
                             <div className="border-t border-slate-700 pt-1.5 text-[11px] sm:text-xs font-black tracking-wider text-slate-800 uppercase">
                                 AUTHORIZED SIGNATURE

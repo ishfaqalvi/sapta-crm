@@ -6,6 +6,7 @@ use App\Models\ClientService;
 use App\Models\Employee;
 use App\Models\ProjectTask;
 use App\Models\ServiceTask;
+use App\Models\Task;
 use App\Models\WebsiteProject;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -17,7 +18,7 @@ use Inertia\Response;
 class MyTaskController extends Controller
 {
     /**
-     * Display a listing of assigned project and service tasks for the authenticated employee.
+     * Display a listing of assigned project, service, and general tasks for the authenticated employee.
      */
     public function index(Request $request): Response
     {
@@ -114,21 +115,53 @@ class MyTaskController extends Controller
             $serviceQuery->where('client_service_id', $serviceId);
         }
 
+        // 3. General Tasks Query
+        $generalQuery = Task::withCount('messages')->with([
+            'taskCategory:id,name',
+            'assignedEmployee:id,name,employee_code,avatar',
+        ]);
+
+        if (!is_null($employeeId)) {
+            $generalQuery->where('assigned_employee_id', $employeeId);
+        }
+
+        if ($search) {
+            $generalQuery->where(function ($q) use ($search) {
+                $q->where('task_title', 'like', "%{$search}%")
+                    ->orWhere('task_code', 'like', "%{$search}%")
+                    ->orWhere('description', 'like', "%{$search}%")
+                    ->orWhereHas('taskCategory', function ($cq) use ($search) {
+                        $cq->where('name', 'like', "%{$search}%");
+                    });
+            });
+        }
+
+        if ($status) {
+            $generalQuery->where('status', $status);
+        }
+        if ($priority) {
+            $generalQuery->where('priority', $priority);
+        }
+
         // Stats Base Queries
         $baseProjectStats = ProjectTask::query();
         $baseServiceStats = ServiceTask::query();
+        $baseGeneralStats = Task::query();
+
         if (!is_null($employeeId)) {
             $baseProjectStats->where('assigned_employee_id', $employeeId);
             $baseServiceStats->where('assigned_employee_id', $employeeId);
+            $baseGeneralStats->where('assigned_employee_id', $employeeId);
         }
 
-        $totalCount = (clone $baseProjectStats)->count() + (clone $baseServiceStats)->count();
-        $todoCount = (clone $baseProjectStats)->where('status', 'todo')->count() + (clone $baseServiceStats)->where('status', 'todo')->count();
-        $inProgressCount = (clone $baseProjectStats)->where('status', 'in_progress')->count() + (clone $baseServiceStats)->where('status', 'in_progress')->count();
-        $inReviewCount = (clone $baseProjectStats)->where('status', 'in_review')->count() + (clone $baseServiceStats)->where('status', 'in_review')->count();
-        $completedCount = (clone $baseProjectStats)->where('status', 'completed')->count() + (clone $baseServiceStats)->where('status', 'completed')->count();
+        $totalCount = (clone $baseProjectStats)->count() + (clone $baseServiceStats)->count() + (clone $baseGeneralStats)->count();
+        $todoCount = (clone $baseProjectStats)->where('status', 'todo')->count() + (clone $baseServiceStats)->where('status', 'todo')->count() + (clone $baseGeneralStats)->where('status', 'todo')->count();
+        $inProgressCount = (clone $baseProjectStats)->where('status', 'in_progress')->count() + (clone $baseServiceStats)->where('status', 'in_progress')->count() + (clone $baseGeneralStats)->where('status', 'in_progress')->count();
+        $inReviewCount = (clone $baseProjectStats)->where('status', 'in_review')->count() + (clone $baseServiceStats)->where('status', 'in_review')->count() + (clone $baseGeneralStats)->where('status', 'in_review')->count();
+        $completedCount = (clone $baseProjectStats)->where('status', 'completed')->count() + (clone $baseServiceStats)->where('status', 'completed')->count() + (clone $baseGeneralStats)->where('status', 'completed')->count();
         $urgentCount = (clone $baseProjectStats)->where('priority', 'urgent')->where('status', '!=', 'completed')->count()
-            + (clone $baseServiceStats)->where('priority', 'urgent')->where('status', '!=', 'completed')->count();
+            + (clone $baseServiceStats)->where('priority', 'urgent')->where('status', '!=', 'completed')->count()
+            + (clone $baseGeneralStats)->where('priority', 'urgent')->where('status', '!=', 'completed')->count();
 
         $stats = [
             'total' => $totalCount,
@@ -142,7 +175,7 @@ class MyTaskController extends Controller
         // Fetch tasks according to sourceType filter
         $allTasks = collect();
 
-        if ($sourceType !== 'service') {
+        if ($sourceType !== 'service' && $sourceType !== 'general' && !$serviceId) {
             $projectTasks = $projectQuery->get()->map(function ($t) {
                 return [
                     'id' => $t->id,
@@ -153,6 +186,8 @@ class MyTaskController extends Controller
                     'start_date' => $t->start_date ? $t->start_date->toDateString() : null,
                     'due_date' => $t->due_date ? $t->due_date->toDateString() : null,
                     'description' => $t->description,
+                    'attachment' => $t->attachment,
+                    'attachment_name' => $t->attachment_name,
                     'completed_at' => $t->completed_at ? $t->completed_at->toISOString() : null,
                     'created_at' => $t->created_at ? $t->created_at->toISOString() : null,
                     'messages_count' => $t->messages_count ?? 0,
@@ -160,6 +195,14 @@ class MyTaskController extends Controller
                     'website_project' => $t->websiteProject ? [
                         'id' => $t->websiteProject->id,
                         'project_name' => $t->websiteProject->project_name,
+                        'total_budget' => $t->websiteProject->total_budget,
+                        'currency' => $t->websiteProject->currency,
+                        'total_budget_pkr' => $t->websiteProject->total_budget_pkr,
+                        'start_date' => $t->websiteProject->start_date ? $t->websiteProject->start_date->toDateString() : null,
+                        'deadline' => $t->websiteProject->deadline ? $t->websiteProject->deadline->toDateString() : null,
+                        'status' => $t->websiteProject->status,
+                        'progress_percentage' => $t->websiteProject->progress_percentage,
+                        'notes' => $t->websiteProject->notes,
                         'client' => $t->websiteProject->client,
                         'category' => $t->websiteProject->category,
                     ] : null,
@@ -169,7 +212,7 @@ class MyTaskController extends Controller
             $allTasks = $allTasks->concat($projectTasks);
         }
 
-        if ($sourceType !== 'project' && !$projectId) {
+        if ($sourceType !== 'project' && $sourceType !== 'general' && !$projectId) {
             $serviceTasks = $serviceQuery->get()->map(function ($t) {
                 return [
                     'id' => $t->id,
@@ -180,6 +223,8 @@ class MyTaskController extends Controller
                     'start_date' => $t->start_date ? $t->start_date->toDateString() : null,
                     'due_date' => $t->due_date ? $t->due_date->toDateString() : null,
                     'description' => $t->description,
+                    'attachment' => $t->attachment,
+                    'attachment_name' => $t->attachment_name,
                     'completed_at' => $t->completed_at ? $t->completed_at->toISOString() : null,
                     'created_at' => $t->created_at ? $t->created_at->toISOString() : null,
                     'messages_count' => $t->messages_count ?? 0,
@@ -187,6 +232,14 @@ class MyTaskController extends Controller
                     'service' => $t->service ? [
                         'id' => $t->service->id,
                         'service_name' => $t->service->service_name,
+                        'monthly_fee' => $t->service->monthly_fee,
+                        'contract_months' => $t->service->contract_months,
+                        'currency' => $t->service->currency,
+                        'monthly_fee_pkr' => $t->service->monthly_fee_pkr,
+                        'billing_day' => $t->service->billing_day,
+                        'start_date' => $t->service->start_date ? $t->service->start_date->toDateString() : null,
+                        'status' => $t->service->status,
+                        'notes' => $t->service->notes,
                         'client' => $t->service->client,
                         'category' => $t->service->category,
                     ] : null,
@@ -194,6 +247,33 @@ class MyTaskController extends Controller
                 ];
             });
             $allTasks = $allTasks->concat($serviceTasks);
+        }
+
+        if ($sourceType !== 'project' && $sourceType !== 'service' && !$projectId && !$serviceId) {
+            $generalTasks = $generalQuery->get()->map(function ($t) {
+                return [
+                    'id' => $t->id,
+                    'source_type' => 'general',
+                    'task_code' => $t->task_code,
+                    'task_title' => $t->task_title,
+                    'priority' => $t->priority,
+                    'status' => $t->status,
+                    'start_date' => $t->start_date ? $t->start_date->toDateString() : null,
+                    'due_date' => $t->due_date ? $t->due_date->toDateString() : null,
+                    'description' => $t->description,
+                    'attachment' => $t->attachment,
+                    'attachment_name' => $t->attachment_name,
+                    'completed_at' => $t->completed_at ? $t->completed_at->toISOString() : null,
+                    'created_at' => $t->created_at ? $t->created_at->toISOString() : null,
+                    'messages_count' => $t->messages_count ?? 0,
+                    'task_category' => $t->taskCategory ? [
+                        'id' => $t->taskCategory->id,
+                        'name' => $t->taskCategory->name,
+                    ] : null,
+                    'assigned_employee' => $t->assignedEmployee,
+                ];
+            });
+            $allTasks = $allTasks->concat($generalTasks);
         }
 
         // Sort: incomplete first, then due_date asc, then created_at desc
@@ -312,5 +392,39 @@ class MyTaskController extends Controller
         $task->update($updateData);
 
         return redirect()->back()->with('success', 'Service task status updated successfully.');
+    }
+
+    /**
+     * Update status of an assigned general task.
+     */
+    public function updateGeneralTaskStatus(Request $request, Task $task): RedirectResponse
+    {
+        $user = Auth::user();
+
+        if (!$user) {
+            abort(401, 'Unauthenticated');
+        }
+
+        if ($user->type === 'employee') {
+            $employee = $user->employee ?: Employee::where('user_id', $user->id)->first();
+            if (!$employee || $task->assigned_employee_id !== $employee->id) {
+                abort(403, 'Unauthorized. You can only update your own assigned tasks.');
+            }
+        }
+
+        $validated = $request->validate([
+            'status' => 'required|in:todo,in_progress,in_review,completed,cancelled',
+        ]);
+
+        $updateData = ['status' => $validated['status']];
+        if ($validated['status'] === 'completed' && $task->status !== 'completed') {
+            $updateData['completed_at'] = now();
+        } elseif ($validated['status'] !== 'completed') {
+            $updateData['completed_at'] = null;
+        }
+
+        $task->update($updateData);
+
+        return redirect()->back()->with('success', 'General task status updated successfully.');
     }
 }

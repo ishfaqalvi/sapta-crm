@@ -186,6 +186,16 @@
         .cat-domain { background-color: #eff6ff; color: #1d4ed8; }
         .cat-hosting { background-color: #fef3c7; color: #b45309; }
 
+        .items-table th.text-center,
+        .items-table td.text-center,
+        .text-center { text-align: center !important; }
+        .items-table th.text-right,
+        .items-table td.text-right,
+        .text-right { text-align: right !important; }
+        .items-table th.text-left,
+        .items-table td.text-left,
+        .text-left { text-align: left !important; }
+
         /* Footer */
         .footer {
             margin-top: 20px;

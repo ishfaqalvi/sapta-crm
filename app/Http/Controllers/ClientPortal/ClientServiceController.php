@@ -16,6 +16,7 @@ use App\Models\SystemSetting;
 use App\Models\User;
 use App\Notifications\CrmNotification;
 use App\Services\CurrencyService;
+use App\Services\TaskNotificationService;
 use App\Traits\AuthorizesClientPortalAccess;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -706,6 +707,18 @@ class ClientServiceController extends Controller
         $currency = $service ? ($service->currency ?? 'USD') : 'USD';
         $rate = CurrencyService::getRate($currency);
 
+        $remainingCost = 0.00;
+        if ($service && $service->contract_months > 0 && $service->monthly_fee > 0) {
+            $totalContract = (float) $service->monthly_fee * (int) $service->contract_months;
+            $paidSum = (float) ServicePayment::where('client_service_id', $service->id)
+                ->where('status', 'paid')
+                ->sum('amount_paid');
+            $remainingCost = max(0, round($totalContract - ($paidSum + (float) $servicePayment->amount_due), 2));
+        } elseif ($servicePayment->parent_id) {
+            $parent = ServicePayment::find($servicePayment->parent_id);
+            $remainingCost = $parent ? (float) $parent->amount_due : 0.00;
+        }
+
         $invoiceNumber = Invoice::generateNextInvoiceNumber();
 
         $titleSuffix = $servicePayment->split_title ? ' (' . $servicePayment->split_title . ')' : '';
@@ -735,6 +748,7 @@ class ClientServiceController extends Controller
             'quantity' => 1.00,
             'unit_price' => $servicePayment->amount_due,
             'amount' => $servicePayment->amount_due,
+            'remaining_cost' => $remainingCost,
             'invoiceable_type' => ServicePayment::class,
             'invoiceable_id' => $servicePayment->id,
         ]);
@@ -884,6 +898,7 @@ class ClientServiceController extends Controller
             'start_date' => 'nullable|date',
             'due_date' => 'nullable|date',
             'description' => 'nullable|string|max:2000',
+            'attachment' => 'nullable|file|max:10240|mimes:jpeg,png,jpg,webp,pdf,doc,docx,xls,xlsx,zip,txt',
         ]);
 
         $validated['assigned_employee_id'] = $request->filled('assigned_employee_id') ? $request->assigned_employee_id : null;
@@ -894,22 +909,14 @@ class ClientServiceController extends Controller
             $validated['completed_at'] = now();
         }
 
-        $task = ServiceTask::create($validated);
+        $task = new ServiceTask($validated);
+        if ($request->hasFile('attachment')) {
+            $task->attachment = $request->file('attachment');
+        }
+        $task->save();
 
         if ($task->assigned_employee_id) {
-            $employee = Employee::with('user')->find($task->assigned_employee_id);
-            if ($employee && $employee->user) {
-                $service = ClientService::find($task->client_service_id);
-                $serviceName = $service ? $service->service_name : 'Service';
-                $employee->user->notify(new CrmNotification(
-                    "New Task Assigned: {$task->task_title}",
-                    "You have been assigned to task '{$task->task_title}' on service '{$serviceName}'.",
-                    'task_assigned',
-                    'info',
-                    "/tasks/detail/service/{$task->id}",
-                    ['task_id' => $task->id, 'type' => 'service']
-                ));
-            }
+            TaskNotificationService::notifyAssignedEmployee($task, 'service');
         }
 
         return redirect()->back()->with('success', 'Service task created successfully.');
@@ -939,11 +946,21 @@ class ClientServiceController extends Controller
             'start_date' => 'nullable|date',
             'due_date' => 'nullable|date',
             'description' => 'nullable|string|max:2000',
+            'attachment' => 'nullable',
+            'remove_attachment' => 'nullable|boolean',
         ]);
+
+        $oldAssignedId = $task->assigned_employee_id;
 
         $validated['assigned_employee_id'] = $request->filled('assigned_employee_id') ? $request->assigned_employee_id : null;
         $validated['start_date'] = $request->filled('start_date') ? $request->start_date : null;
         $validated['due_date'] = $request->filled('due_date') ? $request->due_date : null;
+
+        if ($request->boolean('remove_attachment')) {
+            $task->attachment = null;
+        } elseif ($request->hasFile('attachment')) {
+            $task->attachment = $request->file('attachment');
+        }
 
         if ($validated['status'] === 'completed' && $task->status !== 'completed') {
             $validated['completed_at'] = now();
@@ -951,7 +968,13 @@ class ClientServiceController extends Controller
             $validated['completed_at'] = null;
         }
 
-        $task->update($validated);
+        unset($validated['attachment'], $validated['remove_attachment']);
+        $task->fill($validated);
+        $task->save();
+
+        if ($task->assigned_employee_id && $task->assigned_employee_id !== $oldAssignedId) {
+            TaskNotificationService::notifyAssignedEmployee($task, 'service', $oldAssignedId);
+        }
 
         return redirect()->back()->with('success', 'Service task updated successfully.');
     }

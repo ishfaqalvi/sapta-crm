@@ -64,6 +64,7 @@ class Quotation extends Model
     {
         static::deleting(function (Quotation $quotation) {
             $quotation->deleteOldCompanyLogoFile();
+            $quotation->deleteOldSignatureImageFile();
         });
     }
 
@@ -134,13 +135,55 @@ class Quotation extends Model
     }
 
     /**
+     * Mutator for signature_image attribute.
+     */
+    public function setSignatureImageAttribute($value): void
+    {
+        if (is_null($value) || $value === '') {
+            $this->deleteOldSignatureImageFile();
+            $this->attributes['signature_image'] = null;
+            return;
+        }
+
+        if ($value instanceof UploadedFile && $value->isValid()) {
+            $this->deleteOldSignatureImageFile();
+
+            $destinationPath = public_path('uploads/quotations/signatures');
+            if (!file_exists($destinationPath)) {
+                mkdir($destinationPath, 0755, true);
+            }
+
+            $filename = 'sig_' . time() . '_' . uniqid() . '.' . $value->getClientOriginalExtension();
+            $value->move($destinationPath, $filename);
+
+            $this->attributes['signature_image'] = '/uploads/quotations/signatures/' . $filename;
+            return;
+        }
+
+        if (is_string($value)) {
+            if (str_contains($value, 'Temp') || str_contains($value, '.tmp')) {
+                return;
+            }
+            $this->attributes['signature_image'] = $value;
+        }
+    }
+
+    public function deleteOldSignatureImageFile(): void
+    {
+        $oldPath = $this->getRawOriginal('signature_image');
+        if ($oldPath && !str_contains($oldPath, '.tmp') && file_exists(public_path($oldPath))) {
+            @unlink(public_path($oldPath));
+        }
+    }
+
+    /**
      * Helper to recalculate all totals from items.
      */
     public function recalculateTotals(): void
     {
         $subtotal = 0;
         foreach ($this->items as $item) {
-            $subtotal += ($item->quantity * $item->unit_price);
+            $subtotal += ($item->amount > 0 ? (float) $item->amount : ((float) $item->quantity * (float) $item->unit_price));
         }
 
         $taxRate = (float) ($this->tax_rate ?? 0);

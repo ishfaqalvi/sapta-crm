@@ -5,18 +5,17 @@ import {
     AlertCircle,
     ArrowLeft,
     Building2,
-    Calendar,
-    Coins,
     DollarSign,
     FileSpreadsheet,
     FileText,
-    Layers,
     LoaderCircle,
+    PenTool,
     Plus,
     Receipt,
     Save,
     Sparkles,
     Trash2,
+    Upload,
     User,
 } from 'lucide-react';
 import React, { useEffect, useState } from 'react';
@@ -51,9 +50,7 @@ interface QuotationEditProps {
 export interface ItemRow {
     id?: number;
     description: string;
-    quantity: number | string;
-    unit_price: number | string;
-    amount: number;
+    amount: number | string;
 }
 
 export default function QuotationEdit({ client, quotation }: QuotationEditProps) {
@@ -64,21 +61,17 @@ export default function QuotationEdit({ client, quotation }: QuotationEditProps)
             ? quotation.items.map((it) => ({
                   id: it.id,
                   description: it.description || '',
-                  quantity: Number(it.quantity) || '',
-                  unit_price: Number(it.unit_price) || '',
-                  amount: Number(it.amount) || 0,
+                  amount: Number(it.amount || it.unit_price) || '',
               }))
             : [
                   {
                       description: '',
-                      quantity: '',
-                      unit_price: '',
-                      amount: 0,
+                      amount: '',
                   },
               ]
     );
 
-    const { data, setData, post, put, processing, errors } = useForm<{
+    const { data, setData, post, processing, errors } = useForm<{
         [key: string]: any;
         quotation_number: string;
         currency_code: string;
@@ -101,10 +94,12 @@ export default function QuotationEdit({ client, quotation }: QuotationEditProps)
         discount: number | string;
         date: string;
         expiry_date: string;
-        status: 'draft' | 'sent' | 'accepted' | 'rejected' | 'expired';
+        status: 'draft' | 'sent' | 'accepted' | 'paid' | 'rejected' | 'expired';
         notes: string;
         terms: string;
         authorized_by_text: string;
+        signature_image: File | null;
+        remove_signature_image: boolean;
         company_logo: File | null;
         remove_company_logo: boolean;
         items: ItemRow[];
@@ -125,6 +120,8 @@ export default function QuotationEdit({ client, quotation }: QuotationEditProps)
         company_whatsapp: quotation.company_whatsapp || '',
         company_logo: null,
         remove_company_logo: false,
+        signature_image: null,
+        remove_signature_image: false,
         greeting: quotation.greeting || '',
         opening_text: quotation.opening_text || '',
         closing_text: quotation.closing_text || '',
@@ -132,7 +129,7 @@ export default function QuotationEdit({ client, quotation }: QuotationEditProps)
         discount: Number(quotation.discount) || '',
         date: quotation.date ? quotation.date.split('T')[0] : '',
         expiry_date: quotation.expiry_date ? quotation.expiry_date.split('T')[0] : '',
-        status: quotation.status || 'draft',
+        status: (quotation.status as any) || 'draft',
         notes: quotation.notes || '',
         terms: quotation.terms || '',
         authorized_by_text: quotation.authorized_by_text || '',
@@ -140,6 +137,7 @@ export default function QuotationEdit({ client, quotation }: QuotationEditProps)
     });
 
     const [showCompanyDetails, setShowCompanyDetails] = useState(false);
+    const [signaturePreview, setSignaturePreview] = useState<string | null>(null);
 
     useEffect(() => {
         setData('items', items);
@@ -148,15 +146,7 @@ export default function QuotationEdit({ client, quotation }: QuotationEditProps)
     const handleItemChange = (index: number, field: keyof ItemRow, val: any) => {
         setItems((prevItems) => {
             const updated = [...prevItems];
-            const item = { ...updated[index], [field]: val };
-            if (field === 'quantity' || field === 'unit_price') {
-                const rawQty = field === 'quantity' ? val : item.quantity;
-                const rawPrice = field === 'unit_price' ? val : item.unit_price;
-                const qty = rawQty === '' ? 0 : parseFloat(String(rawQty)) || 0;
-                const price = rawPrice === '' ? 0 : parseFloat(String(rawPrice)) || 0;
-                item.amount = Math.round(qty * price * 100) / 100;
-            }
-            updated[index] = item;
+            updated[index] = { ...updated[index], [field]: val };
             return updated;
         });
     };
@@ -166,9 +156,7 @@ export default function QuotationEdit({ client, quotation }: QuotationEditProps)
             ...prev,
             {
                 description: '',
-                quantity: '',
-                unit_price: '',
-                amount: 0,
+                amount: '',
             },
         ]);
     };
@@ -176,6 +164,15 @@ export default function QuotationEdit({ client, quotation }: QuotationEditProps)
     const removeItemRow = (index: number) => {
         if (items.length <= 1) return;
         setItems((prev) => prev.filter((_, i) => i !== index));
+    };
+
+    const handleSignatureChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        if (e.target.files && e.target.files[0]) {
+            const file = e.target.files[0];
+            setData('signature_image', file);
+            setData('remove_signature_image', false);
+            setSignaturePreview(URL.createObjectURL(file));
+        }
     };
 
     // Calculations
@@ -278,7 +275,7 @@ export default function QuotationEdit({ client, quotation }: QuotationEditProps)
                                     type="text"
                                     value={data.quotation_number}
                                     onChange={(e) => setData('quotation_number', e.target.value)}
-                                    placeholder="e.g. QTE-2026-0001"
+                                    placeholder="e.g. Quote-1"
                                     className={`w-full h-10 px-4 rounded-xl bg-slate-50 dark:bg-slate-950 border text-xs font-mono font-bold text-blue-600 dark:text-blue-400 placeholder:text-slate-400 focus:outline-none transition-all ${
                                         errors.quotation_number
                                             ? 'border-rose-500 focus:ring-2 focus:ring-rose-500/20'
@@ -348,9 +345,10 @@ export default function QuotationEdit({ client, quotation }: QuotationEditProps)
                                             : 'border-slate-200 dark:border-slate-800 focus:border-blue-600'
                                     }`}
                                 >
-                                    <option value="draft">Draft</option>
-                                    <option value="sent">Sent</option>
-                                    <option value="accepted">Accepted</option>
+                                    <option value="draft">Draft (Unpaid)</option>
+                                    <option value="sent">Sent (Unpaid)</option>
+                                    <option value="accepted">Accepted (Invoice Ready)</option>
+                                    <option value="paid">Paid (Invoice Settled)</option>
                                     <option value="rejected">Rejected</option>
                                     <option value="expired">Expired</option>
                                 </select>
@@ -444,7 +442,7 @@ export default function QuotationEdit({ client, quotation }: QuotationEditProps)
                                     type="text"
                                     value={data.customer_phone}
                                     onChange={(e) => setData('customer_phone', e.target.value)}
-                                    placeholder="Phone number..."
+                                    placeholder="e.g. +971 50 123 4567"
                                     className={`w-full h-10 px-4 rounded-xl bg-slate-50 dark:bg-slate-950 border text-xs font-medium text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none transition-all ${
                                         errors.customer_phone
                                             ? 'border-rose-500 focus:ring-2 focus:ring-rose-500/20'
@@ -465,7 +463,7 @@ export default function QuotationEdit({ client, quotation }: QuotationEditProps)
                                     type="email"
                                     value={data.customer_email}
                                     onChange={(e) => setData('customer_email', e.target.value)}
-                                    placeholder="client@example.com"
+                                    placeholder="e.g. client@example.com"
                                     className={`w-full h-10 px-4 rounded-xl bg-slate-50 dark:bg-slate-950 border text-xs font-medium text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none transition-all ${
                                         errors.customer_email
                                             ? 'border-rose-500 focus:ring-2 focus:ring-rose-500/20'
@@ -609,21 +607,6 @@ export default function QuotationEdit({ client, quotation }: QuotationEditProps)
                                 </div>
                                 <div>
                                     <label className="block text-xs font-extrabold text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-2">
-                                        Authorized Signatory
-                                    </label>
-                                    <input
-                                        type="text"
-                                        value={data.authorized_by_text}
-                                        onChange={(e) => setData('authorized_by_text', e.target.value)}
-                                        placeholder="e.g. For, AL MUSTAFA FURNITURE MOVERS"
-                                        className="w-full h-10 px-4 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-xs font-medium text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:border-blue-600 transition-all"
-                                    />
-                                    {errors.authorized_by_text && (
-                                        <p className="text-rose-500 text-xs font-medium mt-1.5">{errors.authorized_by_text}</p>
-                                    )}
-                                </div>
-                                <div className="sm:col-span-3">
-                                    <label className="block text-xs font-extrabold text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-2">
                                         Client Company Logo (Optional)
                                     </label>
                                     <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
@@ -656,11 +639,6 @@ export default function QuotationEdit({ client, quotation }: QuotationEditProps)
                                             }}
                                             className="w-full text-xs text-slate-500 file:mr-3 file:py-2 file:px-3.5 file:rounded-xl file:border-0 file:text-xs file:font-bold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 cursor-pointer"
                                         />
-                                        {data.company_logo && (
-                                            <span className="text-xs text-emerald-600 font-bold shrink-0">
-                                                Selected: {data.company_logo.name}
-                                            </span>
-                                        )}
                                     </div>
                                     {errors.company_logo && (
                                         <p className="text-rose-500 text-xs font-medium mt-1.5">{errors.company_logo}</p>
@@ -703,7 +681,7 @@ export default function QuotationEdit({ client, quotation }: QuotationEditProps)
                         </div>
                     </div>
 
-                    {/* Section 4: Line Items Table */}
+                    {/* Section 4: Line Items Table (No Quantity column) */}
                     <div className="space-y-4">
                         <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800">
                             <div className="flex items-center gap-2.5">
@@ -715,7 +693,7 @@ export default function QuotationEdit({ client, quotation }: QuotationEditProps)
                                         Quotation Line Items
                                     </h2>
                                     <p className="text-[11px] text-slate-400 font-medium">
-                                        Add itemized services, description breakdown, quantity, and unit pricing ({currencyCode})
+                                        Add itemized services, description breakdown, and pricing ({currencyCode})
                                     </p>
                                 </div>
                             </div>
@@ -741,19 +719,16 @@ export default function QuotationEdit({ client, quotation }: QuotationEditProps)
                                 <table className="w-full text-left text-xs border-collapse">
                                     <thead>
                                         <tr className="bg-slate-50 dark:bg-slate-800/60 border-b border-slate-200/80 dark:border-slate-800 text-slate-400 uppercase tracking-wider font-extrabold text-[10px]">
-                                            <th className="py-3 px-3 w-10 text-center">#</th>
+                                            <th className="py-3 px-3 w-12 text-center">#</th>
                                             <th className="py-3 px-3">Description <span className="text-rose-500">*</span></th>
-                                            <th className="py-3 px-3 w-28 text-center">Qty <span className="text-rose-500">*</span></th>
-                                            <th className="py-3 px-3 w-36 text-right">Price ({currencyCode}) <span className="text-rose-500">*</span></th>
-                                            <th className="py-3 px-3 w-36 text-right">Total</th>
+                                            <th className="py-3 px-3 w-48 text-right">Amount ({currencyCode}) <span className="text-rose-500">*</span></th>
                                             <th className="py-3 px-3 w-12 text-center"></th>
                                         </tr>
                                     </thead>
                                     <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60 font-medium">
                                         {items.map((item, index) => {
                                             const descErr = errors[`items.${index}.description`];
-                                            const qtyErr = errors[`items.${index}.quantity`];
-                                            const priceErr = errors[`items.${index}.unit_price`];
+                                            const amountErr = errors[`items.${index}.amount`] || errors[`items.${index}.unit_price`];
 
                                             return (
                                                 <tr
@@ -786,50 +761,22 @@ export default function QuotationEdit({ client, quotation }: QuotationEditProps)
                                                         <input
                                                             type="number"
                                                             step="any"
-                                                            min="0.01"
-                                                            value={item.quantity}
-                                                            onChange={(e) =>
-                                                                handleItemChange(index, 'quantity', e.target.value)
-                                                            }
-                                                            placeholder="1"
-                                                            className={`w-full h-10 px-2 text-xs text-center font-mono bg-slate-50 dark:bg-slate-950 rounded-xl border placeholder:text-slate-400 focus:outline-none font-bold ${
-                                                                qtyErr
-                                                                    ? 'border-rose-500 focus:ring-2 focus:ring-rose-500/20'
-                                                                    : 'border-slate-200 dark:border-slate-800 focus:border-blue-600'
-                                                            }`}
-                                                            required
-                                                        />
-                                                        {qtyErr && (
-                                                            <p className="text-rose-500 text-[11px] font-medium mt-1 text-center">{qtyErr}</p>
-                                                        )}
-                                                    </td>
-                                                    <td className="py-3 px-3 align-top">
-                                                        <input
-                                                            type="number"
-                                                            step="any"
                                                             min="0"
-                                                            value={item.unit_price}
+                                                            value={item.amount}
                                                             onChange={(e) =>
-                                                                handleItemChange(index, 'unit_price', e.target.value)
+                                                                handleItemChange(index, 'amount', e.target.value)
                                                             }
                                                             placeholder="0.00"
                                                             className={`w-full h-10 px-3 text-xs text-right font-mono bg-slate-50 dark:bg-slate-950 rounded-xl border placeholder:text-slate-400 focus:outline-none font-bold ${
-                                                                priceErr
+                                                                amountErr
                                                                     ? 'border-rose-500 focus:ring-2 focus:ring-rose-500/20'
                                                                     : 'border-slate-200 dark:border-slate-800 focus:border-blue-600'
                                                             }`}
                                                             required
                                                         />
-                                                        {priceErr && (
-                                                            <p className="text-rose-500 text-[11px] font-medium mt-1 text-right">{priceErr}</p>
+                                                        {amountErr && (
+                                                            <p className="text-rose-500 text-[11px] font-medium mt-1 text-right">{amountErr}</p>
                                                         )}
-                                                    </td>
-                                                    <td className="py-3 px-3 text-right font-black text-slate-900 dark:text-white font-mono text-xs align-top pt-4">
-                                                        {currencyCode}{' '}
-                                                        {Number(item.amount).toLocaleString(undefined, {
-                                                            minimumFractionDigits: 2,
-                                                            maximumFractionDigits: 2,
-                                                        })}
                                                     </td>
                                                     <td className="py-3 px-3 text-center align-top pt-2">
                                                         {items.length > 1 && (
@@ -927,7 +874,87 @@ export default function QuotationEdit({ client, quotation }: QuotationEditProps)
                         </div>
                     </div>
 
-                    {/* Section 5: Notes & Terms (Optional) */}
+                    {/* Section 5: Signature & Authorization */}
+                    <div className="space-y-4">
+                        <div className="flex items-center gap-2.5 pb-3 border-b border-slate-100 dark:border-slate-800">
+                            <div className="p-2 rounded-xl bg-amber-50 dark:bg-amber-950/60 text-amber-600 dark:text-amber-400">
+                                <PenTool className="size-4" />
+                            </div>
+                            <div>
+                                <h2 className="text-sm font-extrabold text-slate-900 dark:text-white">
+                                    Signature & Authorization
+                                </h2>
+                                <p className="text-[11px] text-slate-400 font-medium">
+                                    Signatory designation text and client/provider signature image upload
+                                </p>
+                            </div>
+                        </div>
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-2">
+                            <div>
+                                <label className="block text-xs font-extrabold text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-2">
+                                    Authorized Signatory Heading
+                                </label>
+                                <input
+                                    type="text"
+                                    value={data.authorized_by_text}
+                                    onChange={(e) => setData('authorized_by_text', e.target.value)}
+                                    placeholder="e.g. For, AL MUSTAFA FURNITURE MOVERS"
+                                    className="w-full h-10 px-4 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-xs font-medium text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:border-blue-600 transition-all"
+                                />
+                                {errors.authorized_by_text && (
+                                    <p className="text-rose-500 text-xs font-medium mt-1">{errors.authorized_by_text}</p>
+                                )}
+                            </div>
+
+                            <div>
+                                <label className="block text-xs font-extrabold text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-2">
+                                    Upload Signature Image (Optional)
+                                </label>
+                                <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
+                                    {quotation.signature_image && !data.remove_signature_image && (
+                                        <div className="flex items-center gap-3 p-2 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl">
+                                            <img
+                                                src={quotation.signature_image}
+                                                alt="Current Signature"
+                                                className="h-8 w-auto max-w-[120px] object-contain"
+                                            />
+                                            <label className="flex items-center gap-1.5 text-xs text-rose-600 font-bold cursor-pointer">
+                                                <input
+                                                    type="checkbox"
+                                                    checked={data.remove_signature_image}
+                                                    onChange={(e) => setData('remove_signature_image', e.target.checked)}
+                                                    className="rounded text-rose-600 focus:ring-rose-500"
+                                                />
+                                                <span>Remove</span>
+                                            </label>
+                                        </div>
+                                    )}
+                                    <input
+                                        type="file"
+                                        accept="image/*"
+                                        onChange={handleSignatureChange}
+                                        className="w-full text-xs text-slate-500 file:mr-3 file:py-2 file:px-3.5 file:rounded-xl file:border-0 file:text-xs file:font-bold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 cursor-pointer"
+                                    />
+                                    {signaturePreview && (
+                                        <div className="flex items-center gap-2 p-1.5 bg-slate-100 dark:bg-slate-800 rounded-xl shrink-0 border border-slate-200 dark:border-slate-700">
+                                            <img
+                                                src={signaturePreview}
+                                                alt="Signature Preview"
+                                                className="h-8 max-w-[100px] object-contain"
+                                            />
+                                            <span className="text-[11px] text-emerald-600 font-bold pr-1">New</span>
+                                        </div>
+                                    )}
+                                </div>
+                                {errors.signature_image && (
+                                    <p className="text-rose-500 text-xs font-medium mt-1">{errors.signature_image}</p>
+                                )}
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Section 6: Notes & Terms (Optional) */}
                     <div className="space-y-4">
                         <div className="flex items-center gap-2.5 pb-3 border-b border-slate-100 dark:border-slate-800">
                             <div className="p-2 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400">

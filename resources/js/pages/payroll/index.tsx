@@ -175,6 +175,7 @@ export default function PayrollIndex({ payrolls, summary, filters }: PayrollInde
 
     // Open Edit Payroll Modal
     const handleEdit = (payroll: PayrollItem) => {
+        if (payroll.payment_status === 'paid') return;
         setEditingPayroll(payroll);
         form.setData({
             total_working_days: payroll.total_working_days,
@@ -232,7 +233,6 @@ export default function PayrollIndex({ payrolls, summary, filters }: PayrollInde
 
     // Open Delete Confirmation Modal
     const handleDelete = (payroll: PayrollItem) => {
-        if (payroll.payment_status === 'paid') return;
         setDeletingPayroll(payroll);
     };
 
@@ -594,7 +594,7 @@ export default function PayrollIndex({ payrolls, summary, filters }: PayrollInde
                                                         )}
 
                                                         {/* Edit Modal Button */}
-                                                        {hasPermission(authUser, 'edit-payroll') && (
+                                                        {!isPaid && hasPermission(authUser, 'edit-payroll') && (
                                                             <button
                                                                 onClick={() => handleEdit(item)}
                                                                 className="size-8 rounded-xl bg-purple-50 dark:bg-purple-950/60 text-purple-600 dark:text-purple-400 hover:bg-purple-600 hover:text-white dark:hover:bg-purple-600 dark:hover:text-white transition-all flex items-center justify-center shadow-2xs cursor-pointer"
@@ -876,6 +876,15 @@ export default function PayrollIndex({ payrolls, summary, filters }: PayrollInde
                                     Are you sure you want to delete the payroll record for <strong className="text-slate-900 dark:text-white">"{deletingPayroll.employee.name}"</strong> ({monthsList.find((m) => m.value === deletingPayroll.month)?.label} {deletingPayroll.year})? This action cannot be undone.
                                 </p>
                             </div>
+
+                            {deletingPayroll.payment_status === 'paid' && (
+                                <div className="p-3.5 rounded-2xl bg-amber-50 dark:bg-amber-950/50 border border-amber-200 dark:border-amber-800/60 text-left flex items-start gap-2.5">
+                                    <AlertTriangle className="size-4 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
+                                    <p className="text-[11px] font-semibold text-amber-800 dark:text-amber-300 leading-snug">
+                                        <strong>Caution:</strong> This payroll record was already marked as <strong>PAID</strong> (PKR {Number(deletingPayroll.net_salary_pkr).toLocaleString()}). Deleting it will permanently remove this disbursed payment record from the system.
+                                    </p>
+                                </div>
+                            )}
 
                             <div className="flex items-center justify-center gap-3 pt-2 border-t border-slate-100 dark:border-slate-800">
                                 <button

@@ -5,18 +5,18 @@ import {
     AlertCircle,
     ArrowLeft,
     Building2,
-    Calendar,
-    Coins,
+    CheckCircle2,
     DollarSign,
     FileSpreadsheet,
     FileText,
-    Layers,
     LoaderCircle,
+    PenTool,
     Plus,
     Receipt,
     Save,
     Sparkles,
     Trash2,
+    Upload,
     User,
 } from 'lucide-react';
 import React, { useEffect, useState } from 'react';
@@ -56,9 +56,7 @@ interface QuotationCreateProps {
 
 export interface ItemRow {
     description: string;
-    quantity: number | string;
-    unit_price: number | string;
-    amount: number;
+    amount: number | string;
 }
 
 export default function QuotationCreate({
@@ -71,9 +69,7 @@ export default function QuotationCreate({
     const [items, setItems] = useState<ItemRow[]>([
         {
             description: '',
-            quantity: '',
-            unit_price: '',
-            amount: 0,
+            amount: '',
         },
     ]);
 
@@ -100,10 +96,11 @@ export default function QuotationCreate({
         discount: number | string;
         date: string;
         expiry_date: string;
-        status: 'draft' | 'sent' | 'accepted' | 'rejected' | 'expired';
+        status: 'draft' | 'sent' | 'accepted' | 'paid' | 'rejected' | 'expired';
         notes: string;
         terms: string;
         authorized_by_text: string;
+        signature_image: File | null;
         company_logo: File | null;
         items: ItemRow[];
     }>({
@@ -122,6 +119,7 @@ export default function QuotationCreate({
         company_email: '',
         company_whatsapp: '',
         company_logo: null,
+        signature_image: null,
         greeting: '',
         opening_text: '',
         closing_text: '',
@@ -137,6 +135,7 @@ export default function QuotationCreate({
     });
 
     const [showCompanyDetails, setShowCompanyDetails] = useState(false);
+    const [signaturePreview, setSignaturePreview] = useState<string | null>(null);
 
     useEffect(() => {
         setData('items', items);
@@ -145,15 +144,7 @@ export default function QuotationCreate({
     const handleItemChange = (index: number, field: keyof ItemRow, val: any) => {
         setItems((prevItems) => {
             const updated = [...prevItems];
-            const item = { ...updated[index], [field]: val };
-            if (field === 'quantity' || field === 'unit_price') {
-                const rawQty = field === 'quantity' ? val : item.quantity;
-                const rawPrice = field === 'unit_price' ? val : item.unit_price;
-                const qty = rawQty === '' ? 0 : parseFloat(String(rawQty)) || 0;
-                const price = rawPrice === '' ? 0 : parseFloat(String(rawPrice)) || 0;
-                item.amount = Math.round(qty * price * 100) / 100;
-            }
-            updated[index] = item;
+            updated[index] = { ...updated[index], [field]: val };
             return updated;
         });
     };
@@ -163,9 +154,7 @@ export default function QuotationCreate({
             ...prev,
             {
                 description: '',
-                quantity: '',
-                unit_price: '',
-                amount: 0,
+                amount: '',
             },
         ]);
     };
@@ -173,6 +162,14 @@ export default function QuotationCreate({
     const removeItemRow = (index: number) => {
         if (items.length <= 1) return;
         setItems((prev) => prev.filter((_, i) => i !== index));
+    };
+
+    const handleSignatureChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        if (e.target.files && e.target.files[0]) {
+            const file = e.target.files[0];
+            setData('signature_image', file);
+            setSignaturePreview(URL.createObjectURL(file));
+        }
     };
 
     // Calculations
@@ -184,7 +181,9 @@ export default function QuotationCreate({
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
-        post('/client-portal/quotations/store');
+        post('/client-portal/quotations/store', {
+            forceFormData: true,
+        });
     };
 
     const breadcrumbs: BreadcrumbItem[] = [
@@ -342,9 +341,10 @@ export default function QuotationCreate({
                                             : 'border-slate-200 dark:border-slate-800 focus:border-blue-600'
                                     }`}
                                 >
-                                    <option value="draft">Draft</option>
-                                    <option value="sent">Sent</option>
-                                    <option value="accepted">Accepted</option>
+                                    <option value="draft">Draft (Unpaid)</option>
+                                    <option value="sent">Sent (Unpaid)</option>
+                                    <option value="accepted">Accepted (Invoice Ready)</option>
+                                    <option value="paid">Paid (Invoice Settled)</option>
                                     <option value="rejected">Rejected</option>
                                     <option value="expired">Expired</option>
                                 </select>
@@ -603,40 +603,18 @@ export default function QuotationCreate({
                                 </div>
                                 <div>
                                     <label className="block text-xs font-extrabold text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-2">
-                                        Authorized Signatory
-                                    </label>
-                                    <input
-                                        type="text"
-                                        value={data.authorized_by_text}
-                                        onChange={(e) => setData('authorized_by_text', e.target.value)}
-                                        placeholder="e.g. For, AL MUSTAFA FURNITURE MOVERS"
-                                        className="w-full h-10 px-4 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-xs font-medium text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:border-blue-600 transition-all"
-                                    />
-                                    {errors.authorized_by_text && (
-                                        <p className="text-rose-500 text-xs font-medium mt-1.5">{errors.authorized_by_text}</p>
-                                    )}
-                                </div>
-                                <div className="sm:col-span-3">
-                                    <label className="block text-xs font-extrabold text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-2">
                                         Client Company Logo (Optional)
                                     </label>
-                                    <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
-                                        <input
-                                            type="file"
-                                            accept="image/*"
-                                            onChange={(e) => {
-                                                if (e.target.files && e.target.files[0]) {
-                                                    setData('company_logo', e.target.files[0]);
-                                                }
-                                            }}
-                                            className="w-full text-xs text-slate-500 file:mr-3 file:py-2 file:px-3.5 file:rounded-xl file:border-0 file:text-xs file:font-bold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 cursor-pointer"
-                                        />
-                                        {data.company_logo && (
-                                            <span className="text-xs text-emerald-600 font-bold shrink-0">
-                                                Selected: {data.company_logo.name}
-                                            </span>
-                                        )}
-                                    </div>
+                                    <input
+                                        type="file"
+                                        accept="image/*"
+                                        onChange={(e) => {
+                                            if (e.target.files && e.target.files[0]) {
+                                                setData('company_logo', e.target.files[0]);
+                                            }
+                                        }}
+                                        className="w-full text-xs text-slate-500 file:mr-3 file:py-2 file:px-3.5 file:rounded-xl file:border-0 file:text-xs file:font-bold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 cursor-pointer"
+                                    />
                                     {errors.company_logo && (
                                         <p className="text-rose-500 text-xs font-medium mt-1.5">{errors.company_logo}</p>
                                     )}
@@ -678,7 +656,7 @@ export default function QuotationCreate({
                         </div>
                     </div>
 
-                    {/* Section 4: Line Items Table */}
+                    {/* Section 4: Line Items Table (No Quantity column) */}
                     <div className="space-y-4">
                         <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800">
                             <div className="flex items-center gap-2.5">
@@ -690,7 +668,7 @@ export default function QuotationCreate({
                                         Quotation Line Items
                                     </h2>
                                     <p className="text-[11px] text-slate-400 font-medium">
-                                        Add itemized services, description breakdown, quantity, and unit pricing ({clientCurrency})
+                                        Add itemized services, description breakdown, and pricing ({clientCurrency})
                                     </p>
                                 </div>
                             </div>
@@ -716,19 +694,16 @@ export default function QuotationCreate({
                                 <table className="w-full text-left text-xs border-collapse">
                                     <thead>
                                         <tr className="bg-slate-50 dark:bg-slate-800/60 border-b border-slate-200/80 dark:border-slate-800 text-slate-400 uppercase tracking-wider font-extrabold text-[10px]">
-                                            <th className="py-3 px-3 w-10 text-center">#</th>
+                                            <th className="py-3 px-3 w-12 text-center">#</th>
                                             <th className="py-3 px-3">Description <span className="text-rose-500">*</span></th>
-                                            <th className="py-3 px-3 w-28 text-center">Qty <span className="text-rose-500">*</span></th>
-                                            <th className="py-3 px-3 w-36 text-right">Price ({clientCurrency}) <span className="text-rose-500">*</span></th>
-                                            <th className="py-3 px-3 w-36 text-right">Total</th>
+                                            <th className="py-3 px-3 w-48 text-right">Amount ({clientCurrency}) <span className="text-rose-500">*</span></th>
                                             <th className="py-3 px-3 w-12 text-center"></th>
                                         </tr>
                                     </thead>
                                     <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60 font-medium">
                                         {items.map((item, index) => {
                                             const descErr = errors[`items.${index}.description`];
-                                            const qtyErr = errors[`items.${index}.quantity`];
-                                            const priceErr = errors[`items.${index}.unit_price`];
+                                            const amountErr = errors[`items.${index}.amount`] || errors[`items.${index}.unit_price`];
 
                                             return (
                                                 <tr
@@ -761,50 +736,22 @@ export default function QuotationCreate({
                                                         <input
                                                             type="number"
                                                             step="any"
-                                                            min="0.01"
-                                                            value={item.quantity}
-                                                            onChange={(e) =>
-                                                                handleItemChange(index, 'quantity', e.target.value)
-                                                            }
-                                                            placeholder="1"
-                                                            className={`w-full h-10 px-2 text-xs text-center font-mono bg-slate-50 dark:bg-slate-950 rounded-xl border placeholder:text-slate-400 focus:outline-none font-bold ${
-                                                                qtyErr
-                                                                    ? 'border-rose-500 focus:ring-2 focus:ring-rose-500/20'
-                                                                    : 'border-slate-200 dark:border-slate-800 focus:border-blue-600'
-                                                            }`}
-                                                            required
-                                                        />
-                                                        {qtyErr && (
-                                                            <p className="text-rose-500 text-[11px] font-medium mt-1 text-center">{qtyErr}</p>
-                                                        )}
-                                                    </td>
-                                                    <td className="py-3 px-3 align-top">
-                                                        <input
-                                                            type="number"
-                                                            step="any"
                                                             min="0"
-                                                            value={item.unit_price}
+                                                            value={item.amount}
                                                             onChange={(e) =>
-                                                                handleItemChange(index, 'unit_price', e.target.value)
+                                                                handleItemChange(index, 'amount', e.target.value)
                                                             }
                                                             placeholder="0.00"
                                                             className={`w-full h-10 px-3 text-xs text-right font-mono bg-slate-50 dark:bg-slate-950 rounded-xl border placeholder:text-slate-400 focus:outline-none font-bold ${
-                                                                priceErr
+                                                                amountErr
                                                                     ? 'border-rose-500 focus:ring-2 focus:ring-rose-500/20'
                                                                     : 'border-slate-200 dark:border-slate-800 focus:border-blue-600'
                                                             }`}
                                                             required
                                                         />
-                                                        {priceErr && (
-                                                            <p className="text-rose-500 text-[11px] font-medium mt-1 text-right">{priceErr}</p>
+                                                        {amountErr && (
+                                                            <p className="text-rose-500 text-[11px] font-medium mt-1 text-right">{amountErr}</p>
                                                         )}
-                                                    </td>
-                                                    <td className="py-3 px-3 text-right font-black text-slate-900 dark:text-white font-mono text-xs align-top pt-4">
-                                                        {clientCurrency}{' '}
-                                                        {Number(item.amount).toLocaleString(undefined, {
-                                                            minimumFractionDigits: 2,
-                                                            maximumFractionDigits: 2,
-                                                        })}
                                                     </td>
                                                     <td className="py-3 px-3 text-center align-top pt-2">
                                                         {items.length > 1 && (
@@ -902,7 +849,69 @@ export default function QuotationCreate({
                         </div>
                     </div>
 
-                    {/* Section 5: Notes & Terms (Optional) */}
+                    {/* Section 5: Signature & Authorization */}
+                    <div className="space-y-4">
+                        <div className="flex items-center gap-2.5 pb-3 border-b border-slate-100 dark:border-slate-800">
+                            <div className="p-2 rounded-xl bg-amber-50 dark:bg-amber-950/60 text-amber-600 dark:text-amber-400">
+                                <PenTool className="size-4" />
+                            </div>
+                            <div>
+                                <h2 className="text-sm font-extrabold text-slate-900 dark:text-white">
+                                    Signature & Authorization
+                                </h2>
+                                <p className="text-[11px] text-slate-400 font-medium">
+                                    Signatory designation text and optional client/provider signature image upload
+                                </p>
+                            </div>
+                        </div>
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-2">
+                            <div>
+                                <label className="block text-xs font-extrabold text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-2">
+                                    Authorized Signatory Heading
+                                </label>
+                                <input
+                                    type="text"
+                                    value={data.authorized_by_text}
+                                    onChange={(e) => setData('authorized_by_text', e.target.value)}
+                                    placeholder="e.g. For, AL MUSTAFA FURNITURE MOVERS"
+                                    className="w-full h-10 px-4 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-xs font-medium text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:border-blue-600 transition-all"
+                                />
+                                {errors.authorized_by_text && (
+                                    <p className="text-rose-500 text-xs font-medium mt-1">{errors.authorized_by_text}</p>
+                                )}
+                            </div>
+
+                            <div>
+                                <label className="block text-xs font-extrabold text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-2">
+                                    Upload Signature Image (Optional)
+                                </label>
+                                <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
+                                    <input
+                                        type="file"
+                                        accept="image/*"
+                                        onChange={handleSignatureChange}
+                                        className="w-full text-xs text-slate-500 file:mr-3 file:py-2 file:px-3.5 file:rounded-xl file:border-0 file:text-xs file:font-bold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 cursor-pointer"
+                                    />
+                                    {signaturePreview && (
+                                        <div className="flex items-center gap-2 p-1.5 bg-slate-100 dark:bg-slate-800 rounded-xl shrink-0 border border-slate-200 dark:border-slate-700">
+                                            <img
+                                                src={signaturePreview}
+                                                alt="Signature Preview"
+                                                className="h-8 max-w-[100px] object-contain"
+                                            />
+                                            <span className="text-[11px] text-emerald-600 font-bold pr-1">Ready</span>
+                                        </div>
+                                    )}
+                                </div>
+                                {errors.signature_image && (
+                                    <p className="text-rose-500 text-xs font-medium mt-1">{errors.signature_image}</p>
+                                )}
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Section 6: Notes & Terms (Optional) */}
                     <div className="space-y-4">
                         <div className="flex items-center gap-2.5 pb-3 border-b border-slate-100 dark:border-slate-800">
                             <div className="p-2 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400">
