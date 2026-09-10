@@ -5,6 +5,7 @@ import {
     AlertCircle,
     ArrowLeft,
     Building2,
+    CheckCircle2,
     DollarSign,
     FileSpreadsheet,
     FileText,
@@ -12,6 +13,7 @@ import {
     PenTool,
     Plus,
     Receipt,
+    RotateCcw,
     Save,
     Sparkles,
     Trash2,
@@ -45,6 +47,16 @@ interface QuotationEditProps {
     };
     quotation: QuotationRecord;
     currencies: CurrencyItem[];
+    defaultCompany?: {
+        name: string;
+        phone: string;
+        address: string;
+        email: string;
+        whatsapp: string;
+        authorized_by_text?: string;
+        logo_url?: string | null;
+        signature_url?: string | null;
+    };
 }
 
 export interface ItemRow {
@@ -53,7 +65,7 @@ export interface ItemRow {
     amount: number | string;
 }
 
-export default function QuotationEdit({ client, quotation }: QuotationEditProps) {
+export default function QuotationEdit({ client, quotation, defaultCompany }: QuotationEditProps) {
     const currencyCode = quotation.currency_code || client.currency || 'AED';
 
     const [items, setItems] = useState<ItemRow[]>(
@@ -136,8 +148,21 @@ export default function QuotationEdit({ client, quotation }: QuotationEditProps)
         items: items,
     });
 
-    const [showCompanyDetails, setShowCompanyDetails] = useState(false);
+    const [showCompanyDetails, setShowCompanyDetails] = useState(true);
     const [signaturePreview, setSignaturePreview] = useState<string | null>(null);
+
+    const handleResetCompanyToProfile = () => {
+        if (!defaultCompany) return;
+        setData((prev) => ({
+            ...prev,
+            company_name: defaultCompany.name || '',
+            company_phone: defaultCompany.phone || '',
+            company_address: defaultCompany.address || '',
+            company_email: defaultCompany.email || '',
+            company_whatsapp: defaultCompany.whatsapp || '',
+            authorized_by_text: defaultCompany.authorized_by_text || (client.company_name ? `For, ${client.company_name}` : (client.name ? `For, ${client.name}` : '')),
+        }));
+    };
 
     useEffect(() => {
         setData('items', items);
@@ -414,7 +439,7 @@ export default function QuotationEdit({ client, quotation }: QuotationEditProps)
                             {/* Client Name */}
                             <div>
                                 <label className="block text-xs font-extrabold text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-2">
-                                    Recipient Name <span className="text-rose-500">*</span>
+                                    Recipient Name <span className="text-slate-400 font-normal normal-case">(Optional)</span>
                                 </label>
                                 <input
                                     type="text"
@@ -426,7 +451,6 @@ export default function QuotationEdit({ client, quotation }: QuotationEditProps)
                                             ? 'border-rose-500 focus:ring-2 focus:ring-rose-500/20'
                                             : 'border-slate-200 dark:border-slate-800 focus:border-blue-600 focus:ring-2 focus:ring-blue-600/10'
                                     }`}
-                                    required
                                 />
                                 {errors.customer_name && (
                                     <p className="text-rose-500 text-xs font-medium mt-1.5">{errors.customer_name}</p>
@@ -500,32 +524,50 @@ export default function QuotationEdit({ client, quotation }: QuotationEditProps)
 
                     {/* Section 3: Company Header & Salutations */}
                     <div className="space-y-4">
-                        <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800">
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-100 dark:border-slate-800">
                             <div className="flex items-center gap-2.5">
                                 <div className="p-2 rounded-xl bg-amber-50 dark:bg-amber-950/60 text-amber-600 dark:text-amber-400">
                                     <Building2 className="size-4" />
                                 </div>
                                 <div>
-                                    <h2 className="text-sm font-extrabold text-slate-900 dark:text-white">
-                                        Company Header & Salutations
-                                    </h2>
+                                    <div className="flex items-center gap-2 flex-wrap">
+                                        <h2 className="text-sm font-extrabold text-slate-900 dark:text-white">
+                                            Provider / Company Details
+                                        </h2>
+                                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400 border border-blue-200/60 dark:border-blue-800/40">
+                                            <CheckCircle2 className="size-3" /> Quotation Provider Details
+                                        </span>
+                                    </div>
                                     <p className="text-[11px] text-slate-400 font-medium">
-                                        Company details, greeting, and inquiry statement (optional custom override)
+                                        Company provider details for this quotation. You can edit any field or reset to profile defaults anytime.
                                     </p>
                                 </div>
                             </div>
 
-                            <button
-                                type="button"
-                                onClick={() => setShowCompanyDetails(!showCompanyDetails)}
-                                className="text-xs text-blue-600 dark:text-blue-400 font-bold hover:underline cursor-pointer"
-                            >
-                                {showCompanyDetails ? 'Hide Provider Details' : 'Edit Provider Info'}
-                            </button>
+                            <div className="flex items-center gap-2 self-end sm:self-auto">
+                                {defaultCompany && (
+                                    <button
+                                        type="button"
+                                        onClick={handleResetCompanyToProfile}
+                                        className="inline-flex items-center gap-1.5 text-xs text-slate-700 dark:text-slate-300 hover:text-blue-600 dark:hover:text-blue-400 font-bold px-2.5 py-1.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700/60 transition-colors cursor-pointer"
+                                        title="Reset company provider details back to profile defaults"
+                                    >
+                                        <RotateCcw className="size-3" />
+                                        <span>Reset to Profile</span>
+                                    </button>
+                                )}
+                                <button
+                                    type="button"
+                                    onClick={() => setShowCompanyDetails(!showCompanyDetails)}
+                                    className="text-xs text-blue-600 dark:text-blue-400 font-bold hover:underline cursor-pointer px-2 py-1"
+                                >
+                                    {showCompanyDetails ? 'Hide Provider Details' : 'Show Provider Details'}
+                                </button>
+                            </div>
                         </div>
 
                         {showCompanyDetails && (
-                            <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 pt-2 pb-4 border-b border-slate-100 dark:border-slate-800">
+                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 pt-2 pb-4 border-b border-slate-100 dark:border-slate-800">
                                 <div>
                                     <label className="block text-xs font-extrabold text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-2">
                                         Company Provider Name
@@ -667,12 +709,12 @@ export default function QuotationEdit({ client, quotation }: QuotationEditProps)
                                 <label className="block text-xs font-extrabold text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-2">
                                     Inquiry Opener Text
                                 </label>
-                                <input
-                                    type="text"
+                                <textarea
+                                    rows={2}
                                     value={data.opening_text}
                                     onChange={(e) => setData('opening_text', e.target.value)}
-                                    placeholder="e.g. Thank you for your valuable inquiry. We are pleased to quote as below"
-                                    className="w-full h-10 px-4 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-xs font-medium text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:border-blue-600 transition-all"
+                                    placeholder="In case of any queries, kindly get in touch with us. Thank you and I look forward to hearing from you."
+                                    className="w-full px-4 py-2.5 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-xs font-medium text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:border-blue-600 transition-all"
                                 />
                                 {errors.opening_text && (
                                     <p className="text-rose-500 text-xs font-medium mt-1.5">{errors.opening_text}</p>
@@ -803,12 +845,12 @@ export default function QuotationEdit({ client, quotation }: QuotationEditProps)
                                 <label className="block text-xs font-extrabold text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-2">
                                     Closing Remarks
                                 </label>
-                                <input
-                                    type="text"
+                                <textarea
+                                    rows={3}
                                     value={data.closing_text}
                                     onChange={(e) => setData('closing_text', e.target.value)}
-                                    placeholder="e.g. We hope you find our offer to be in line with your requirement."
-                                    className="w-full h-10 px-4 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-xs font-medium text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:border-blue-600 transition-all"
+                                    placeholder="We thank you for providing us with an opportunity to submit our quotation for shifting your home furniture and appliances. Our prices are reasonable; our staff are professional and well trained to handle all your stuff and equipment's with care. Please find the complete details and expenses to cover this operation."
+                                    className="w-full px-4 py-2.5 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-xs font-medium text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:border-blue-600 transition-all"
                                 />
                                 {errors.closing_text && (
                                     <p className="text-rose-500 text-xs font-medium mt-1">{errors.closing_text}</p>

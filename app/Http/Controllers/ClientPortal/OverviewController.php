@@ -4,6 +4,14 @@ namespace App\Http\Controllers\ClientPortal;
 
 use App\Http\Controllers\Controller;
 use App\Models\Client;
+use App\Models\ClientDomain;
+use App\Models\ClientHosting;
+use App\Models\ClientService;
+use App\Models\DomainPayment;
+use App\Models\HostingPayment;
+use App\Models\ProjectPayment;
+use App\Models\ServicePayment;
+use App\Models\WebsiteProject;
 use App\Traits\AuthorizesClientPortalAccess;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -166,11 +174,129 @@ class OverviewController extends Controller
             'client' => $client,
             'invoices' => $invoices,
             'quotations' => $quotations,
+            'categoryBreakdown' => $this->calculateCategoryBreakdown($client, $canViewProjectBudget, $canViewServiceBudget),
             'canViewOverview' => $canViewOverview,
             'canViewProjectBudget' => $canViewProjectBudget,
             'canViewServiceBudget' => $canViewServiceBudget,
             'canViewInvoices' => $canViewInvoices,
             'canViewQuotations' => $canViewQuotations,
         ]);
+    }
+
+    /**
+     * Calculate category-wise breakdown for the authenticated client.
+     */
+    protected function calculateCategoryBreakdown(Client $client, bool $canViewProjectBudget = true, bool $canViewServiceBudget = true): array
+    {
+        $clientId = $client->id;
+        if (!$clientId) {
+            return [
+                'project' => ['total' => 0.0, 'paid' => 0.0, 'pending' => 0.0, 'count' => 0],
+                'service' => ['total' => 0.0, 'paid' => 0.0, 'pending' => 0.0, 'count' => 0],
+                'domain'  => ['total' => 0.0, 'paid' => 0.0, 'pending' => 0.0, 'count' => 0],
+                'hosting' => ['total' => 0.0, 'paid' => 0.0, 'pending' => 0.0, 'count' => 0],
+            ];
+        }
+
+        // 1. Projects (Matches Main Card Total Project Budget, Cleared Funds, and Pending Balance)
+        $projects = WebsiteProject::where('client_id', $clientId)->with('payments')->get();
+        $projectCount = (int) $projects->count();
+        $projectTotal = 0.0;
+        $projectPaid = 0.0;
+        $projectPending = 0.0;
+
+        if ($canViewProjectBudget) {
+            $projectTotal = (float) $projects->sum('total_budget');
+            $projectPaid = (float) $projects->sum(function ($p) {
+                return $p->payments
+                    ->filter(fn($pay) => in_array(strtolower(trim((string)$pay->status)), ['paid', 'completed', 'settled']))
+                    ->sum('amount');
+            });
+            $projectPending = max(0.0, $projectTotal - $projectPaid);
+        }
+
+        // 2. Services
+        $services = ClientService::where('client_id', $clientId)->with('payments')->get();
+        $serviceCount = (int) $services->count();
+        $serviceTotal = 0.0;
+        $servicePaid = 0.0;
+        $servicePending = 0.0;
+
+        if ($canViewServiceBudget) {
+            $servicePayments = ServicePayment::where('client_id', $clientId)->get();
+            if ($servicePayments->count() > 0) {
+                $serviceTotal = (float) $servicePayments->sum(function ($s) {
+                    $status = strtolower(trim((string)$s->status));
+                    return in_array($status, ['paid', 'completed', 'settled']) && (float) $s->amount_paid > 0
+                        ? (float) $s->amount_paid
+                        : ((float) $s->amount_due > 0 ? (float) $s->amount_due : 0.0);
+                });
+                $servicePaid = (float) $servicePayments->filter(fn($s) => in_array(strtolower(trim((string)$s->status)), ['paid', 'completed', 'settled']))->sum(function ($s) {
+                    return (float) $s->amount_paid > 0 ? (float) $s->amount_paid : ((float) $s->amount_due > 0 ? (float) $s->amount_due : 0.0);
+                });
+                $servicePending = (float) $servicePayments->filter(fn($s) => in_array(strtolower(trim((string)$s->status)), ['pending', 'due', 'due_pending', 'unpaid', 'overdue']))->sum(function ($s) {
+                    return (float) $s->amount_due > 0 ? (float) $s->amount_due : 0.0;
+                });
+            } else {
+                $serviceTotal = (float) $services->sum('monthly_fee');
+                $servicePaid = 0.0;
+                $servicePending = $serviceTotal;
+            }
+        }
+
+        // 3. Domains
+        $domains = ClientDomain::where('client_id', $clientId)->with('payments')->get();
+        $domainCount = (int) $domains->count();
+        $domainPayments = DomainPayment::where('client_id', $clientId)->get();
+        if ($domainPayments->count() > 0) {
+            $domainTotal = (float) $domainPayments->sum('amount');
+            $domainPaid = (float) $domainPayments->filter(fn($d) => in_array(strtolower(trim((string)$d->status)), ['paid', 'completed', 'settled']))->sum('amount');
+            $domainPending = (float) $domainPayments->filter(fn($d) => in_array(strtolower(trim((string)$d->status)), ['pending', 'due', 'due_pending', 'unpaid', 'overdue']))->sum('amount');
+        } else {
+            $domainTotal = (float) $domains->sum('client_price_pkr');
+            $domainPaid = 0.0;
+            $domainPending = $domainTotal;
+        }
+
+        // 4. Hostings
+        $hostings = ClientHosting::where('client_id', $clientId)->with('payments')->get();
+        $hostingCount = (int) $hostings->count();
+        $hostingPayments = HostingPayment::where('client_id', $clientId)->get();
+        if ($hostingPayments->count() > 0) {
+            $hostingTotal = (float) $hostingPayments->sum('amount');
+            $hostingPaid = (float) $hostingPayments->filter(fn($h) => in_array(strtolower(trim((string)$h->status)), ['paid', 'completed', 'settled']))->sum('amount');
+            $hostingPending = (float) $hostingPayments->filter(fn($h) => in_array(strtolower(trim((string)$h->status)), ['pending', 'due', 'due_pending', 'unpaid', 'overdue']))->sum('amount');
+        } else {
+            $hostingTotal = (float) $hostings->sum('client_price_pkr');
+            $hostingPaid = 0.0;
+            $hostingPending = $hostingTotal;
+        }
+
+        return [
+            'project' => [
+                'total' => round($projectTotal, 2),
+                'paid' => round($projectPaid, 2),
+                'pending' => round($projectPending, 2),
+                'count' => $projectCount,
+            ],
+            'service' => [
+                'total' => round($serviceTotal, 2),
+                'paid' => round($servicePaid, 2),
+                'pending' => round($servicePending, 2),
+                'count' => $serviceCount,
+            ],
+            'domain' => [
+                'total' => round($domainTotal, 2),
+                'paid' => round($domainPaid, 2),
+                'pending' => round($domainPending, 2),
+                'count' => $domainCount,
+            ],
+            'hosting' => [
+                'total' => round($hostingTotal, 2),
+                'paid' => round($hostingPaid, 2),
+                'pending' => round($hostingPending, 2),
+                'count' => $hostingCount,
+            ],
+        ];
     }
 }

@@ -237,6 +237,9 @@ export function AppSidebar() {
                 if (item.hideForEmployee && user?.type === 'employee') {
                     return false;
                 }
+                if (item.url === '/dashboard' && user?.type === 'employee') {
+                    return true;
+                }
                 if (!item.permission) return true;
                 return hasPermission(user, item.permission);
             });

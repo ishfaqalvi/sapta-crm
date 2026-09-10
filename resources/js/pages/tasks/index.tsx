@@ -537,15 +537,17 @@ export default function TasksIndex({ tasks, stats, categories = [], employees = 
                                              {/* Actions */}
                                             <td className="px-6 py-4 text-right whitespace-nowrap">
                                                 <div className="flex items-center justify-end gap-1.5">
-                                                    {/* Dedicated Discussion & Details Page Link */}
-                                                    <Link
-                                                        href={`/tasks/detail/general/${task.id}`}
-                                                        className="h-8 px-2.5 rounded-xl bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400 hover:bg-gradient-to-r hover:from-[#003796] hover:via-[#0052D4] hover:to-[#1d4ed8] hover:text-white font-bold text-xs inline-flex items-center gap-1.5 cursor-pointer shadow-2xs transition-all border border-blue-200/50 hover:border-transparent"
-                                                        title="Open Task Discussion & Details Page"
-                                                    >
-                                                        <MessageSquare className="size-3.5" />
-                                                        <span>{task.messages_count || 0}</span>
-                                                    </Link>
+                                                    {/* Dedicated Discussion & Details Page Link - Only when assigned */}
+                                                    {Boolean(task.assigned_employee || task.assigned_employee_id) && (
+                                                        <Link
+                                                            href={`/tasks/detail/general/${task.id}`}
+                                                            className="h-8 px-2.5 rounded-xl bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400 hover:bg-gradient-to-r hover:from-[#003796] hover:via-[#0052D4] hover:to-[#1d4ed8] hover:text-white font-bold text-xs inline-flex items-center gap-1.5 cursor-pointer shadow-2xs transition-all border border-blue-200/50 hover:border-transparent"
+                                                            title="Open Task Discussion & Details Page"
+                                                        >
+                                                            <MessageSquare className="size-3.5" />
+                                                            <span>{task.messages_count || 0}</span>
+                                                        </Link>
+                                                    )}
 
                                                     <button
                                                         type="button"
@@ -721,14 +723,16 @@ export default function TasksIndex({ tasks, stats, categories = [], employees = 
                             {/* Modal Actions Footer */}
                             <div className="flex items-center justify-between pt-3 border-t border-slate-100 dark:border-slate-800">
                                 <div className="flex items-center gap-2">
-                                    <Link
-                                        href={`/tasks/detail/general/${viewingTask.id}`}
-                                        className="h-9 px-3.5 rounded-xl bg-gradient-to-r from-[#003796] via-[#0052D4] to-[#1d4ed8] hover:opacity-95 text-white font-bold text-xs inline-flex items-center gap-1.5 transition-all cursor-pointer shadow-md shadow-blue-500/20"
-                                        title="Open Dedicated Task Details & Discussion Page"
-                                    >
-                                        <MessageSquare className="size-3.5" />
-                                        <span>Open Discussion Page ({viewingTask.messages_count || 0})</span>
-                                    </Link>
+                                    {Boolean(viewingTask.assigned_employee || viewingTask.assigned_employee_id) && (
+                                        <Link
+                                            href={`/tasks/detail/general/${viewingTask.id}`}
+                                            className="h-9 px-3.5 rounded-xl bg-gradient-to-r from-[#003796] via-[#0052D4] to-[#1d4ed8] hover:opacity-95 text-white font-bold text-xs inline-flex items-center gap-1.5 transition-all cursor-pointer shadow-md shadow-blue-500/20"
+                                            title="Open Dedicated Task Details & Discussion Page"
+                                        >
+                                            <MessageSquare className="size-3.5" />
+                                            <span>Open Discussion Page ({viewingTask.messages_count || 0})</span>
+                                        </Link>
+                                    )}
 
                                     {hasPermission(user, 'edit-tasks') && (
                                         <Link

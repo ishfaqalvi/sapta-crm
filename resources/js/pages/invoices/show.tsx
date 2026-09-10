@@ -29,7 +29,7 @@ export default function InvoicesShow({ invoice, companyInfo }: InvoicesShowProps
 
     const currencyCode = invoice.currency_code || invoice.client?.currency || 'USD';
 
-    const formatCurrency = (amount: number | string) => {
+    const formatCurrency = (amount: number | string | null | undefined) => {
         const num = Number(amount) || 0;
         return `${currencyCode} ${num.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
     };
@@ -181,41 +181,56 @@ export default function InvoicesShow({ invoice, companyInfo }: InvoicesShowProps
                     </div>
 
                     {/* Line Items Table */}
-                    <div className="rounded-2xl border border-slate-200/90 dark:border-slate-800 overflow-hidden">
-                        <table className="w-full text-left text-xs">
-                            <thead className="bg-slate-50 dark:bg-slate-950/70 border-b border-slate-200/80 dark:border-slate-800 uppercase tracking-wider text-[10px] font-extrabold text-slate-500 dark:text-slate-400">
-                                <tr>
-                                    <th className="px-6 py-3.5">#</th>
-                                    <th className="px-6 py-3.5">Item Description</th>
-                                    <th className="px-6 py-3.5 text-right">Amount</th>
-                                    <th className="px-6 py-3.5 text-right">Remaining Cost</th>
-                                </tr>
-                            </thead>
-                            <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                                {invoice.items?.map((item, idx) => (
-                                    <tr key={item.id}>
-                                        <td className="px-6 py-4 font-bold text-slate-400">{idx + 1}</td>
-                                        <td className="px-6 py-4">
-                                            <span className="font-extrabold text-slate-900 dark:text-white text-xs block">
-                                                {item.description}
-                                            </span>
-                                            {item.invoiceable_type && (
-                                                <span className="px-2 py-0.5 rounded-md bg-blue-50 text-blue-600 dark:bg-blue-950/60 text-[9px] font-extrabold border border-blue-200 mt-1 inline-block">
-                                                    LINKED SERVICE RECORD
-                                                </span>
+                    {(() => {
+                        const hasAnyRemainingCost = Boolean(invoice.items?.some((item) => Number(item.remaining_cost) > 0));
+                        return (
+                            <div className="rounded-2xl border border-slate-200/90 dark:border-slate-800 overflow-hidden">
+                                <table className="w-full text-left text-xs">
+                                    <thead className="bg-slate-50 dark:bg-slate-950/70 border-b border-slate-200/80 dark:border-slate-800 uppercase tracking-wider text-[10px] font-extrabold text-slate-500 dark:text-slate-400">
+                                        <tr>
+                                            <th className="px-6 py-3.5">#</th>
+                                            <th className="px-6 py-3.5">Item Description</th>
+                                            <th className="px-6 py-3.5 text-right">Amount</th>
+                                            {hasAnyRemainingCost && (
+                                                <th className="px-6 py-3.5 text-right">Remaining Balance</th>
                                             )}
-                                        </td>
-                                        <td className="px-6 py-4 text-right font-black text-slate-900 dark:text-white">
-                                            {formatCurrency(item.amount)}
-                                        </td>
-                                        <td className="px-6 py-4 text-right font-bold text-slate-600 dark:text-slate-400">
-                                            {formatCurrency(item.remaining_cost ?? 0)}
-                                        </td>
-                                    </tr>
-                                ))}
-                            </tbody>
-                        </table>
-                    </div>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                                        {invoice.items?.map((item, idx) => (
+                                            <tr key={item.id}>
+                                                <td className="px-6 py-4 font-bold text-slate-400">{idx + 1}</td>
+                                                <td className="px-6 py-4">
+                                                    <span className="font-extrabold text-slate-900 dark:text-white text-xs block">
+                                                        {item.description}
+                                                    </span>
+                                                    {item.invoiceable_type && (
+                                                        <span className="px-2 py-0.5 rounded-md bg-blue-50 text-blue-600 dark:bg-blue-950/60 text-[9px] font-extrabold border border-blue-200 mt-1 inline-block">
+                                                            LINKED SERVICE RECORD
+                                                        </span>
+                                                    )}
+                                                </td>
+                                                <td className="px-6 py-4 text-right font-black text-slate-900 dark:text-white">
+                                                    {formatCurrency(item.amount)}
+                                                </td>
+                                                {hasAnyRemainingCost && (
+                                                    <td className="px-6 py-4 text-right">
+                                                        {Number(item.remaining_cost) > 0 ? (
+                                                            <span className="font-bold text-slate-700 dark:text-slate-300 font-mono">
+                                                                {formatCurrency(item.remaining_cost!)}
+                                                            </span>
+                                                        ) : (
+                                                            <span className="text-slate-400 dark:text-slate-500 font-mono">—</span>
+                                                        )}
+                                                    </td>
+                                                )}
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
+                        );
+                    })()}
 
                     {/* Summary Totals */}
                     <div className="flex flex-col sm:flex-row justify-between items-start gap-6 pt-4 border-t border-slate-100 dark:border-slate-800">

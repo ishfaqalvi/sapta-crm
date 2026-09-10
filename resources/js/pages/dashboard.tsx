@@ -56,9 +56,24 @@ const breadcrumbs: BreadcrumbItem[] = [
     },
 ];
 
+export interface CategoryBreakdownItem {
+    total: number;
+    paid: number;
+    pending: number;
+    count: number;
+}
+
+export interface CategoryBreakdown {
+    project: CategoryBreakdownItem;
+    service: CategoryBreakdownItem;
+    domain: CategoryBreakdownItem;
+    hosting: CategoryBreakdownItem;
+}
+
 interface DashboardProps {
     canViewDashboard?: boolean;
     canViewBudget?: boolean;
+    categoryBreakdown?: CategoryBreakdown;
     kpis: {
         total_revenue_pkr: number;
         mrr_pkr: number;
@@ -157,6 +172,12 @@ interface DashboardProps {
 export default function Dashboard({
     canViewDashboard,
     canViewBudget: canViewBudgetProp,
+    categoryBreakdown = {
+        project: { total: 0, paid: 0, pending: 0, count: 0 },
+        service: { total: 0, paid: 0, pending: 0, count: 0 },
+        domain: { total: 0, paid: 0, pending: 0, count: 0 },
+        hosting: { total: 0, paid: 0, pending: 0, count: 0 },
+    },
     kpis = {
         total_revenue_pkr: 0,
         mrr_pkr: 0,
@@ -485,6 +506,189 @@ export default function Dashboard({
                         </div>
                     </div>
                 )}
+
+                {/* Category-Wise Financial Breakdown Strip */}
+                <div className="space-y-2.5">
+                    <div className="flex items-center justify-between">
+                        <span className="text-[11px] font-extrabold uppercase tracking-wider text-slate-400">
+                            Category Breakdown & Cash Flow
+                        </span>
+                        {canViewBudget && (
+                            <Link
+                                href="/reports"
+                                className="text-xs font-bold text-indigo-600 dark:text-indigo-400 hover:text-indigo-700 dark:hover:text-indigo-300 flex items-center gap-1 transition-colors"
+                            >
+                                Detailed Financial Ledger <ArrowUpRight className="size-3.5" />
+                            </Link>
+                        )}
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                        {/* Projects Breakdown */}
+                        <Link
+                            href="/reports?category=project"
+                            className="p-4 rounded-xl border transition-all cursor-pointer shadow-2xs bg-white dark:bg-slate-900 border-slate-200/80 dark:border-slate-800 hover:border-purple-300 dark:hover:border-purple-700 hover:shadow-xs group block"
+                        >
+                            <div className="flex items-center justify-between">
+                                <span className="text-xs font-extrabold text-slate-900 dark:text-white flex items-center gap-1.5 group-hover:text-purple-600 dark:group-hover:text-purple-400 transition-colors">
+                                    <FolderKanban className="size-4 text-purple-600" />
+                                    Website Projects
+                                </span>
+                                <span className="text-[11px] font-extrabold text-slate-400 bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded-full">
+                                    {categoryBreakdown.project.count} {categoryBreakdown.project.count === 1 ? 'project' : 'projects'}
+                                </span>
+                            </div>
+                            {canViewBudget ? (
+                                <>
+                                    <div className="mt-3 flex items-baseline justify-between">
+                                        <span className="text-xs text-slate-500">Total Budget:</span>
+                                        <span className="text-sm font-black text-slate-900 dark:text-white font-mono">
+                                            PKR {categoryBreakdown.project.total.toLocaleString('en-US', {
+                                                minimumFractionDigits: 0,
+                                                maximumFractionDigits: 2,
+                                            })}
+                                        </span>
+                                    </div>
+                                    <div className="mt-1 flex items-baseline justify-between text-[11px]">
+                                        <span className="text-emerald-600 dark:text-emerald-400 font-bold">
+                                            Paid: PKR {categoryBreakdown.project.paid.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
+                                        </span>
+                                        <span className="text-amber-600 dark:text-amber-400 font-bold">
+                                            Due: PKR {categoryBreakdown.project.pending.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
+                                        </span>
+                                    </div>
+                                </>
+                            ) : (
+                                <div className="mt-2 text-xs text-slate-400 font-medium">
+                                    Active development deliverables
+                                </div>
+                            )}
+                        </Link>
+
+                        {/* Services Breakdown */}
+                        <Link
+                            href="/reports?category=service"
+                            className="p-4 rounded-xl border transition-all cursor-pointer shadow-2xs bg-white dark:bg-slate-900 border-slate-200/80 dark:border-slate-800 hover:border-emerald-300 dark:hover:border-emerald-700 hover:shadow-xs group block"
+                        >
+                            <div className="flex items-center justify-between">
+                                <span className="text-xs font-extrabold text-slate-900 dark:text-white flex items-center gap-1.5 group-hover:text-emerald-600 dark:group-hover:text-emerald-400 transition-colors">
+                                    <Layers className="size-4 text-emerald-600" />
+                                    Subscriptions & Services
+                                </span>
+                                <span className="text-[11px] font-extrabold text-slate-400 bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded-full">
+                                    {categoryBreakdown.service.count} cycles
+                                </span>
+                            </div>
+                            {canViewBudget ? (
+                                <>
+                                    <div className="mt-3 flex items-baseline justify-between">
+                                        <span className="text-xs text-slate-500">Total:</span>
+                                        <span className="text-sm font-black text-slate-900 dark:text-white font-mono">
+                                            PKR {categoryBreakdown.service.total.toLocaleString('en-US', {
+                                                minimumFractionDigits: 0,
+                                                maximumFractionDigits: 2,
+                                            })}
+                                        </span>
+                                    </div>
+                                    <div className="mt-1 flex items-baseline justify-between text-[11px]">
+                                        <span className="text-emerald-600 dark:text-emerald-400 font-bold">
+                                            Paid: PKR {categoryBreakdown.service.paid.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
+                                        </span>
+                                        <span className="text-amber-600 dark:text-amber-400 font-bold">
+                                            Due: PKR {categoryBreakdown.service.pending.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
+                                        </span>
+                                    </div>
+                                </>
+                            ) : (
+                                <div className="mt-2 text-xs text-slate-400 font-medium">
+                                    Recurring monthly contracts
+                                </div>
+                            )}
+                        </Link>
+
+                        {/* Domains Breakdown */}
+                        <Link
+                            href="/reports?category=domain"
+                            className="p-4 rounded-xl border transition-all cursor-pointer shadow-2xs bg-white dark:bg-slate-900 border-slate-200/80 dark:border-slate-800 hover:border-blue-300 dark:hover:border-blue-700 hover:shadow-xs group block"
+                        >
+                            <div className="flex items-center justify-between">
+                                <span className="text-xs font-extrabold text-slate-900 dark:text-white flex items-center gap-1.5 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
+                                    <Globe className="size-4 text-blue-600" />
+                                    Domain Registrations
+                                </span>
+                                <span className="text-[11px] font-extrabold text-slate-400 bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded-full">
+                                    {categoryBreakdown.domain.count} records
+                                </span>
+                            </div>
+                            {canViewBudget ? (
+                                <>
+                                    <div className="mt-3 flex items-baseline justify-between">
+                                        <span className="text-xs text-slate-500">Total:</span>
+                                        <span className="text-sm font-black text-slate-900 dark:text-white font-mono">
+                                            PKR {categoryBreakdown.domain.total.toLocaleString('en-US', {
+                                                minimumFractionDigits: 0,
+                                                maximumFractionDigits: 2,
+                                            })}
+                                        </span>
+                                    </div>
+                                    <div className="mt-1 flex items-baseline justify-between text-[11px]">
+                                        <span className="text-emerald-600 dark:text-emerald-400 font-bold">
+                                            Paid: PKR {categoryBreakdown.domain.paid.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
+                                        </span>
+                                        <span className="text-amber-600 dark:text-amber-400 font-bold">
+                                            Due: PKR {categoryBreakdown.domain.pending.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
+                                        </span>
+                                    </div>
+                                </>
+                            ) : (
+                                <div className="mt-2 text-xs text-slate-400 font-medium">
+                                    Registered client web domains
+                                </div>
+                            )}
+                        </Link>
+
+                        {/* Hostings Breakdown */}
+                        <Link
+                            href="/reports?category=hosting"
+                            className="p-4 rounded-xl border transition-all cursor-pointer shadow-2xs bg-white dark:bg-slate-900 border-slate-200/80 dark:border-slate-800 hover:border-amber-300 dark:hover:border-amber-700 hover:shadow-xs group block"
+                        >
+                            <div className="flex items-center justify-between">
+                                <span className="text-xs font-extrabold text-slate-900 dark:text-white flex items-center gap-1.5 group-hover:text-amber-600 dark:group-hover:text-amber-400 transition-colors">
+                                    <Server className="size-4 text-amber-600" />
+                                    Web Hostings
+                                </span>
+                                <span className="text-[11px] font-extrabold text-slate-400 bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded-full">
+                                    {categoryBreakdown.hosting.count} accounts
+                                </span>
+                            </div>
+                            {canViewBudget ? (
+                                <>
+                                    <div className="mt-3 flex items-baseline justify-between">
+                                        <span className="text-xs text-slate-500">Total:</span>
+                                        <span className="text-sm font-black text-slate-900 dark:text-white font-mono">
+                                            PKR {categoryBreakdown.hosting.total.toLocaleString('en-US', {
+                                                minimumFractionDigits: 0,
+                                                maximumFractionDigits: 2,
+                                            })}
+                                        </span>
+                                    </div>
+                                    <div className="mt-1 flex items-baseline justify-between text-[11px]">
+                                        <span className="text-emerald-600 dark:text-emerald-400 font-bold">
+                                            Paid: PKR {categoryBreakdown.hosting.paid.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
+                                        </span>
+                                        <span className="text-amber-600 dark:text-amber-400 font-bold">
+                                            Due: PKR {categoryBreakdown.hosting.pending.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
+                                        </span>
+                                    </div>
+                                </>
+                            ) : (
+                                <div className="mt-2 text-xs text-slate-400 font-medium">
+                                    Hosting servers and packages
+                                </div>
+                            )}
+                        </Link>
+                    </div>
+                </div>
 
                 {/* Secondary Operational Summary Strip (4 Compact Metric Cards) */}
                 {canViewBudget && (

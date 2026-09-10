@@ -427,4 +427,180 @@ class MyTaskController extends Controller
 
         return redirect()->back()->with('success', 'General task status updated successfully.');
     }
+
+    /**
+     * Display dedicated task conversation and discussion page for an assigned task in Employee Portal.
+     */
+    public function taskConversation(Request $request, string $type, int $id): Response
+    {
+        $user = Auth::user();
+
+        if (!$user) {
+            abort(401, 'Unauthenticated');
+        }
+
+        $isSuperAdmin = ($user->type === 'admin' || $user->hasRole('Super Admin') || $user->hasRole('admin'));
+
+        // Resolve employee record linked to user
+        $employee = null;
+        if ($user->type === 'employee' || $user->employee_id) {
+            $employee = $user->employee ?: Employee::where('user_id', $user->id)->first();
+        }
+        $employeeId = $employee ? $employee->id : 0;
+
+        $task = null;
+        $sourceInfo = null;
+        $clientData = null;
+
+        if ($type === 'project') {
+            $task = ProjectTask::with([
+                'websiteProject.client:id,name,company_name,client_code,currency',
+                'websiteProject.category:id,name',
+                'assignedEmployee:id,name,employee_code,avatar,email,designation_id,department_id',
+                'assignedEmployee.designation:id,name',
+                'assignedEmployee.department:id,name',
+                'messages' => function ($q) {
+                    $q->with('user:id,name,email,avatar,type,employee_id')->orderBy('created_at', 'asc');
+                },
+            ])->find($id);
+
+            if (!$task) {
+                abort(404, 'Project task not found');
+            }
+
+            if ($user->type === 'employee' && !$isSuperAdmin && $task->assigned_employee_id !== $employeeId) {
+                abort(403, 'Unauthorized access: this task is not assigned to you.');
+            }
+
+            $project = $task->websiteProject;
+            if ($project) {
+                $sourceInfo = [
+                    'id' => $project->id,
+                    'title' => $project->project_name,
+                    'code' => $project->project_code ?? 'PRJ-' . str_pad((string) $project->id, 4, '0', STR_PAD_LEFT),
+                    'status' => $project->status,
+                    'url' => "/projects/{$project->id}?tab=tasks",
+                ];
+                if ($project->client) {
+                    $clientData = [
+                        'id' => $project->client->id,
+                        'name' => $project->client->name,
+                        'company_name' => $project->client->company_name,
+                        'client_code' => $project->client->client_code,
+                        'currency' => $project->client->currency ?? 'USD',
+                    ];
+                }
+            }
+        } elseif ($type === 'service') {
+            $task = ServiceTask::with([
+                'service.client:id,name,company_name,client_code,currency',
+                'service.category:id,name',
+                'assignedEmployee:id,name,employee_code,avatar,email,designation_id,department_id',
+                'assignedEmployee.designation:id,name',
+                'assignedEmployee.department:id,name',
+                'messages' => function ($q) {
+                    $q->with('user:id,name,email,avatar,type,employee_id')->orderBy('created_at', 'asc');
+                },
+            ])->find($id);
+
+            if (!$task) {
+                abort(404, 'Service task not found');
+            }
+
+            if ($user->type === 'employee' && !$isSuperAdmin && $task->assigned_employee_id !== $employeeId) {
+                abort(403, 'Unauthorized access: this task is not assigned to you.');
+            }
+
+            $service = $task->service;
+            if ($service) {
+                $sourceInfo = [
+                    'id' => $service->id,
+                    'title' => $service->service_name,
+                    'code' => $service->service_code ?? 'SRV-' . str_pad((string) $service->id, 4, '0', STR_PAD_LEFT),
+                    'status' => $service->status,
+                    'url' => "/services/{$service->id}?tab=tasks",
+                ];
+                if ($service->client) {
+                    $clientData = [
+                        'id' => $service->client->id,
+                        'name' => $service->client->name,
+                        'company_name' => $service->client->company_name,
+                        'client_code' => $service->client->client_code,
+                        'currency' => $service->client->currency ?? 'USD',
+                    ];
+                }
+            }
+        } elseif ($type === 'general') {
+            $task = Task::with([
+                'taskCategory:id,name',
+                'assignedEmployee:id,name,employee_code,avatar,email,designation_id,department_id',
+                'assignedEmployee.designation:id,name',
+                'assignedEmployee.department:id,name',
+                'messages' => function ($q) {
+                    $q->with('user:id,name,email,avatar,type,employee_id')->orderBy('created_at', 'asc');
+                },
+            ])->find($id);
+
+            if (!$task) {
+                abort(404, 'General task not found');
+            }
+
+            if ($user->type === 'employee' && !$isSuperAdmin && $task->assigned_employee_id !== $employeeId) {
+                abort(403, 'Unauthorized access: this task is not assigned to you.');
+            }
+
+            $sourceInfo = [
+                'id' => $task->id,
+                'title' => $task->taskCategory ? $task->taskCategory->name : 'General Task',
+                'code' => 'GEN-' . str_pad((string) $task->id, 4, '0', STR_PAD_LEFT),
+                'status' => $task->status,
+                'url' => '/tasks',
+            ];
+        } else {
+            abort(404, 'Invalid task type');
+        }
+
+        $from = $request->query('from');
+        if (!$from || !str_starts_with($from, '/') || str_starts_with($from, '//')) {
+            $from = '/my-tasks';
+        }
+
+        $taskData = [
+            'id' => $task->id,
+            'task_title' => $task->task_title,
+            'priority' => $task->priority,
+            'status' => $task->status,
+            'start_date' => $task->start_date ? $task->start_date->toDateString() : null,
+            'due_date' => $task->due_date ? $task->due_date->toDateString() : null,
+            'completed_at' => $task->completed_at ? $task->completed_at->toISOString() : null,
+            'created_at' => $task->created_at ? $task->created_at->toISOString() : null,
+            'description' => $task->description,
+            'attachment' => $task->attachment,
+            'attachment_name' => $task->attachment_name,
+            'source_type' => $type,
+            'source_id' => $sourceInfo['id'] ?? null,
+            'source_title' => $sourceInfo['title'] ?? 'Task',
+            'source_code' => $sourceInfo['code'] ?? null,
+            'source_url' => $sourceInfo['url'] ?? null,
+            'from' => $from,
+            'client' => $clientData,
+            'assigned_employee' => $task->assignedEmployee ? [
+                'id' => $task->assignedEmployee->id,
+                'name' => $task->assignedEmployee->name,
+                'employee_code' => $task->assignedEmployee->employee_code,
+                'avatar' => $task->assignedEmployee->avatar,
+                'email' => $task->assignedEmployee->email ?? null,
+                'designation' => $task->assignedEmployee->designation?->name,
+                'department' => $task->assignedEmployee->department?->name,
+            ] : null,
+            'messages' => $task->messages,
+        ];
+
+        return Inertia::render('my-tasks/task-conversation', [
+            'task' => $taskData,
+            'sourceInfo' => $sourceInfo,
+            'client' => $clientData,
+            'from' => $from,
+        ]);
+    }
 }

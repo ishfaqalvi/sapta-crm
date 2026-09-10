@@ -90,8 +90,8 @@ export default function QuotationShow({ client, quotation }: QuotationShowProps)
                 );
             case 'accepted':
                 return (
-                    <span className="px-2.5 py-0.5 rounded-full text-xs font-bold capitalize bg-blue-500/15 text-blue-700 dark:text-blue-300 border border-blue-500/30 flex items-center gap-1">
-                        <span>Accepted (Unpaid Invoice)</span>
+                    <span className="px-2.5 py-0.5 rounded-full text-xs font-bold capitalize bg-rose-500/15 text-rose-700 dark:text-rose-300 border border-rose-500/30 flex items-center gap-1">
+                        <span>Invoice (Unpaid)</span>
                     </span>
                 );
             case 'sent':
@@ -229,9 +229,24 @@ export default function QuotationShow({ client, quotation }: QuotationShowProps)
                 {/* Printable Document Paper Card (Exact Layout from Sample Screenshot) */}
                 <div
                     id="quotation-print-area"
-                    className="bg-white text-slate-900 rounded-2xl sm:rounded-3xl border border-slate-200/90 shadow-xl p-6 sm:p-10 md:p-12 space-y-6 print:border-none print:shadow-none print:p-0 print:rounded-none print:m-0"
+                    className="relative overflow-hidden bg-white text-slate-900 rounded-2xl sm:rounded-3xl border border-slate-200/90 shadow-xl p-6 sm:p-10 md:p-12 space-y-6 print:border-none print:shadow-none print:p-8 print:rounded-none print:m-0"
                     style={{ fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif" }}
                 >
+                    {/* Status Ribbon (When converted to Invoice) */}
+                    {isInvoice && (
+                        <div className="absolute top-0 right-0 w-36 h-36 overflow-hidden pointer-events-none z-20 select-none">
+                            {quotation.status === 'paid' ? (
+                                <div className="absolute top-7 -right-10 w-44 rotate-45 text-center py-1 bg-emerald-600 text-white font-black text-[11px] uppercase tracking-widest shadow-md shadow-emerald-950/20 border-y border-emerald-400">
+                                    PAID
+                                </div>
+                            ) : (
+                                <div className="absolute top-7 -right-10 w-44 rotate-45 text-center py-1 bg-rose-600 text-white font-black text-[11px] uppercase tracking-widest shadow-md shadow-rose-950/20 border-y border-rose-400">
+                                    UNPAID
+                                </div>
+                            )}
+                        </div>
+                    )}
+
                     {/* Header Row */}
                     <div className="flex flex-col sm:flex-row items-center justify-between gap-6 pb-2">
                         {/* Left: Client's Company Logo */}
@@ -292,6 +307,20 @@ export default function QuotationShow({ client, quotation }: QuotationShowProps)
                             <h1 className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">
                                 {documentTypeLabel}
                             </h1>
+                            {isInvoice && (
+                                <div className="flex justify-end pt-1">
+                                    {quotation.status === 'paid' ? (
+                                        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-md text-[11px] font-black uppercase tracking-wider bg-emerald-100 text-emerald-800 border border-emerald-300">
+                                            <CheckCircle2 className="size-3 text-emerald-600" />
+                                            <span>PAID</span>
+                                        </span>
+                                    ) : (
+                                        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-md text-[11px] font-black uppercase tracking-wider bg-rose-100 text-rose-800 border border-rose-300">
+                                            <span>UNPAID</span>
+                                        </span>
+                                    )}
+                                </div>
+                            )}
                         </div>
                     </div>
 
@@ -303,11 +332,10 @@ export default function QuotationShow({ client, quotation }: QuotationShowProps)
                         {/* Left: Recipient */}
                         <div className="space-y-0.5 text-sm sm:text-base font-bold text-slate-900">
                             <div>To,</div>
-                            <div className="text-base sm:text-lg font-black">
-                                {quotation.customer_prefix || 'Mr/Mrs'} {quotation.customer_name}
-                            </div>
-                            {client.company_name && client.company_name !== quotation.customer_name && (
-                                <div className="text-xs font-semibold text-slate-600">{client.company_name}</div>
+                            {quotation.customer_name?.trim() && (
+                                <div className="text-base sm:text-lg font-black">
+                                    {quotation.customer_prefix || 'Mr/Mrs'} {quotation.customer_name}
+                                </div>
                             )}
                             {quotation.customer_phone && (
                                 <div className="text-xs font-normal text-slate-500">Phone: {quotation.customer_phone}</div>
@@ -338,7 +366,7 @@ export default function QuotationShow({ client, quotation }: QuotationShowProps)
                         <div className="font-bold">{quotation.greeting || 'Dear Sir/Mam,'}</div>
                         <div>
                             {quotation.opening_text ||
-                                'Thank you for your valuable inquiry. We are pleased to quote as below'}
+                                'In case of any queries, kindly get in touch with us. Thank you and I look forward to hearing from you.'}
                         </div>
                     </div>
 
@@ -445,7 +473,8 @@ export default function QuotationShow({ client, quotation }: QuotationShowProps)
 
                     {/* Closing Note */}
                     <div className="text-sm font-semibold text-slate-900 pt-2">
-                        {quotation.closing_text || 'We hope you find our offer to be in line with your requirement.'}
+                        {quotation.closing_text ||
+                            "We thank you for providing us with an opportunity to submit our quotation for shifting your home furniture and appliances. Our prices are reasonable; our staff are professional and well trained to handle all your stuff and equipment's with care. Please find the complete details and expenses to cover this operation."}
                     </div>
 
                     {/* Notes & Terms if any */}

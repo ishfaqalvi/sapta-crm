@@ -69,18 +69,15 @@ class TaskNotificationService
         // 2. Send In-App CRM Database Notification (if employee has CRM login user account)
         if ($employee->user && (!$assignedBy || $employee->user->id !== $assignedBy->id)) {
             $sourceInfo = '';
-            $actionUrl = '/tasks';
+            $actionUrl = "/my-tasks/task/{$type}/{$task->id}/conversation";
 
             if ($type === 'project' && $task->websiteProject) {
                 $sourceInfo = " on project '{$task->websiteProject->project_name}'";
-                $actionUrl = "/tasks/detail/project/{$task->id}";
             } elseif ($type === 'service' && $task->service) {
                 $sourceInfo = " on service '{$task->service->service_name}'";
-                $actionUrl = "/tasks/detail/service/{$task->id}";
             } else {
                 $code = $task->task_code ? " ({$task->task_code})" : '';
                 $sourceInfo = "{$code}";
-                $actionUrl = "/tasks/detail/general/{$task->id}";
             }
 
             try {

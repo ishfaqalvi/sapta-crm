@@ -21,6 +21,7 @@
             color: #0f172a;
             -webkit-print-color-adjust: exact;
             print-color-adjust: exact;
+            padding: 0 16px;
         }
 
         /* Top Action Bar (Hidden on Print) */
@@ -100,12 +101,70 @@
 
         /* Printable Paper Container */
         .paper-container {
-            max-width: 820px;
+            width: 100%;
+            max-width: 860px;
             margin: 24px auto 40px auto;
             background: #ffffff;
             border-radius: 16px;
             box-shadow: 0 10px 30px -5px rgba(0, 0, 0, 0.08), 0 0 0 1px rgba(0, 0, 0, 0.05);
             padding: 40px 48px;
+            position: relative;
+            overflow: hidden;
+        }
+
+        /* Diagonal Status Ribbon */
+        .status-corner-banner {
+            position: absolute;
+            top: 0px;
+            right: 0px;
+            width: 130px;
+            height: 130px;
+            overflow: hidden;
+            z-index: 100;
+        }
+        .status-corner-ribbon {
+            position: absolute;
+            top: 26px;
+            right: -32px;
+            width: 140px;
+            padding: 5px 0;
+            text-align: center;
+            font-size: 10.5px;
+            font-weight: 900;
+            letter-spacing: 1.5px;
+            text-transform: uppercase;
+            color: #ffffff;
+            transform: rotate(45deg);
+            -webkit-transform: rotate(45deg);
+            box-shadow: 0 2px 4px rgba(0,0,0,0.15);
+        }
+        .ribbon-paid {
+            background-color: #16a34a;
+        }
+        .ribbon-unpaid {
+            background-color: #dc2626;
+        }
+
+        /* Status Badges */
+        .status-badge {
+            display: inline-block;
+            padding: 3px 8px;
+            font-size: 10px;
+            font-weight: 900;
+            text-transform: uppercase;
+            border-radius: 4px;
+            letter-spacing: 0.5px;
+            margin-top: 4px;
+        }
+        .status-paid {
+            background-color: #dcfce7;
+            color: #15803d;
+            border: 1px solid #86efac;
+        }
+        .status-unpaid {
+            background-color: #fee2e2;
+            color: #b91c1c;
+            border: 1px solid #fca5a5;
         }
 
         .w-full { width: 100%; }
@@ -309,22 +368,24 @@
         @media print {
             body {
                 background-color: #ffffff;
-                padding: 0;
+                padding: 0 !important;
+                margin: 0 !important;
             }
             .print-actions-bar {
                 display: none !important;
             }
             .paper-container {
+                width: 100% !important;
                 max-width: 100% !important;
                 margin: 0 !important;
-                padding: 0 !important;
+                padding: 24px 36px !important;
                 box-shadow: none !important;
                 border-radius: 0 !important;
                 border: none !important;
             }
             @page {
                 size: A4 portrait;
-                margin: 12mm 15mm;
+                margin: 8mm 10mm;
             }
         }
     </style>
@@ -334,7 +395,15 @@
     <!-- Floating Top Bar for user convenience -->
     <div class="print-actions-bar">
         <div class="bar-left">
-            <span class="doc-tag">{{ $docTitle }}</span>
+            @if($isInvoice)
+                @if($quotation->status === 'paid')
+                    <span class="doc-tag" style="background-color: #16a34a;">Invoice &bull; Paid</span>
+                @else
+                    <span class="doc-tag" style="background-color: #dc2626;">Invoice &bull; Unpaid</span>
+                @endif
+            @else
+                <span class="doc-tag">{{ $docTitle }}</span>
+            @endif
             <span class="bar-title">{{ $quotation->quotation_number }} &bull; {{ $quotation->customer_name }}</span>
         </div>
         <div class="bar-actions">
@@ -366,6 +435,17 @@
     @endphp
 
     <div class="paper-container">
+        @if($isInvoice)
+            <!-- Diagonal Status Ribbon for Invoices -->
+            <div class="status-corner-banner">
+                @if($quotation->status === 'paid')
+                    <div class="status-corner-ribbon ribbon-paid">PAID</div>
+                @else
+                    <div class="status-corner-ribbon ribbon-unpaid">UNPAID</div>
+                @endif
+            </div>
+        @endif
+
         <!-- Header Block -->
         <table class="table-layout">
             <tr>
@@ -412,6 +492,15 @@
                 <!-- Right: Quotation / Invoice Title -->
                 <td style="width: 25%; text-align: right; vertical-align: middle;">
                     <div class="quotation-main-title">{{ $docTitle }}</div>
+                    @if($isInvoice)
+                        <div style="margin-top: 4px;">
+                            @if($quotation->status === 'paid')
+                                <span class="status-badge status-paid">PAID</span>
+                            @else
+                                <span class="status-badge status-unpaid">UNPAID</span>
+                            @endif
+                        </div>
+                    @endif
                 </td>
             </tr>
         </table>
@@ -424,11 +513,10 @@
                 <td style="width: 55%;">
                     <div class="to-section">
                         <div class="to-title">To,</div>
-                        <div class="to-name">
-                            {{ $quotation->customer_prefix ?: 'Mr/Mrs' }} {{ $quotation->customer_name }}
-                        </div>
-                        @if($quotation->client?->company_name && $quotation->client?->company_name !== $quotation->customer_name)
-                            <div class="to-company">{{ $quotation->client->company_name }}</div>
+                        @if(!empty(trim($quotation->customer_name ?? '')))
+                            <div class="to-name">
+                                {{ $quotation->customer_prefix ?: 'Mr/Mrs' }} {{ $quotation->customer_name }}
+                            </div>
                         @endif
                         @if($quotation->customer_phone)
                             <div class="to-phone">Phone: {{ $quotation->customer_phone }}</div>
@@ -450,7 +538,7 @@
         <!-- Salutation & Inquiry Intro -->
         <div class="salutation-block">
             <div class="greeting">{{ $quotation->greeting ?: 'Dear Sir/Mam,' }}</div>
-            <div>{{ $quotation->opening_text ?: 'Thank you for your valuable inquiry. We are pleased to quote as below' }}</div>
+            <div>{{ $quotation->opening_text ?: 'In case of any queries, kindly get in touch with us. Thank you and I look forward to hearing from you.' }}</div>
         </div>
 
         <!-- Line Items Table -->
@@ -518,7 +606,7 @@
 
         <!-- Closing Remarks -->
         <div class="closing-text">
-            {{ $quotation->closing_text ?: 'We hope you find our offer to be in line with your requirement.' }}
+            {{ $quotation->closing_text ?: "We thank you for providing us with an opportunity to submit our quotation for shifting your home furniture and appliances. Our prices are reasonable; our staff are professional and well trained to handle all your stuff and equipment's with care. Please find the complete details and expenses to cover this operation." }}
         </div>
 
         <!-- Notes & Terms if any -->

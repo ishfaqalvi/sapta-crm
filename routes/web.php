@@ -104,6 +104,10 @@ Route::middleware(['web', 'auth'])->group(function () {
         Route::put('service-task/{task}/status', 'updateServiceTaskStatus');
         Route::post('general-task/{task}/status', 'updateGeneralTaskStatus')->name('general-task.status');
         Route::put('general-task/{task}/status', 'updateGeneralTaskStatus');
+
+        // Dedicated Task Conversation & Details Routes in Employee My Tasks
+        Route::get('task/{type}/{id}/conversation', 'taskConversation')->name('task.conversation');
+        Route::get('task/{type}/{id}', 'taskConversation')->name('task.show');
     });
 
     // Dedicated Task Detail & Discussion Page
@@ -155,7 +159,13 @@ Route::group(['prefix' => 'client-portal', 'as' => 'client-portal.', 'middleware
             Route::post('tasks/store', 'storeTask')->name('tasks.store');
             Route::put('tasks/update/{task}', 'updateTask')->name('tasks.update');
             Route::post('tasks/update/{task}', 'updateTask');
+            Route::post('tasks/{task}/status', 'updateStatus')->name('tasks.status');
+            Route::put('tasks/{task}/status', 'updateStatus');
             Route::delete('tasks/destroy/{task}', 'destroyTask')->name('tasks.destroy');
+
+            // Dedicated Task Conversation & Details Routes in Client Portal
+            Route::get('{project}/tasks/{task}/conversation', 'taskConversation')->name('tasks.conversation');
+            Route::get('{project}/tasks/{task}', 'taskConversation')->name('tasks.show');
 
             // Milestones Sub-routes
             Route::post('milestones/store', 'storeMilestone')->name('milestones.store');
@@ -205,6 +215,10 @@ Route::group(['prefix' => 'client-portal', 'as' => 'client-portal.', 'middleware
             Route::post('tasks/{task}/status', 'updateTaskStatus')->name('tasks.status');
             Route::put('tasks/{task}/status', 'updateTaskStatus');
             Route::delete('tasks/destroy/{task}', 'destroyTask')->name('tasks.destroy');
+
+            // Dedicated Task Conversation & Details Routes in Client Portal Services
+            Route::get('{service}/tasks/{task}/conversation', 'taskConversation')->name('tasks.conversation');
+            Route::get('{service}/tasks/{task}', 'taskConversation')->name('tasks.show');
 
             Route::post('credentials/store', 'storeCredential')->name('credentials.store');
             Route::put('credentials/update/{credential}', 'updateCredential')->name('credentials.update');
@@ -347,6 +361,7 @@ Route::middleware(['web', 'admin.access'])->group(function () {
     |--------------------------------------------------------------------------
     */
     Route::get('dashboard', [DashboardController::class, 'index'])->name('dashboard');
+    Route::get('employee/dashboard', [DashboardController::class, 'employeeDashboardView'])->name('employee.dashboard');
 
     /*
     |--------------------------------------------------------------------------
@@ -377,6 +392,12 @@ Route::middleware(['web', 'admin.access'])->group(function () {
     Route::controller(AdminProjectController::class)->prefix('projects')->as('projects.')->group(function () {
         Route::get('/', 'index')->name('index');
         Route::get('{project}', 'show')->name('show');
+
+        // Dedicated Project Task Conversation & Details Routes in Admin Portal
+        Route::get('{project}/tasks/{task}/conversation', 'taskConversation')->name('tasks.conversation');
+        Route::get('{project}/tasks/{task}', 'taskConversation')->name('tasks.show');
+        Route::post('tasks/{task}/status', 'updateTaskStatus')->name('tasks.status');
+        Route::put('tasks/{task}/status', 'updateTaskStatus');
     });
 
     /*
@@ -387,6 +408,12 @@ Route::middleware(['web', 'admin.access'])->group(function () {
     Route::controller(AdminServiceController::class)->prefix('services')->as('services.')->group(function () {
         Route::get('/', 'index')->name('index');
         Route::get('{service}', 'show')->name('show');
+
+        // Dedicated Service Task Conversation & Details Routes in Admin Portal
+        Route::get('{service}/tasks/{task}/conversation', 'taskConversation')->name('tasks.conversation');
+        Route::get('{service}/tasks/{task}', 'taskConversation')->name('tasks.show');
+        Route::post('tasks/{task}/status', 'updateTaskStatus')->name('tasks.status');
+        Route::put('tasks/{task}/status', 'updateTaskStatus');
     });
 
     /*

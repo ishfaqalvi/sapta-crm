@@ -1212,13 +1212,19 @@ export default function ClientPortalProjectsShow({
                                                 <tr key={task.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/40 transition-colors">
                                                     <td className="px-3 py-3.5 font-bold text-slate-900 dark:text-white">
                                                         <div className="space-y-1">
-                                                            <Link
-                                                                href={`/tasks/detail/project/${task.id}`}
-                                                                className="text-left font-bold text-slate-900 dark:text-white hover:text-blue-600 dark:hover:text-blue-400 transition-colors block leading-snug"
-                                                                title="View Task Details & Discussion Page"
-                                                            >
-                                                                {task.task_title}
-                                                            </Link>
+                                                            {task.assigned_employee ? (
+                                                                <Link
+                                                                    href={`/client-portal/projects/${project.id}/tasks/${task.id}/conversation`}
+                                                                    className="text-left font-bold text-slate-900 dark:text-white hover:text-blue-600 dark:hover:text-blue-400 transition-colors block leading-snug"
+                                                                    title="View Task Details & Discussion Page"
+                                                                >
+                                                                    {task.task_title}
+                                                                </Link>
+                                                            ) : (
+                                                                <span className="text-left font-bold text-slate-900 dark:text-white block leading-snug">
+                                                                    {task.task_title}
+                                                                </span>
+                                                            )}
                                                             {task.attachment && (
                                                                 <button
                                                                     type="button"
@@ -1296,15 +1302,17 @@ export default function ClientPortalProjectsShow({
                                                     </td>
                                                     <td className="px-3 py-3.5 text-right whitespace-nowrap">
                                                         <div className="flex items-center justify-end gap-1.5">
-                                                            {/* DEDICATED DETAIL & DISCUSSION PAGE LINK */}
-                                                            <Link
-                                                                href={`/tasks/detail/project/${task.id}`}
-                                                                className="h-8 px-2.5 rounded-lg bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400 hover:bg-gradient-to-r hover:from-[#003796] hover:via-[#0052D4] hover:to-[#1d4ed8] hover:text-white font-bold text-xs inline-flex items-center gap-1.5 cursor-pointer shadow-2xs transition-all border border-blue-200/50 hover:border-transparent"
-                                                                title="Open Task Details & Discussion Page"
-                                                            >
-                                                                <MessageSquare className="size-3.5" />
-                                                                <span>{task.messages_count || 0}</span>
-                                                            </Link>
+                                                            {/* DEDICATED DETAIL & DISCUSSION PAGE LINK - Only if assigned */}
+                                                            {Boolean(task.assigned_employee || task.assigned_employee_id) && (
+                                                                <Link
+                                                                    href={`/client-portal/projects/${project.id}/tasks/${task.id}/conversation`}
+                                                                    className="h-8 px-2.5 rounded-lg bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400 hover:bg-gradient-to-r hover:from-[#003796] hover:via-[#0052D4] hover:to-[#1d4ed8] hover:text-white font-bold text-xs inline-flex items-center gap-1.5 cursor-pointer shadow-2xs transition-all border border-blue-200/50 hover:border-transparent"
+                                                                    title="Open Task Details & Discussion Page"
+                                                                >
+                                                                    <MessageSquare className="size-3.5" />
+                                                                    <span>{task.messages_count || 0}</span>
+                                                                </Link>
+                                                            )}
 
                                                             {hasPermission(user, 'edit-client-portal-project-tasks') && (
                                                                 <button

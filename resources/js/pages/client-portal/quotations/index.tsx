@@ -41,7 +41,7 @@ export interface QuotationRecord {
     exchange_rate_to_pkr: number;
     subject?: string | null;
     customer_prefix?: string | null;
-    customer_name: string;
+    customer_name?: string | null;
     customer_email?: string | null;
     customer_phone?: string | null;
     customer_address?: string | null;
@@ -383,7 +383,7 @@ export default function ClientPortalQuotationsIndex({
 
                                             <td className="px-6 py-4">
                                                 <div className="font-bold text-slate-900 dark:text-white">
-                                                    {item.customer_prefix} {item.customer_name}
+                                                    {item.customer_name ? `${item.customer_prefix ? item.customer_prefix + ' ' : ''}${item.customer_name}` : <span className="text-slate-400 font-normal italic">—</span>}
                                                 </div>
                                                 {item.subject && (
                                                     <span className="text-slate-400 text-[11px] block truncate max-w-[200px]">

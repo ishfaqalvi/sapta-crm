@@ -346,6 +346,7 @@ class ReportController extends Controller
         $totalPaid = (float) $filtered->where('status', 'paid')->sum('amount');
         $totalPending = (float) $filtered->where('status', 'pending')->sum('amount');
         $totalOverdue = (float) $filtered->where('status', 'overdue')->sum('amount');
+        $totalUnpaid = (float) $filtered->whereIn('status', ['pending', 'overdue'])->sum('amount');
         $totalCancelled = (float) $filtered->where('status', 'cancelled')->sum('amount');
 
         $kpi = [
@@ -353,11 +354,13 @@ class ReportController extends Controller
             'total_paid' => $totalPaid,
             'total_pending' => $totalPending,
             'total_overdue' => $totalOverdue,
+            'total_unpaid' => $totalUnpaid,
             'total_cancelled' => $totalCancelled,
             'count_all' => $filtered->count(),
             'count_paid' => $filtered->where('status', 'paid')->count(),
             'count_pending' => $filtered->where('status', 'pending')->count(),
             'count_overdue' => $filtered->where('status', 'overdue')->count(),
+            'count_unpaid' => $filtered->whereIn('status', ['pending', 'overdue'])->count(),
             'count_cancelled' => $filtered->where('status', 'cancelled')->count(),
         ];
 

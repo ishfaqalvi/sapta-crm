@@ -62,11 +62,13 @@ export interface KpiData {
     total_paid: number;
     total_pending: number;
     total_overdue: number;
+    total_unpaid?: number;
     total_cancelled: number;
     count_all: number;
     count_paid: number;
     count_pending: number;
     count_overdue: number;
+    count_unpaid?: number;
     count_cancelled: number;
 }
 
@@ -127,11 +129,13 @@ export default function AdminReportsIndex({
         total_paid: 0,
         total_pending: 0,
         total_overdue: 0,
+        total_unpaid: 0,
         total_cancelled: 0,
         count_all: 0,
         count_paid: 0,
         count_pending: 0,
         count_overdue: 0,
+        count_unpaid: 0,
         count_cancelled: 0,
     },
     categoryBreakdown = {
@@ -177,6 +181,10 @@ export default function AdminReportsIndex({
     const [fromDate, setFromDate] = useState<string>(filters.from_date || '');
     const [toDate, setToDate] = useState<string>(filters.to_date || '');
     const [search, setSearch] = useState<string>(filters.search || '');
+
+    const selectedCurrency = selectedClient?.currency || transactions[0]?.currency || 'AED';
+    const totalUnpaid = kpi.total_unpaid ?? (kpi.total_pending + (kpi.total_overdue || 0));
+    const countUnpaid = kpi.count_unpaid ?? (kpi.count_pending + (kpi.count_overdue || 0));
 
     // Synchronize local filter state on props change
     useEffect(() => {
@@ -423,7 +431,7 @@ export default function AdminReportsIndex({
                 </div>
 
                 {/* KPI Overview Stat Cards */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                     {/* Total Billed */}
                     <div className="p-4 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 shadow-xs flex items-center justify-between">
                         <div>
@@ -466,45 +474,24 @@ export default function AdminReportsIndex({
                         </div>
                     </div>
 
-                    {/* Pending / Due */}
+                    {/* Total Unpaid (Pending / Due) */}
                     <div className="p-4 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 shadow-xs flex items-center justify-between">
                         <div>
                             <p className="text-[11px] font-bold uppercase tracking-wider text-amber-600 dark:text-amber-400">
-                                Pending / Due
+                                Total Unpaid Amount
                             </p>
                             <h3 className="text-lg font-black text-amber-600 dark:text-amber-400 mt-0.5">
-                                {kpi.total_pending.toLocaleString('en-US', {
+                                {totalUnpaid.toLocaleString('en-US', {
                                     minimumFractionDigits: 2,
                                     maximumFractionDigits: 2,
                                 })}
                             </h3>
                             <p className="text-[10px] text-amber-700 dark:text-amber-400 font-semibold mt-1">
-                                {kpi.count_pending} items awaiting payment
+                                {countUnpaid} items pending / due
                             </p>
                         </div>
                         <div className="size-11 rounded-2xl bg-amber-50 dark:bg-amber-950 text-amber-600 dark:text-amber-400 flex items-center justify-center shadow-2xs">
                             <Clock className="size-5" />
-                        </div>
-                    </div>
-
-                    {/* Overdue */}
-                    <div className="p-4 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 shadow-xs flex items-center justify-between">
-                        <div>
-                            <p className="text-[11px] font-bold uppercase tracking-wider text-rose-600 dark:text-rose-400">
-                                Overdue Invoices
-                            </p>
-                            <h3 className="text-lg font-black text-rose-600 dark:text-rose-400 mt-0.5">
-                                {kpi.total_overdue.toLocaleString('en-US', {
-                                    minimumFractionDigits: 2,
-                                    maximumFractionDigits: 2,
-                                })}
-                            </h3>
-                            <p className="text-[10px] text-rose-700 dark:text-rose-400 font-semibold mt-1">
-                                {kpi.count_overdue} overdue items
-                            </p>
-                        </div>
-                        <div className="size-11 rounded-2xl bg-rose-50 dark:bg-rose-950 text-rose-600 dark:text-rose-400 flex items-center justify-center shadow-2xs">
-                            <ShieldAlert className="size-5" />
                         </div>
                     </div>
                 </div>
@@ -1117,21 +1104,64 @@ export default function AdminReportsIndex({
                             </tbody>
 
                             {transactions.length > 0 && (
-                                <tfoot>
-                                    <tr className="bg-slate-50/90 dark:bg-slate-950/80 border-t-2 border-slate-200 dark:border-slate-800 font-bold text-xs">
+                                <tfoot className="border-t-2 border-slate-200 dark:border-slate-800">
+                                    {/* Paid Total Row */}
+                                    <tr className="bg-emerald-50/50 dark:bg-emerald-950/20 text-xs">
                                         <td
                                             colSpan={5}
-                                            className="py-3.5 px-4 text-right uppercase tracking-wider text-slate-500 dark:text-slate-400"
+                                            className="py-3 px-4 text-right font-bold text-emerald-800 dark:text-emerald-300"
                                         >
-                                            Filtered Summary:
+                                            <span className="inline-flex items-center gap-1.5 uppercase tracking-wider text-[11px]">
+                                                <CheckCircle2 className="size-3.5 text-emerald-600 dark:text-emerald-400" />
+                                                Paid Total (Settled):
+                                            </span>
                                         </td>
-                                        <td className="py-3.5 px-4 text-center text-[11px] text-slate-600 dark:text-slate-300">
-                                            Settled:{' '}
-                                            <strong className="text-emerald-600">{kpi.count_paid}</strong> / Due:{' '}
-                                            <strong className="text-amber-600">{kpi.count_pending}</strong>
+                                        <td className="py-3 px-4 text-center text-[11px] font-bold text-emerald-700 dark:text-emerald-400 whitespace-nowrap">
+                                            {kpi.count_paid} settled
                                         </td>
-                                        <td className="py-3.5 px-4 text-right font-black text-sm text-blue-600 dark:text-blue-400 whitespace-nowrap">
-                                            {kpi.total_billed.toLocaleString('en-US', {
+                                        <td className="py-3 px-4 text-right font-black text-sm text-emerald-600 dark:text-emerald-400 whitespace-nowrap font-mono">
+                                            {selectedCurrency} {kpi.total_paid.toLocaleString('en-US', {
+                                                minimumFractionDigits: 2,
+                                                maximumFractionDigits: 2,
+                                            })}
+                                        </td>
+                                    </tr>
+
+                                    {/* Unpaid Total Row */}
+                                    <tr className="bg-amber-50/50 dark:bg-amber-950/20 border-t border-slate-200/60 dark:border-slate-800/80 text-xs">
+                                        <td
+                                            colSpan={5}
+                                            className="py-3 px-4 text-right font-bold text-amber-800 dark:text-amber-300"
+                                        >
+                                            <span className="inline-flex items-center gap-1.5 uppercase tracking-wider text-[11px]">
+                                                <Clock className="size-3.5 text-amber-600 dark:text-amber-400" />
+                                                Unpaid Total (Pending / Due):
+                                            </span>
+                                        </td>
+                                        <td className="py-3 px-4 text-center text-[11px] font-bold text-amber-700 dark:text-amber-400 whitespace-nowrap">
+                                            {countUnpaid} pending / due
+                                        </td>
+                                        <td className="py-3 px-4 text-right font-black text-sm text-amber-600 dark:text-amber-400 whitespace-nowrap font-mono">
+                                            {selectedCurrency} {totalUnpaid.toLocaleString('en-US', {
+                                                minimumFractionDigits: 2,
+                                                maximumFractionDigits: 2,
+                                            })}
+                                        </td>
+                                    </tr>
+
+                                    {/* Overall Billed Total Row */}
+                                    <tr className="bg-slate-100/90 dark:bg-slate-950/90 border-t-2 border-slate-300 dark:border-slate-700 font-bold text-xs">
+                                        <td
+                                            colSpan={5}
+                                            className="py-3.5 px-4 text-right uppercase tracking-wider text-slate-700 dark:text-slate-300"
+                                        >
+                                            Overall Filtered Total:
+                                        </td>
+                                        <td className="py-3.5 px-4 text-center text-[11px] font-bold text-slate-500 dark:text-slate-400 whitespace-nowrap">
+                                            {transactions.length} records
+                                        </td>
+                                        <td className="py-3.5 px-4 text-right font-black text-sm text-blue-600 dark:text-blue-400 whitespace-nowrap font-mono">
+                                            {selectedCurrency} {kpi.total_billed.toLocaleString('en-US', {
                                                 minimumFractionDigits: 2,
                                                 maximumFractionDigits: 2,
                                             })}
@@ -1141,6 +1171,79 @@ export default function AdminReportsIndex({
                             )}
                         </table>
                     </div>
+
+                    {/* Bottom Summary Cards: Paid vs Unpaid */}
+                    {transactions.length > 0 && (
+                        <div className="p-4 sm:p-5 bg-slate-50/80 dark:bg-slate-950/60 border-t border-slate-200/80 dark:border-slate-800">
+                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                                {/* Paid Summary Card */}
+                                <div className="flex items-center justify-between p-3.5 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800/60">
+                                    <div className="flex items-center gap-3">
+                                        <div className="size-9 rounded-lg bg-emerald-100 dark:bg-emerald-900/60 text-emerald-700 dark:text-emerald-300 flex items-center justify-center shrink-0">
+                                            <CheckCircle2 className="size-5" />
+                                        </div>
+                                        <div>
+                                            <p className="text-[10px] font-extrabold uppercase tracking-wider text-emerald-800 dark:text-emerald-300">
+                                                Paid Total
+                                            </p>
+                                            <p className="text-xs text-emerald-700 dark:text-emerald-400 font-semibold">
+                                                {kpi.count_paid} settled payments
+                                            </p>
+                                        </div>
+                                    </div>
+                                    <div className="text-right font-mono">
+                                        <span className="text-sm font-black text-emerald-700 dark:text-emerald-300">
+                                            {selectedCurrency} {kpi.total_paid.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                        </span>
+                                    </div>
+                                </div>
+
+                                {/* Unpaid Summary Card */}
+                                <div className="flex items-center justify-between p-3.5 rounded-xl bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800/60">
+                                    <div className="flex items-center gap-3">
+                                        <div className="size-9 rounded-lg bg-amber-100 dark:bg-amber-900/60 text-amber-700 dark:text-amber-300 flex items-center justify-center shrink-0">
+                                            <Clock className="size-5" />
+                                        </div>
+                                        <div>
+                                            <p className="text-[10px] font-extrabold uppercase tracking-wider text-amber-800 dark:text-amber-300">
+                                                Unpaid Total
+                                            </p>
+                                            <p className="text-xs text-amber-700 dark:text-amber-400 font-semibold">
+                                                {countUnpaid} pending / due
+                                            </p>
+                                        </div>
+                                    </div>
+                                    <div className="text-right font-mono">
+                                        <span className="text-sm font-black text-amber-700 dark:text-amber-300">
+                                            {selectedCurrency} {totalUnpaid.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                        </span>
+                                    </div>
+                                </div>
+
+                                {/* Overall Billed Total Card */}
+                                <div className="flex items-center justify-between p-3.5 rounded-xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 sm:col-span-2 lg:col-span-1">
+                                    <div className="flex items-center gap-3">
+                                        <div className="size-9 rounded-lg bg-blue-50 dark:bg-blue-950 text-blue-600 dark:text-blue-400 flex items-center justify-center shrink-0">
+                                            <Receipt className="size-5" />
+                                        </div>
+                                        <div>
+                                            <p className="text-[10px] font-extrabold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                                                Overall Billed Total
+                                            </p>
+                                            <p className="text-xs text-slate-400 font-semibold">
+                                                {transactions.length} filtered transactions
+                                            </p>
+                                        </div>
+                                    </div>
+                                    <div className="text-right font-mono">
+                                        <span className="text-sm font-black text-blue-600 dark:text-blue-400">
+                                            {selectedCurrency} {kpi.total_billed.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                        </span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    )}
                 </div>
             </div>
         </AppLayout>

@@ -19,6 +19,7 @@ import {
     Globe,
     Key,
     ListTodo,
+    MessageSquare,
     PauseCircle,
     User,
     XCircle,
@@ -212,7 +213,28 @@ export function getFileBadgeClass(fileType?: string | null) {
 }
 
 export default function ServiceShow({ service, permissions }: ServiceDetailProps) {
-    const [activeTab, setActiveTab] = useState<'details' | 'tasks' | 'credentials' | 'documents'>('details');
+    const getInitialTab = (): 'details' | 'tasks' | 'credentials' | 'documents' => {
+        if (typeof window !== 'undefined') {
+            const params = new URLSearchParams(window.location.search);
+            const tab = params.get('tab');
+            if (tab === 'tasks' || tab === 'credentials' || tab === 'details' || tab === 'documents') {
+                return tab;
+            }
+        }
+        return 'details';
+    };
+
+    const [activeTab, setActiveTabState] = useState<'details' | 'tasks' | 'credentials' | 'documents'>(getInitialTab);
+
+    const setActiveTab = (tab: 'details' | 'tasks' | 'credentials' | 'documents') => {
+        setActiveTabState(tab);
+        if (typeof window !== 'undefined') {
+            const url = new URL(window.location.href);
+            url.searchParams.set('tab', tab);
+            window.history.replaceState({}, '', url.toString());
+        }
+    };
+
     const [visiblePasswords, setVisiblePasswords] = useState<{ [key: number]: boolean }>({});
     const [copiedId, setCopiedId] = useState<string | null>(null);
 
@@ -520,6 +542,7 @@ export default function ServiceShow({ service, permissions }: ServiceDetailProps
                                         <th className="px-4 py-3.5">Priority</th>
                                         <th className="px-4 py-3.5">Status</th>
                                         <th className="px-4 py-3.5">Due Date</th>
+                                        <th className="px-4 py-3.5 text-right">Discussion</th>
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
@@ -528,9 +551,19 @@ export default function ServiceShow({ service, permissions }: ServiceDetailProps
                                             <tr key={task.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/40 transition-colors">
                                                 <td className="px-4 py-3.5">
                                                     <div>
-                                                        <span className="font-extrabold text-slate-900 dark:text-white block text-sm">
-                                                            {task.task_title}
-                                                        </span>
+                                                        {task.assigned_employee ? (
+                                                            <Link
+                                                                href={`/services/${service.id}/tasks/${task.id}/conversation`}
+                                                                className="font-extrabold text-slate-900 dark:text-white block text-sm hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
+                                                                title="View Task Details & Conversation"
+                                                            >
+                                                                {task.task_title}
+                                                            </Link>
+                                                        ) : (
+                                                            <span className="font-extrabold text-slate-900 dark:text-white block text-sm">
+                                                                {task.task_title}
+                                                            </span>
+                                                        )}
                                                         {task.task_description && (
                                                             <p className="text-[11px] text-slate-400 line-clamp-2 mt-0.5">
                                                                 {task.task_description}
@@ -577,11 +610,25 @@ export default function ServiceShow({ service, permissions }: ServiceDetailProps
                                                         <span>{formatDateOnly(task.due_date)}</span>
                                                     </div>
                                                 </td>
+                                                <td className="px-4 py-3.5 text-right whitespace-nowrap">
+                                                    {task.assigned_employee ? (
+                                                        <Link
+                                                            href={`/services/${service.id}/tasks/${task.id}/conversation`}
+                                                            className="h-8 px-2.5 rounded-lg bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400 hover:bg-gradient-to-r hover:from-[#003796] hover:via-[#0052D4] hover:to-[#1d4ed8] hover:text-white font-bold text-xs inline-flex items-center gap-1.5 cursor-pointer shadow-2xs transition-all border border-blue-200/50 hover:border-transparent"
+                                                            title="Open Task Discussion & Details Page"
+                                                        >
+                                                            <MessageSquare className="size-3.5" />
+                                                            <span>{task.messages_count || 0}</span>
+                                                        </Link>
+                                                    ) : (
+                                                        <span className="text-slate-400 text-xs italic">—</span>
+                                                    )}
+                                                </td>
                                             </tr>
                                         ))
                                     ) : (
                                         <tr>
-                                            <td colSpan={5} className="px-6 py-12 text-center text-slate-400 italic">
+                                            <td colSpan={6} className="px-6 py-12 text-center text-slate-400 italic">
                                                 No tasks found for this service.
                                             </td>
                                         </tr>

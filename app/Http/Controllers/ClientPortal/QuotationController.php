@@ -99,13 +99,22 @@ class QuotationController extends Controller
         $nextId = $latestQuote ? ($latestQuote->id + 1) : 1;
         $suggestedNumber = 'Quote-' . $nextId;
 
-        // Default Company details for placeholders matching client's workspace
+        // Retrieve client's latest quotation to pull any previously saved provider branding/settings
+        $lastClientQuotation = Quotation::where('client_id', $client->id)->latest('id')->first();
+
+        // Format address from city and country if no specific address exists
+        $profileAddress = trim(($client->city ? $client->city . ', ' : '') . ($client->country ?? ''));
+
+        // Default Company details populated from client / user profile (with fallback to previous quotation)
         $companySettings = [
-            'name' => $client->company_name ?: $client->name,
-            'phone' => $client->phone ?: $client->mobile,
-            'address' => trim(($client->city ? $client->city . ', ' : '') . ($client->country ?? '')),
-            'email' => $client->email,
-            'whatsapp' => $client->mobile ?: $client->phone,
+            'name' => $client->company_name ?: ($client->name ?: ($lastClientQuotation?->company_name ?? '')),
+            'phone' => $client->phone ?: ($client->mobile ?: ($lastClientQuotation?->company_phone ?? '')),
+            'address' => $profileAddress ?: ($lastClientQuotation?->company_address ?? ''),
+            'email' => $client->email ?: (auth()->user()?->email ?: ($lastClientQuotation?->company_email ?? '')),
+            'whatsapp' => $client->mobile ?: ($client->phone ?: ($lastClientQuotation?->company_whatsapp ?? '')),
+            'authorized_by_text' => $lastClientQuotation?->authorized_by_text ?: ('For, ' . ($client->company_name ?: $client->name)),
+            'logo_url' => $lastClientQuotation?->company_logo ?? null,
+            'signature_url' => $lastClientQuotation?->signature_image ?? null,
         ];
 
         return Inertia::render('client-portal/quotations/create', [
@@ -132,7 +141,7 @@ class QuotationController extends Controller
             'exchange_rate_to_pkr' => 'nullable|numeric|min:0.0001',
             'subject' => 'nullable|string|max:255',
             'customer_prefix' => 'nullable|string|max:50',
-            'customer_name' => 'required|string|max:255',
+            'customer_name' => 'nullable|string|max:255',
             'customer_email' => 'nullable|email|max:255',
             'customer_phone' => 'nullable|string|max:100',
             'customer_address' => 'nullable|string|max:1000',
@@ -142,6 +151,7 @@ class QuotationController extends Controller
             'company_email' => 'nullable|email|max:255',
             'company_whatsapp' => 'nullable|string|max:100',
             'company_logo' => 'nullable|image|mimes:jpeg,png,jpg,gif,svg,webp|max:2048',
+            'existing_company_logo' => 'nullable|string|max:500',
             'greeting' => 'nullable|string|max:255',
             'opening_text' => 'nullable|string|max:2000',
             'closing_text' => 'nullable|string|max:2000',
@@ -154,6 +164,7 @@ class QuotationController extends Controller
             'terms' => 'nullable|string|max:3000',
             'authorized_by_text' => 'nullable|string|max:255',
             'signature_image' => 'nullable|image|mimes:jpeg,png,jpg,gif,svg,webp|max:2048',
+            'existing_signature_image' => 'nullable|string|max:500',
             'items' => 'required|array|min:1',
             'items.*.description' => 'required|string|max:1000',
             'items.*.amount' => 'nullable|numeric|min:0',
@@ -204,7 +215,7 @@ class QuotationController extends Controller
                 'exchange_rate_to_pkr' => $exchangeRate,
                 'subject' => $validated['subject'] ?? null,
                 'customer_prefix' => $validated['customer_prefix'] ?? null,
-                'customer_name' => $validated['customer_name'],
+                'customer_name' => $validated['customer_name'] ?? null,
                 'customer_email' => $validated['customer_email'] ?? null,
                 'customer_phone' => $validated['customer_phone'] ?? null,
                 'customer_address' => $validated['customer_address'] ?? null,
@@ -233,10 +244,14 @@ class QuotationController extends Controller
 
             if ($request->hasFile('company_logo')) {
                 $quotation->company_logo = $request->file('company_logo');
+            } elseif ($request->filled('existing_company_logo')) {
+                $quotation->company_logo = $request->input('existing_company_logo');
             }
 
             if ($request->hasFile('signature_image')) {
                 $quotation->signature_image = $request->file('signature_image');
+            } elseif ($request->filled('existing_signature_image')) {
+                $quotation->signature_image = $request->input('existing_signature_image');
             }
 
             $quotation->save();
@@ -304,11 +319,23 @@ class QuotationController extends Controller
         $currencies = Currency::where('is_active', true)
             ->select('code', 'name', 'symbol', 'exchange_rate_to_pkr')
             ->get();
+        $profileAddress = trim(($client->city ? $client->city . ', ' : '') . ($client->country ?? ''));
+        $defaultCompany = [
+            'name' => $client->company_name ?: ($client->name ?: ($quotation->company_name ?? '')),
+            'phone' => $client->phone ?: ($client->mobile ?: ($quotation->company_phone ?? '')),
+            'address' => $profileAddress ?: ($quotation->company_address ?? ''),
+            'email' => $client->email ?: (auth()->user()?->email ?: ($quotation->company_email ?? '')),
+            'whatsapp' => $client->mobile ?: ($client->phone ?: ($quotation->company_whatsapp ?? '')),
+            'authorized_by_text' => $quotation->authorized_by_text ?: ('For, ' . ($client->company_name ?: $client->name)),
+            'logo_url' => $quotation->company_logo ?: (auth()->user()?->avatar ?: null),
+            'signature_url' => $quotation->signature_image ?? null,
+        ];
 
         return Inertia::render('client-portal/quotations/edit', [
             'client' => $client,
             'quotation' => $quotation,
             'currencies' => $currencies,
+            'defaultCompany' => $defaultCompany,
         ]);
     }
 
@@ -331,7 +358,7 @@ class QuotationController extends Controller
             'exchange_rate_to_pkr' => 'nullable|numeric|min:0.0001',
             'subject' => 'nullable|string|max:255',
             'customer_prefix' => 'nullable|string|max:50',
-            'customer_name' => 'required|string|max:255',
+            'customer_name' => 'nullable|string|max:255',
             'customer_email' => 'nullable|email|max:255',
             'customer_phone' => 'nullable|string|max:100',
             'customer_address' => 'nullable|string|max:1000',
@@ -404,7 +431,7 @@ class QuotationController extends Controller
                 'exchange_rate_to_pkr' => $exchangeRate,
                 'subject' => $validated['subject'] ?? null,
                 'customer_prefix' => $validated['customer_prefix'] ?? null,
-                'customer_name' => $validated['customer_name'],
+                'customer_name' => $validated['customer_name'] ?? null,
                 'customer_email' => $validated['customer_email'] ?? null,
                 'customer_phone' => $validated['customer_phone'] ?? null,
                 'customer_address' => $validated['customer_address'] ?? null,

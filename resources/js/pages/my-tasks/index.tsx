@@ -196,6 +196,16 @@ export default function MyTasksIndex({
         router.get('/my-tasks', {}, { preserveState: true, preserveScroll: true });
     };
 
+    const getTaskDetailUrl = (sourceType: string, taskId: number) => {
+        const params = new URLSearchParams();
+        if (selectedSourceType) params.set('source_type', selectedSourceType);
+        if (selectedProject) params.set('project_id', selectedProject);
+        if (selectedService) params.set('service_id', selectedService);
+        const queryStr = params.toString() ? `?${params.toString()}` : '';
+        const fromParam = `/my-tasks${queryStr}`;
+        return `/my-tasks/task/${sourceType}/${taskId}/conversation?from=${encodeURIComponent(fromParam)}`;
+    };
+
     const hasActiveFilters = Boolean(
         searchQuery || selectedStatus || selectedPriority || selectedSourceType || selectedProject || selectedService
     );
@@ -767,7 +777,7 @@ export default function MyTasksIndex({
                                                     <div className="inline-flex items-center gap-1.5">
                                                         {/* CONVERSATION / QUERY BUTTON (DIRECT LINK TO DEDICATED PAGE) */}
                                                         <Link
-                                                            href={`/tasks/detail/${isGeneral ? 'general' : isService ? 'service' : 'project'}/${task.id}`}
+                                                            href={getTaskDetailUrl(isGeneral ? 'general' : isService ? 'service' : 'project', task.id)}
                                                             className="h-8 px-2.5 rounded-xl bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400 hover:bg-gradient-to-r hover:from-[#003796] hover:via-[#0052D4] hover:to-[#1d4ed8] hover:text-white font-bold text-xs inline-flex items-center gap-1.5 cursor-pointer shadow-2xs transition-all border border-blue-200/50 hover:border-transparent"
                                                             title="Open Task Discussion & Details Page"
                                                         >
@@ -1045,7 +1055,7 @@ export default function MyTasksIndex({
 
                                 <div className="flex items-center gap-2 justify-end">
                                     <Link
-                                        href={`/tasks/detail/${viewingTask.source_type || 'project'}/${viewingTask.id}`}
+                                        href={getTaskDetailUrl(viewingTask.source_type || 'project', viewingTask.id)}
                                         className="h-9 px-3.5 rounded-xl bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400 hover:bg-blue-100 dark:hover:bg-blue-900/60 text-xs font-bold transition-all inline-flex items-center gap-1.5 cursor-pointer border border-blue-200/60 dark:border-blue-800/60"
                                     >
                                         <MessageSquare className="size-3.5" />
@@ -1203,7 +1213,7 @@ export default function MyTasksIndex({
 
                                 <div className="flex items-center gap-2 justify-end">
                                     <Link
-                                        href={`/tasks/detail/general/${viewingGeneralTask.id}`}
+                                        href={getTaskDetailUrl('general', viewingGeneralTask.id)}
                                         className="h-9 px-3.5 rounded-xl bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400 hover:bg-blue-100 dark:hover:bg-blue-900/60 text-xs font-bold transition-all inline-flex items-center gap-1.5 cursor-pointer border border-blue-200/60 dark:border-blue-800/60"
                                     >
                                         <MessageSquare className="size-3.5" />
@@ -1398,7 +1408,7 @@ export default function MyTasksIndex({
 
                                 <div className="flex items-center gap-2 justify-end">
                                     <Link
-                                        href={`/tasks/detail/project/${viewingProjectTask.id}`}
+                                        href={getTaskDetailUrl('project', viewingProjectTask.id)}
                                         className="h-9 px-3.5 rounded-xl bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400 hover:bg-blue-100 dark:hover:bg-blue-900/60 text-xs font-bold transition-all inline-flex items-center gap-1.5 cursor-pointer border border-blue-200/60 dark:border-blue-800/60"
                                     >
                                         <MessageSquare className="size-3.5" />
@@ -1593,7 +1603,7 @@ export default function MyTasksIndex({
 
                                 <div className="flex items-center gap-2 justify-end">
                                     <Link
-                                        href={`/tasks/detail/service/${viewingServiceTask.id}`}
+                                        href={getTaskDetailUrl('service', viewingServiceTask.id)}
                                         className="h-9 px-3.5 rounded-xl bg-purple-50 dark:bg-purple-950/60 text-purple-600 dark:text-purple-400 hover:bg-purple-100 dark:hover:bg-purple-900/60 text-xs font-bold transition-all inline-flex items-center gap-1.5 cursor-pointer border border-purple-200/60 dark:border-purple-800/60"
                                     >
                                         <MessageSquare className="size-3.5" />

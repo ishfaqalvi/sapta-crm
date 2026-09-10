@@ -328,31 +328,25 @@
         </tr>
     </table>
 
-    <!-- 4 KPI Summary Cards -->
+    <!-- 3 KPI Summary Cards -->
     <table class="kpi-container">
         <tr>
-            <td style="width: 25%; padding-right: 4px;">
+            <td style="width: 33.33%; padding-right: 4px;">
                 <div class="kpi-box kpi-total">
                     <div class="kpi-label">Total Billed ({{ $kpi['count_all'] }})</div>
                     <div class="kpi-value">{{ $client->currency ?: 'AED' }} {{ number_format($kpi['total_billed'], 2) }}</div>
                 </div>
             </td>
-            <td style="width: 25%; padding: 0 4px;">
+            <td style="width: 33.33%; padding: 0 2px;">
                 <div class="kpi-box kpi-paid">
                     <div class="kpi-label">Total Paid ({{ $kpi['count_paid'] }})</div>
                     <div class="kpi-value">{{ $client->currency ?: 'AED' }} {{ number_format($kpi['total_paid'], 2) }}</div>
                 </div>
             </td>
-            <td style="width: 25%; padding: 0 4px;">
+            <td style="width: 33.33%; padding-left: 4px;">
                 <div class="kpi-box kpi-pending">
-                    <div class="kpi-label">Pending / Due ({{ $kpi['count_pending'] }})</div>
-                    <div class="kpi-value">{{ $client->currency ?: 'AED' }} {{ number_format($kpi['total_pending'], 2) }}</div>
-                </div>
-            </td>
-            <td style="width: 25%; padding-left: 4px;">
-                <div class="kpi-box kpi-overdue">
-                    <div class="kpi-label">Overdue ({{ $kpi['count_overdue'] }})</div>
-                    <div class="kpi-value">{{ $client->currency ?: 'AED' }} {{ number_format($kpi['total_overdue'], 2) }}</div>
+                    <div class="kpi-label">Unpaid / Due ({{ $kpi['count_unpaid'] ?? ($kpi['count_pending'] + $kpi['count_overdue']) }})</div>
+                    <div class="kpi-value">{{ $client->currency ?: 'AED' }} {{ number_format($kpi['total_unpaid'] ?? ($kpi['total_pending'] + $kpi['total_overdue']), 2) }}</div>
                 </div>
             </td>
         </tr>
@@ -457,12 +451,34 @@
             @endforelse
 
             @if(count($transactions) > 0)
-                <tr class="totals-row">
-                    <td colspan="4" style="text-align: right; font-size: 9px; font-weight: 800; text-transform: uppercase;">
-                        Filtered Summary Totals:
+                <tr style="background-color: #f0fdf4; font-weight: 700; border-top: 1.5px solid #bbf7d0;">
+                    <td colspan="4" style="padding: 5px 7px; text-align: right; text-transform: uppercase; font-size: 8px; color: #166534;">
+                        Paid Total ({{ $kpi['count_paid'] }} settled):
                     </td>
-                    <td style="text-align: center; font-size: 8.5px;">
-                        Paid: {{ $kpi['count_paid'] }} / Due: {{ $kpi['count_pending'] }}
+                    <td style="padding: 5px 7px; text-align: center; font-size: 8px; color: #166534; font-weight: 800;">
+                        Paid
+                    </td>
+                    <td style="padding: 5px 7px; text-align: right; font-size: 9px; color: #166534; font-weight: 800;">
+                        {{ $client->currency ?: 'AED' }} {{ number_format($kpi['total_paid'], 2) }}
+                    </td>
+                </tr>
+                <tr style="background-color: #fffbeb; font-weight: 700; border-top: 1px solid #fef3c7;">
+                    <td colspan="4" style="padding: 5px 7px; text-align: right; text-transform: uppercase; font-size: 8px; color: #92400e;">
+                        Unpaid Total ({{ $kpi['count_unpaid'] ?? ($kpi['count_pending'] + $kpi['count_overdue']) }} pending/due):
+                    </td>
+                    <td style="padding: 5px 7px; text-align: center; font-size: 8px; color: #92400e; font-weight: 800;">
+                        Unpaid
+                    </td>
+                    <td style="padding: 5px 7px; text-align: right; font-size: 9px; color: #92400e; font-weight: 800;">
+                        {{ $client->currency ?: 'AED' }} {{ number_format($kpi['total_unpaid'] ?? ($kpi['total_pending'] + $kpi['total_overdue']), 2) }}
+                    </td>
+                </tr>
+                <tr class="totals-row">
+                    <td colspan="4" style="text-align: right; font-size: 8.5px; font-weight: 800; text-transform: uppercase;">
+                        Filtered Summary Totals ({{ count($transactions) }} records):
+                    </td>
+                    <td style="text-align: center; font-size: 8px; color: #475569;">
+                        All
                     </td>
                     <td style="text-align: right; font-size: 10px; font-weight: 900; color: #003796;">
                         {{ $client->currency ?: 'AED' }} {{ number_format($kpi['total_billed'], 2) }}

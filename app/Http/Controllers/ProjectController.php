@@ -4,7 +4,9 @@ namespace App\Http\Controllers;
 
 use App\Models\Client;
 use App\Models\ProjectCategory;
+use App\Models\ProjectTask;
 use App\Models\WebsiteProject;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -221,5 +223,102 @@ class ProjectController extends Controller
                 'view_documents' => $canViewDocuments,
             ],
         ]);
+    }
+
+    /**
+     * Display dedicated task conversation and discussion page within admin project hierarchy.
+     */
+    public function taskConversation(Request $request, WebsiteProject $project, ProjectTask $task): Response
+    {
+        $user = auth()->user();
+        if (!$user || (!$user->hasRole('Super Admin') && !$user->hasPermissionTo('view-projects') && !$user->can('view-projects') && !$user->hasRole('admin') && $user->type !== 'admin')) {
+            abort(403, 'Unauthorized. You do not have permission to view projects.');
+        }
+
+        if ($task->website_project_id !== $project->id) {
+            abort(404, 'Task not found on this project');
+        }
+
+        $task->load([
+            'assignedEmployee:id,name,employee_code,avatar,email,designation_id,department_id',
+            'assignedEmployee.designation:id,name',
+            'assignedEmployee.department:id,name',
+            'messages' => function ($q) {
+                $q->with('user:id,name,email,avatar,type,employee_id')->orderBy('created_at', 'asc');
+            },
+        ]);
+
+        $project->load([
+            'client:id,name,company_name,client_code,currency,status',
+            'category:id,name',
+        ]);
+
+        $taskData = [
+            'id' => $task->id,
+            'task_title' => $task->task_title,
+            'priority' => $task->priority,
+            'status' => $task->status,
+            'start_date' => $task->start_date ? $task->start_date->toDateString() : null,
+            'due_date' => $task->due_date ? $task->due_date->toDateString() : null,
+            'completed_at' => $task->completed_at ? $task->completed_at->toISOString() : null,
+            'created_at' => $task->created_at ? $task->created_at->toISOString() : null,
+            'description' => $task->description ?? $task->task_description,
+            'attachment' => $task->attachment,
+            'attachment_name' => $task->attachment_name,
+            'source_type' => 'project',
+            'source_id' => $project->id,
+            'source_title' => $project->project_name,
+            'source_code' => $project->project_code ?? 'PRJ-' . str_pad((string) $project->id, 4, '0', STR_PAD_LEFT),
+            'source_url' => "/projects/{$project->id}?tab=tasks",
+            'from' => "/projects/{$project->id}?tab=tasks",
+            'assigned_employee' => $task->assignedEmployee ? [
+                'id' => $task->assignedEmployee->id,
+                'name' => $task->assignedEmployee->name,
+                'employee_code' => $task->assignedEmployee->employee_code,
+                'avatar' => $task->assignedEmployee->avatar,
+                'email' => $task->assignedEmployee->email ?? null,
+                'designation' => $task->assignedEmployee->designation?->name,
+                'department' => $task->assignedEmployee->department?->name,
+            ] : null,
+            'messages' => $task->messages,
+        ];
+
+        return Inertia::render('projects/task-conversation', [
+            'project' => [
+                'id' => $project->id,
+                'project_name' => $project->project_name,
+                'project_code' => $project->project_code ?? 'PRJ-' . str_pad((string) $project->id, 4, '0', STR_PAD_LEFT),
+                'status' => $project->status,
+                'client' => $project->client,
+                'category' => $project->category,
+            ],
+            'task' => $taskData,
+        ]);
+    }
+
+    /**
+     * Update project task status from the admin task conversation view.
+     */
+    public function updateTaskStatus(Request $request, ProjectTask $task): RedirectResponse
+    {
+        $user = auth()->user();
+        if (!$user || (!$user->hasRole('Super Admin') && !$user->hasPermissionTo('edit-projects') && !$user->can('edit-projects') && !$user->hasRole('admin') && $user->type !== 'admin')) {
+            abort(403, 'Unauthorized to update task status.');
+        }
+
+        $validated = $request->validate([
+            'status' => 'required|in:todo,in_progress,in_review,completed,cancelled',
+        ]);
+
+        $updateData = ['status' => $validated['status']];
+        if ($validated['status'] === 'completed' && $task->status !== 'completed') {
+            $updateData['completed_at'] = now();
+        } elseif ($validated['status'] !== 'completed') {
+            $updateData['completed_at'] = null;
+        }
+
+        $task->update($updateData);
+
+        return redirect()->back()->with('success', 'Task status updated successfully.');
     }
 }

@@ -132,8 +132,8 @@ export default function ClientPortalInvoiceShow({
         return cleanDate;
     };
 
-    const formatCurrency = (val: number | string) => {
-        const num = typeof val === 'string' ? parseFloat(val) : val;
+    const formatCurrency = (val: number | string | null | undefined) => {
+        const num = typeof val === 'string' ? parseFloat(val) : (val ?? 0);
         return (num || 0).toLocaleString('en-US', {
             style: 'currency',
             currency: invoice.currency_code || client.currency || 'USD',
@@ -342,42 +342,57 @@ export default function ClientPortalInvoiceShow({
                     </div>
 
                     {/* Line Items Table */}
-                    <div className="overflow-x-auto">
-                        <table className="w-full text-left text-xs text-slate-700 dark:text-slate-300">
-                            <thead className="bg-slate-50 dark:bg-slate-800/60 border-b border-slate-200/80 dark:border-slate-800 uppercase tracking-wider text-[10px] font-bold text-slate-400">
-                                <tr>
-                                    <th className="px-4 py-3">#</th>
-                                    <th className="px-4 py-3">Description</th>
-                                    <th className="px-4 py-3 text-right">Amount</th>
-                                    <th className="px-4 py-3 text-right">Remaining Cost</th>
-                                </tr>
-                            </thead>
-                            <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                                {invoice.items && invoice.items.length > 0 ? (
-                                    invoice.items.map((item, idx) => (
-                                        <tr key={item.id || idx}>
-                                            <td className="px-4 py-3.5 text-slate-400 font-bold">{idx + 1}</td>
-                                            <td className="px-4 py-3.5 font-bold text-slate-900 dark:text-white">
-                                                {item.description}
-                                            </td>
-                                            <td className="px-4 py-3.5 text-right font-extrabold text-slate-900 dark:text-white">
-                                                {formatCurrency(item.amount)}
-                                            </td>
-                                            <td className="px-4 py-3.5 text-right font-semibold text-slate-600 dark:text-slate-400">
-                                                {formatCurrency(item.remaining_cost ?? 0)}
-                                            </td>
+                    {(() => {
+                        const hasAnyRemainingCost = Boolean(invoice.items?.some((item) => Number(item.remaining_cost) > 0));
+                        return (
+                            <div className="overflow-x-auto">
+                                <table className="w-full text-left text-xs text-slate-700 dark:text-slate-300">
+                                    <thead className="bg-slate-50 dark:bg-slate-800/60 border-b border-slate-200/80 dark:border-slate-800 uppercase tracking-wider text-[10px] font-bold text-slate-400">
+                                        <tr>
+                                            <th className="px-4 py-3">#</th>
+                                            <th className="px-4 py-3">Description</th>
+                                            <th className="px-4 py-3 text-right">Amount</th>
+                                            {hasAnyRemainingCost && (
+                                                <th className="px-4 py-3 text-right">Remaining Balance</th>
+                                            )}
                                         </tr>
-                                    ))
-                                ) : (
-                                    <tr>
-                                        <td colSpan={4} className="px-4 py-6 text-center text-slate-400 italic">
-                                            No line items attached.
-                                        </td>
-                                    </tr>
-                                )}
-                            </tbody>
-                        </table>
-                    </div>
+                                    </thead>
+                                    <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                                        {invoice.items && invoice.items.length > 0 ? (
+                                            invoice.items.map((item, idx) => (
+                                                <tr key={item.id || idx}>
+                                                    <td className="px-4 py-3.5 text-slate-400 font-bold">{idx + 1}</td>
+                                                    <td className="px-4 py-3.5 font-bold text-slate-900 dark:text-white">
+                                                        {item.description}
+                                                    </td>
+                                                    <td className="px-4 py-3.5 text-right font-extrabold text-slate-900 dark:text-white">
+                                                        {formatCurrency(item.amount)}
+                                                    </td>
+                                                    {hasAnyRemainingCost && (
+                                                        <td className="px-4 py-3.5 text-right font-semibold">
+                                                            {Number(item.remaining_cost) > 0 ? (
+                                                                <span className="text-slate-700 dark:text-slate-300 font-mono font-bold">
+                                                                    {formatCurrency(item.remaining_cost!)}
+                                                                </span>
+                                                            ) : (
+                                                                <span className="text-slate-400 dark:text-slate-500 font-mono font-normal">—</span>
+                                                            )}
+                                                        </td>
+                                                    )}
+                                                </tr>
+                                            ))
+                                        ) : (
+                                            <tr>
+                                                <td colSpan={hasAnyRemainingCost ? 4 : 3} className="px-4 py-6 text-center text-slate-400 italic">
+                                                    No line items attached.
+                                                </td>
+                                            </tr>
+                                        )}
+                                    </tbody>
+                                </table>
+                            </div>
+                        );
+                    })()}
 
                     {/* Totals Summary */}
                     <div className="flex flex-col sm:flex-row justify-between items-start sm:items-end gap-6 pt-4 border-t border-slate-100 dark:border-slate-800">

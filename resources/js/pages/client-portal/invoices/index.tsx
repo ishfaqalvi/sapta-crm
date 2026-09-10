@@ -156,7 +156,7 @@ export default function ClientPortalInvoicesIndex({
         });
     };
 
-    const formatCurrency = (val: number | string, currencyCode: string = client.currency || 'USD') => {
+    const formatCurrency = (val: number | string | null | undefined, currencyCode: string = client.currency || 'USD') => {
         const num = Number(val) || 0;
         return `${currencyCode} ${num.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
     };
@@ -523,30 +523,47 @@ export default function ClientPortalInvoicesIndex({
                         {/* Line Items Table */}
                         <div className="border border-slate-200/80 dark:border-slate-800 rounded-xl overflow-hidden w-full min-w-0">
                             <div className="w-full overflow-x-auto scrollbar-thin">
-                                <table className="w-full min-w-[400px] text-left border-collapse text-xs">
-                                    <thead>
-                                        <tr className="bg-slate-50 dark:bg-slate-800/60 border-b border-slate-200/80 dark:border-slate-800 text-[10px] font-extrabold uppercase text-slate-400 tracking-wider">
-                                            <th className="p-3">Description</th>
-                                            <th className="p-3 text-right">Amount</th>
-                                            <th className="p-3 text-right">Remaining Cost</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60 font-medium">
-                                        {viewingInvoice.items && viewingInvoice.items.length > 0 ? (
-                                            viewingInvoice.items.map((item, idx) => (
-                                                <tr key={item.id || idx}>
-                                                    <td className="p-3 font-semibold text-slate-800 dark:text-slate-200">{item.description}</td>
-                                                    <td className="p-3 text-right font-bold text-slate-900 dark:text-white font-mono">{formatCurrency(item.amount ?? (Number(item.quantity || 1) * Number(item.unit_price || 0)), viewingInvoice.currency_code)}</td>
-                                                    <td className="p-3 text-right text-slate-600 dark:text-slate-400 font-mono">{formatCurrency(item.remaining_cost || 0, viewingInvoice.currency_code)}</td>
+                                {(() => {
+                                    const hasAnyRemainingCost = Boolean(viewingInvoice.items?.some((item) => Number(item.remaining_cost) > 0));
+                                    return (
+                                        <table className="w-full min-w-[400px] text-left border-collapse text-xs">
+                                            <thead>
+                                                <tr className="bg-slate-50 dark:bg-slate-800/60 border-b border-slate-200/80 dark:border-slate-800 text-[10px] font-extrabold uppercase text-slate-400 tracking-wider">
+                                                    <th className="p-3">Description</th>
+                                                    <th className="p-3 text-right">Amount</th>
+                                                    {hasAnyRemainingCost && (
+                                                        <th className="p-3 text-right">Remaining Balance</th>
+                                                    )}
                                                 </tr>
-                                            ))
-                                        ) : (
-                                            <tr>
-                                                <td colSpan={3} className="p-4 text-center text-slate-400 italic">No line items.</td>
-                                            </tr>
-                                        )}
-                                    </tbody>
-                                </table>
+                                            </thead>
+                                            <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60 font-medium">
+                                                {viewingInvoice.items && viewingInvoice.items.length > 0 ? (
+                                                    viewingInvoice.items.map((item, idx) => (
+                                                        <tr key={item.id || idx}>
+                                                            <td className="p-3 font-semibold text-slate-800 dark:text-slate-200">{item.description}</td>
+                                                            <td className="p-3 text-right font-bold text-slate-900 dark:text-white font-mono">{formatCurrency(item.amount ?? (Number(item.quantity || 1) * Number(item.unit_price || 0)), viewingInvoice.currency_code)}</td>
+                                                            {hasAnyRemainingCost && (
+                                                                <td className="p-3 text-right font-mono">
+                                                                    {Number(item.remaining_cost) > 0 ? (
+                                                                        <span className="font-bold text-slate-700 dark:text-slate-300">
+                                                                            {formatCurrency(item.remaining_cost, viewingInvoice.currency_code)}
+                                                                        </span>
+                                                                    ) : (
+                                                                        <span className="text-slate-400 dark:text-slate-500 font-normal">—</span>
+                                                                    )}
+                                                                </td>
+                                                            )}
+                                                        </tr>
+                                                    ))
+                                                ) : (
+                                                    <tr>
+                                                        <td colSpan={hasAnyRemainingCost ? 3 : 2} className="p-4 text-center text-slate-400 italic">No line items.</td>
+                                                    </tr>
+                                                )}
+                                            </tbody>
+                                        </table>
+                                    );
+                                })()}
                             </div>
                         </div>
 

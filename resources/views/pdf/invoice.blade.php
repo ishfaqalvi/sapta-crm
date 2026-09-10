@@ -355,13 +355,24 @@
         </tr>
     </table>
 
+    @php
+        $hasRemainingCost = $invoice->items->contains(function($item) {
+            return ($item->remaining_cost ?? 0) > 0;
+        });
+    @endphp
+
     <!-- Line Items Table -->
     <table class="items-table">
         <thead>
             <tr>
-                <th class="text-left" style="width: 50%; text-align: left;">Item Description</th>
-                <th class="text-right" style="width: 25%; text-align: right;">Amount</th>
-                <th class="text-right" style="width: 25%; text-align: right;">Remaining Cost</th>
+                @if($hasRemainingCost)
+                    <th class="text-left" style="width: 52%; text-align: left;">Item Description</th>
+                    <th class="text-right" style="width: 24%; text-align: right;">Amount</th>
+                    <th class="text-right" style="width: 24%; text-align: right;">Remaining Balance</th>
+                @else
+                    <th class="text-left" style="width: 75%; text-align: left;">Item Description</th>
+                    <th class="text-right" style="width: 25%; text-align: right;">Amount</th>
+                @endif
             </tr>
         </thead>
         <tbody>
@@ -371,9 +382,15 @@
                     <td class="text-right" style="font-weight: 800; color: #0f172a; text-align: right;">
                         {{ $invoice->currency_code }} {{ number_format($item->amount, 2) }}
                     </td>
-                    <td class="text-right" style="font-weight: 600; color: #64748b; text-align: right;">
-                        {{ $invoice->currency_code }} {{ number_format($item->remaining_cost ?? 0, 2) }}
-                    </td>
+                    @if($hasRemainingCost)
+                        <td class="text-right" style="font-weight: 600; text-align: right;">
+                            @if(($item->remaining_cost ?? 0) > 0)
+                                <span style="color: #475569; font-weight: 700;">{{ $invoice->currency_code }} {{ number_format($item->remaining_cost, 2) }}</span>
+                            @else
+                                <span style="color: #94a3b8; font-weight: 400;">&mdash;</span>
+                            @endif
+                        </td>
+                    @endif
                 </tr>
             @endforeach
         </tbody>

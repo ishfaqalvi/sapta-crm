@@ -1019,4 +1019,90 @@ class ClientServiceController extends Controller
 
         return redirect()->back()->with('success', 'Service task deleted successfully.');
     }
+
+    /**
+     * Display dedicated task conversation and discussion page within client portal service hierarchy.
+     */
+    public function taskConversation(Request $request, ClientService $service, ServiceTask $task): Response
+    {
+        $this->authorizePermission('view-client-portal-services', null, $service);
+
+        $clientId = $this->getClientId($service->client_id);
+        $user = Auth::user();
+        $isSuperAdmin = $user && ($user->type === 'admin' || $user->hasRole('Super Admin') || $user->hasRole('admin'));
+
+        if ($service->client_id !== $clientId && !$isSuperAdmin) {
+            abort(403, 'Unauthorized access to service');
+        }
+
+        if ($task->client_service_id !== $service->id) {
+            abort(404, 'Task not found on this service');
+        }
+
+        if ($user && $user->type === 'employee') {
+            $employee = $user->employee ?: Employee::where('user_id', $user->id)->first();
+            $employeeId = $employee ? $employee->id : 0;
+            if ($task->assigned_employee_id !== $employeeId && !$isSuperAdmin) {
+                abort(403, 'Unauthorized access: this task is not assigned to you.');
+            }
+        }
+
+        $client = $this->getClientModel($service->client_id);
+
+        $task->load([
+            'assignedEmployee:id,name,employee_code,avatar,email,designation_id,department_id',
+            'assignedEmployee.designation:id,name',
+            'assignedEmployee.department:id,name',
+            'messages' => function ($q) {
+                $q->with('user:id,name,email,avatar,type,employee_id')->orderBy('created_at', 'asc');
+            },
+        ]);
+
+        $service->load([
+            'client:id,name,company_name,client_code,currency,status',
+            'category:id,name',
+        ]);
+
+        $taskData = [
+            'id' => $task->id,
+            'task_title' => $task->task_title,
+            'priority' => $task->priority,
+            'status' => $task->status,
+            'start_date' => $task->start_date ? $task->start_date->toDateString() : null,
+            'due_date' => $task->due_date ? $task->due_date->toDateString() : null,
+            'completed_at' => $task->completed_at ? $task->completed_at->toISOString() : null,
+            'created_at' => $task->created_at ? $task->created_at->toISOString() : null,
+            'description' => $task->description,
+            'attachment' => $task->attachment,
+            'attachment_name' => $task->attachment_name,
+            'source_type' => 'service',
+            'source_id' => $service->id,
+            'source_title' => $service->service_name,
+            'source_url' => "/client-portal/services/{$service->id}?tab=tasks",
+            'from' => "/client-portal/services/{$service->id}?tab=tasks",
+            'assigned_employee' => $task->assignedEmployee ? [
+                'id' => $task->assignedEmployee->id,
+                'name' => $task->assignedEmployee->name,
+                'employee_code' => $task->assignedEmployee->employee_code,
+                'avatar' => $task->assignedEmployee->avatar,
+                'email' => $task->assignedEmployee->email ?? null,
+                'designation' => $task->assignedEmployee->designation?->name,
+                'department' => $task->assignedEmployee->department?->name,
+            ] : null,
+            'messages' => $task->messages,
+        ];
+
+        return Inertia::render('client-portal/services/task-conversation', [
+            'client' => $client,
+            'service' => [
+                'id' => $service->id,
+                'service_name' => $service->service_name,
+                'service_code' => $service->service_code ?? 'SRV-' . str_pad((string) $service->id, 4, '0', STR_PAD_LEFT),
+                'status' => $service->status,
+                'client' => $service->client,
+                'category' => $service->category,
+            ],
+            'task' => $taskData,
+        ]);
+    }
 }

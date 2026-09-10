@@ -494,6 +494,91 @@ class ProjectController extends Controller
         return redirect()->back()->with('success', 'Task status updated.');
     }
 
+    /**
+     * Display dedicated task conversation and discussion page within client portal project hierarchy.
+     */
+    public function taskConversation(Request $request, WebsiteProject $project, ProjectTask $task): Response
+    {
+        $this->authorizePermission('view-client-portal-projects', $project);
+
+        $clientId = $this->getClientId($project->client_id);
+        $user = Auth::user();
+        $isSuperAdmin = $user && ($user->type === 'admin' || $user->hasRole('Super Admin') || $user->hasRole('admin'));
+
+        if ($project->client_id !== $clientId && !$isSuperAdmin) {
+            abort(403, 'Unauthorized access to project');
+        }
+
+        if ($task->website_project_id !== $project->id) {
+            abort(404, 'Task not found on this project');
+        }
+
+        if ($user && $user->type === 'employee') {
+            $employee = $user->employee ?: Employee::where('user_id', $user->id)->first();
+            $employeeId = $employee ? $employee->id : 0;
+            if ($task->assigned_employee_id !== $employeeId && !$isSuperAdmin) {
+                abort(403, 'Unauthorized access: this task is not assigned to you.');
+            }
+        }
+
+        $client = $this->getClientModel($project->client_id);
+
+        $task->load([
+            'assignedEmployee:id,name,employee_code,avatar,email,designation_id,department_id',
+            'assignedEmployee.designation:id,name',
+            'assignedEmployee.department:id,name',
+            'messages' => function ($q) {
+                $q->with('user:id,name,email,avatar,type,employee_id')->orderBy('created_at', 'asc');
+            },
+        ]);
+
+        $project->load([
+            'client:id,name,company_name,client_code,currency,status',
+            'category:id,name',
+        ]);
+
+        $taskData = [
+            'id' => $task->id,
+            'task_title' => $task->task_title,
+            'priority' => $task->priority,
+            'status' => $task->status,
+            'start_date' => $task->start_date ? $task->start_date->toDateString() : null,
+            'due_date' => $task->due_date ? $task->due_date->toDateString() : null,
+            'completed_at' => $task->completed_at ? $task->completed_at->toISOString() : null,
+            'created_at' => $task->created_at ? $task->created_at->toISOString() : null,
+            'description' => $task->description,
+            'attachment' => $task->attachment,
+            'attachment_name' => $task->attachment_name,
+            'source_type' => 'project',
+            'source_id' => $project->id,
+            'source_title' => $project->project_name,
+            'source_url' => "/client-portal/projects/{$project->id}?tab=tasks",
+            'from' => "/client-portal/projects/{$project->id}?tab=tasks",
+            'assigned_employee' => $task->assignedEmployee ? [
+                'id' => $task->assignedEmployee->id,
+                'name' => $task->assignedEmployee->name,
+                'employee_code' => $task->assignedEmployee->employee_code,
+                'avatar' => $task->assignedEmployee->avatar,
+                'email' => $task->assignedEmployee->email ?? null,
+                'designation' => $task->assignedEmployee->designation?->name,
+                'department' => $task->assignedEmployee->department?->name,
+            ] : null,
+            'messages' => $task->messages,
+        ];
+
+        return Inertia::render('client-portal/projects/task-conversation', [
+            'client' => $client,
+            'project' => [
+                'id' => $project->id,
+                'project_name' => $project->project_name,
+                'project_code' => $project->project_code ?? 'PRJ-' . str_pad((string) $project->id, 4, '0', STR_PAD_LEFT),
+                'status' => $project->status,
+                'client' => $project->client,
+            ],
+            'task' => $taskData,
+        ]);
+    }
+
     public function destroyTask(ProjectTask $task): RedirectResponse
     {
         $this->authorizePermission('delete-client-portal-project-tasks');

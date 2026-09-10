@@ -133,7 +133,7 @@ export default function EditClientInvoice({
     // Custom Item Form State (for modal)
     const [customDescription, setCustomDescription] = useState('');
     const [customAmount, setCustomAmount] = useState('');
-    const [customRemainingCost, setCustomRemainingCost] = useState('0');
+    const [customRemainingCost, setCustomRemainingCost] = useState('');
     const [customError, setCustomError] = useState('');
 
     // Pending Items Filter & Search State
@@ -265,7 +265,7 @@ export default function EditClientInvoice({
         setEditingItemIndex(null);
         setCustomDescription('');
         setCustomAmount('');
-        setCustomRemainingCost('0');
+        setCustomRemainingCost('');
         setCustomError('');
         setIsCustomItemModalOpen(true);
     };
@@ -278,7 +278,7 @@ export default function EditClientInvoice({
         setEditingItemIndex(index);
         setCustomDescription(target.description);
         setCustomAmount(String(target.amount ?? target.unit_price ?? ''));
-        setCustomRemainingCost(String(target.remaining_cost ?? '0'));
+        setCustomRemainingCost(target.remaining_cost && Number(target.remaining_cost) > 0 ? String(target.remaining_cost) : '');
         setCustomError('');
         setIsCustomItemModalOpen(true);
     };
@@ -295,7 +295,7 @@ export default function EditClientInvoice({
             setCustomError('Please enter a valid amount.');
             return;
         }
-        const rem = parseFloat(customRemainingCost);
+        const rem = customRemainingCost.trim() ? parseFloat(customRemainingCost) : 0;
         const remainingVal = isNaN(rem) || rem < 0 ? 0 : rem;
 
         const currentItems = form.data.items || [];
@@ -537,7 +537,7 @@ export default function EditClientInvoice({
                                                 <th className="pb-3 px-2 w-10 text-center">#</th>
                                                 <th className="pb-3 px-3">Description</th>
                                                 <th className="pb-3 px-3 w-32 text-right">Amount</th>
-                                                <th className="pb-3 px-3 w-32 text-right">Remaining Cost</th>
+                                                <th className="pb-3 px-3 w-32 text-right">Remaining Balance</th>
                                                 <th className="pb-3 px-2 w-20 text-center">Actions</th>
                                             </tr>
                                         </thead>
@@ -574,8 +574,14 @@ export default function EditClientInvoice({
                                                         </td>
 
                                                         {/* Remaining Cost */}
-                                                        <td className="py-3 px-3 text-right font-mono font-semibold text-slate-600 dark:text-slate-400 text-xs">
-                                                            {formatCurrency(Number(item.remaining_cost) || 0)}
+                                                        <td className="py-3 px-3 text-right font-mono text-xs">
+                                                            {Number(item.remaining_cost) > 0 ? (
+                                                                <span className="font-bold text-slate-700 dark:text-slate-300">
+                                                                    {formatCurrency(Number(item.remaining_cost))}
+                                                                </span>
+                                                            ) : (
+                                                                <span className="text-slate-400 dark:text-slate-500 font-normal">—</span>
+                                                            )}
                                                         </td>
 
                                                         {/* Actions */}
@@ -943,7 +949,7 @@ export default function EditClientInvoice({
                                                 <div className="font-black font-mono text-xs text-slate-900 dark:text-white">
                                                     {formatCurrency(item.amount)}
                                                 </div>
-                                                {item.remaining_cost !== undefined && (
+                                                {item.remaining_cost !== undefined && Number(item.remaining_cost) > 0 && (
                                                     <span className="text-[10px] text-slate-500 dark:text-slate-400 font-mono block">
                                                         Rem: {formatCurrency(item.remaining_cost)}
                                                     </span>
@@ -1076,7 +1082,7 @@ export default function EditClientInvoice({
 
                                 <div className="space-y-1.5">
                                     <Label htmlFor="custom_remaining" className="text-xs font-bold text-slate-700 dark:text-slate-300">
-                                        Remaining Cost ({clientCurrency})
+                                        Remaining Balance ({clientCurrency})
                                     </Label>
                                     <Input
                                         id="custom_remaining"
@@ -1085,7 +1091,7 @@ export default function EditClientInvoice({
                                         step="0.01"
                                         value={customRemainingCost}
                                         onChange={(e) => setCustomRemainingCost(e.target.value)}
-                                        placeholder="0.00"
+                                        placeholder="Optional (leave empty if N/A)"
                                         className="h-11 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 text-xs font-mono font-bold text-right"
                                     />
                                 </div>

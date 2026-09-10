@@ -17,7 +17,10 @@ use App\Models\MonthlyPayroll;
 use App\Models\ProjectPayment;
 use App\Models\ProjectTask;
 use App\Models\ServicePayment;
+use App\Models\ServiceTask;
 use App\Models\Task;
+use App\Models\TaskMessage;
+use App\Models\User;
 use App\Models\WebsiteProject;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
@@ -36,6 +39,11 @@ class DashboardController extends Controller
         $user = Auth::user();
         if (!$user) {
             abort(401, 'Unauthenticated');
+        }
+
+        // If user is an employee, route directly to dedicated Employee Dashboard
+        if ($user->type === 'employee' || ($user->employee_id && !$user->hasRole('admin') && !$user->hasRole('Super Admin') && $user->type !== 'admin')) {
+            return $this->employeeDashboard($request, $user);
         }
 
         $isSuperAdmin = $user->type === 'admin'
@@ -73,6 +81,12 @@ class DashboardController extends Controller
                 'projectStatus' => ['in_progress' => 0, 'planning' => 0, 'completed' => 0, 'on_hold' => 0],
                 'taskStatus' => ['completed' => 0, 'in_progress' => 0, 'in_review' => 0, 'pending' => 0, 'urgent' => 0],
                 'currencyBreakdown' => [],
+                'categoryBreakdown' => [
+                    'project' => ['total' => 0, 'paid' => 0, 'pending' => 0, 'count' => 0],
+                    'service' => ['total' => 0, 'paid' => 0, 'pending' => 0, 'count' => 0],
+                    'domain' => ['total' => 0, 'paid' => 0, 'pending' => 0, 'count' => 0],
+                    'hosting' => ['total' => 0, 'paid' => 0, 'pending' => 0, 'count' => 0],
+                ],
                 'recentInvoices' => [],
                 'recentProjects' => [],
                 'urgentTasks' => [],
@@ -368,11 +382,539 @@ class DashboardController extends Controller
             'projectStatus' => $projectStatusCounts,
             'taskStatus' => $taskStatusCounts,
             'currencyBreakdown' => $currencyBreakdown,
+            'categoryBreakdown' => $this->calculateCategoryBreakdown($canViewBudget),
             'recentInvoices' => $recentInvoices,
             'recentProjects' => $recentProjects,
             'urgentTasks' => $urgentTasks,
             'expiringAssets' => $expiringAssets,
             'recentCashflow' => $recentCashflow,
+        ]);
+    }
+
+    /**
+     * Calculate category-wise financial and statistical breakdown consistent with projects and services.
+     */
+    protected function calculateCategoryBreakdown(bool $includeFinancials = true): array
+    {
+        // 1. Projects (Matches Project Budget, Cleared Payments, and Pending Balance)
+        $projects = WebsiteProject::with('payments')->get();
+        $projectCount = (int) $projects->count();
+        $projectTotal = 0.0;
+        $projectPaid = 0.0;
+        $projectPending = 0.0;
+
+        if ($includeFinancials) {
+            $projectTotal = (float) $projects->sum('total_budget_pkr');
+            $projectPaid = (float) $projects->sum(function ($p) {
+                return $p->payments
+                    ->filter(fn($pay) => in_array(strtolower(trim((string)$pay->status)), ['paid', 'completed', 'settled']))
+                    ->sum('amount_pkr');
+            });
+            $projectPending = max(0.0, $projectTotal - $projectPaid);
+        }
+
+        // 2. Services
+        $services = ClientService::with('payments')->get();
+        $serviceCount = (int) $services->count();
+        $serviceTotal = 0.0;
+        $servicePaid = 0.0;
+        $servicePending = 0.0;
+
+        if ($includeFinancials) {
+            $servicePayments = ServicePayment::all();
+            if ($servicePayments->count() > 0) {
+                $serviceTotal = (float) $servicePayments->sum(function ($s) {
+                    $status = strtolower(trim((string)$s->status));
+                    $rate = (float) ($s->exchange_rate ?: 1);
+                    return in_array($status, ['paid', 'completed', 'settled']) && (float) $s->amount_paid > 0
+                        ? (float) ($s->amount_paid_pkr ?: ($s->amount_paid * $rate))
+                        : ((float) $s->amount_due > 0 ? (float) ($s->amount_due * $rate) : 0.0);
+                });
+                $servicePaid = (float) $servicePayments->filter(fn($s) => in_array(strtolower(trim((string)$s->status)), ['paid', 'completed', 'settled']))->sum(function ($s) {
+                    $rate = (float) ($s->exchange_rate ?: 1);
+                    return (float) ($s->amount_paid_pkr ?: ($s->amount_paid * $rate));
+                });
+                $servicePending = (float) $servicePayments->filter(fn($s) => in_array(strtolower(trim((string)$s->status)), ['pending', 'due', 'due_pending', 'unpaid', 'overdue']))->sum(function ($s) {
+                    $rate = (float) ($s->exchange_rate ?: 1);
+                    return (float) ($s->amount_due * $rate);
+                });
+            } else {
+                $serviceTotal = (float) $services->sum('monthly_fee_pkr');
+                $servicePaid = 0.0;
+                $servicePending = $serviceTotal;
+            }
+        }
+
+        // 3. Domains
+        $domains = ClientDomain::all();
+        $domainCount = (int) $domains->count();
+        $domainTotal = 0.0;
+        $domainPaid = 0.0;
+        $domainPending = 0.0;
+
+        if ($includeFinancials) {
+            $domainPayments = DomainPayment::all();
+            if ($domainPayments->count() > 0) {
+                $domainTotal = (float) $domainPayments->sum('amount');
+                $domainPaid = (float) $domainPayments->filter(fn($d) => in_array(strtolower(trim((string)$d->status)), ['paid', 'completed', 'settled']))->sum('amount');
+                $domainPending = (float) $domainPayments->filter(fn($d) => in_array(strtolower(trim((string)$d->status)), ['pending', 'due', 'due_pending', 'unpaid', 'overdue']))->sum('amount');
+            } else {
+                $domainTotal = (float) $domains->sum('client_price_pkr');
+                $domainPaid = 0.0;
+                $domainPending = $domainTotal;
+            }
+        }
+
+        // 4. Hostings
+        $hostings = ClientHosting::all();
+        $hostingCount = (int) $hostings->count();
+        $hostingTotal = 0.0;
+        $hostingPaid = 0.0;
+        $hostingPending = 0.0;
+
+        if ($includeFinancials) {
+            $hostingPayments = HostingPayment::all();
+            if ($hostingPayments->count() > 0) {
+                $hostingTotal = (float) $hostingPayments->sum('amount');
+                $hostingPaid = (float) $hostingPayments->filter(fn($h) => in_array(strtolower(trim((string)$h->status)), ['paid', 'completed', 'settled']))->sum('amount');
+                $hostingPending = (float) $hostingPayments->filter(fn($h) => in_array(strtolower(trim((string)$h->status)), ['pending', 'due', 'due_pending', 'unpaid', 'overdue']))->sum('amount');
+            } else {
+                $hostingTotal = (float) $hostings->sum('client_price_pkr');
+                $hostingPaid = 0.0;
+                $hostingPending = $hostingTotal;
+            }
+        }
+
+        return [
+            'project' => [
+                'total' => round($projectTotal, 2),
+                'paid' => round($projectPaid, 2),
+                'pending' => round($projectPending, 2),
+                'count' => $projectCount,
+            ],
+            'service' => [
+                'total' => round($serviceTotal, 2),
+                'paid' => round($servicePaid, 2),
+                'pending' => round($servicePending, 2),
+                'count' => $serviceCount,
+            ],
+            'domain' => [
+                'total' => round($domainTotal, 2),
+                'paid' => round($domainPaid, 2),
+                'pending' => round($domainPending, 2),
+                'count' => $domainCount,
+            ],
+            'hosting' => [
+                'total' => round($hostingTotal, 2),
+                'paid' => round($hostingPaid, 2),
+                'pending' => round($hostingPending, 2),
+                'count' => $hostingCount,
+            ],
+        ];
+    }
+
+    /**
+     * Dedicated Employee Dashboard route for previewing or explicit navigation.
+     */
+    public function employeeDashboardView(Request $request): Response
+    {
+        $user = Auth::user();
+        if (!$user) {
+            abort(401, 'Unauthenticated');
+        }
+
+        $targetUser = $user;
+        if ($request->filled('employee_id') && ($user->type === 'admin' || $user->hasRole('admin') || $user->hasRole('Super Admin'))) {
+            $employee = Employee::with('user')->find((int) $request->query('employee_id'));
+            if ($employee && $employee->user) {
+                $targetUser = $employee->user;
+            } elseif ($employee) {
+                $targetUser = new User([
+                    'id' => $employee->user_id ?: 0,
+                    'name' => $employee->name,
+                    'email' => $employee->email,
+                    'type' => 'employee',
+                    'employee_id' => $employee->id,
+                ]);
+                $targetUser->setRelation('employee', $employee);
+            }
+        }
+
+        return $this->employeeDashboard($request, $targetUser);
+    }
+
+    /**
+     * Display the Personalized Employee Dashboard strictly scoped to the employee's assigned tasks and permitted menus.
+     */
+    protected function employeeDashboard(Request $request, User $user): Response
+    {
+        // 1. Resolve Employee Model
+        $employee = $user->employee ?: Employee::with(['department', 'designation'])->where('user_id', $user->id)->first();
+        if (!$employee && $user->employee_id) {
+            $employee = Employee::with(['department', 'designation'])->find($user->employee_id);
+        }
+        $employeeId = $employee ? $employee->id : 0;
+
+        $today = Carbon::today();
+        $in3Days = Carbon::today()->addDays(3);
+
+        // 2. Base Queries for Tasks Assigned to THIS Employee
+        $projectTasksQuery = ProjectTask::withCount('messages')->with([
+            'websiteProject.client:id,name,company_name,client_code,currency',
+            'websiteProject.category:id,name',
+        ])->where('assigned_employee_id', $employeeId);
+
+        $serviceTasksQuery = ServiceTask::withCount('messages')->with([
+            'service.client:id,name,company_name,client_code,currency',
+            'service.category:id,name',
+        ])->where('assigned_employee_id', $employeeId);
+
+        $generalTasksQuery = Task::withCount('messages')->with([
+            'taskCategory:id,name',
+        ])->where('assigned_employee_id', $employeeId);
+
+        // 3. Task Status Counters
+        $totalProjectTasks = (clone $projectTasksQuery)->count();
+        $totalServiceTasks = (clone $serviceTasksQuery)->count();
+        $totalGeneralTasks = (clone $generalTasksQuery)->count();
+        $totalTasks = $totalProjectTasks + $totalServiceTasks + $totalGeneralTasks;
+
+        $todoTasks = (clone $projectTasksQuery)->where('status', 'todo')->count()
+            + (clone $serviceTasksQuery)->where('status', 'todo')->count()
+            + (clone $generalTasksQuery)->where('status', 'todo')->count();
+
+        $inProgressTasks = (clone $projectTasksQuery)->where('status', 'in_progress')->count()
+            + (clone $serviceTasksQuery)->where('status', 'in_progress')->count()
+            + (clone $generalTasksQuery)->where('status', 'in_progress')->count();
+
+        $inReviewTasks = (clone $projectTasksQuery)->where('status', 'in_review')->count()
+            + (clone $serviceTasksQuery)->where('status', 'in_review')->count()
+            + (clone $generalTasksQuery)->where('status', 'in_review')->count();
+
+        $completedTasks = (clone $projectTasksQuery)->where('status', 'completed')->count()
+            + (clone $serviceTasksQuery)->where('status', 'completed')->count()
+            + (clone $generalTasksQuery)->where('status', 'completed')->count();
+
+        $urgentTasks = (clone $projectTasksQuery)->where('priority', 'urgent')->where('status', '!=', 'completed')->count()
+            + (clone $serviceTasksQuery)->where('priority', 'urgent')->where('status', '!=', 'completed')->count()
+            + (clone $generalTasksQuery)->where('priority', 'urgent')->where('status', '!=', 'completed')->count();
+
+        $overdueTasks = (clone $projectTasksQuery)->where('status', '!=', 'completed')->whereNotNull('due_date')->whereDate('due_date', '<', $today)->count()
+            + (clone $serviceTasksQuery)->where('status', '!=', 'completed')->whereNotNull('due_date')->whereDate('due_date', '<', $today)->count()
+            + (clone $generalTasksQuery)->where('status', '!=', 'completed')->whereNotNull('due_date')->whereDate('due_date', '<', $today)->count();
+
+        $dueSoonTasks = (clone $projectTasksQuery)->where('status', '!=', 'completed')->whereNotNull('due_date')->whereDate('due_date', '>=', $today)->whereDate('due_date', '<=', $in3Days)->count()
+            + (clone $serviceTasksQuery)->where('status', '!=', 'completed')->whereNotNull('due_date')->whereDate('due_date', '>=', $today)->whereDate('due_date', '<=', $in3Days)->count()
+            + (clone $generalTasksQuery)->where('status', '!=', 'completed')->whereNotNull('due_date')->whereDate('due_date', '>=', $today)->whereDate('due_date', '<=', $in3Days)->count();
+
+        $completionRate = $totalTasks > 0 ? round(($completedTasks / $totalTasks) * 100, 1) : 0;
+
+        $kpis = [
+            'total_tasks' => $totalTasks,
+            'todo_tasks' => $todoTasks,
+            'in_progress_tasks' => $inProgressTasks,
+            'in_review_tasks' => $inReviewTasks,
+            'completed_tasks' => $completedTasks,
+            'urgent_tasks' => $urgentTasks,
+            'overdue_tasks' => $overdueTasks,
+            'due_soon_tasks' => $dueSoonTasks,
+            'completion_rate' => $completionRate,
+        ];
+
+        // 4. Transform and Combine Tasks for Dashboard Feeds
+        $pTasks = (clone $projectTasksQuery)->get()->map(function ($t) use ($today) {
+            $isOverdue = $t->status !== 'completed' && $t->due_date && Carbon::parse($t->due_date)->lt($today);
+            return [
+                'id' => $t->id,
+                'source_type' => 'project',
+                'task_title' => $t->task_title,
+                'priority' => $t->priority,
+                'status' => $t->status,
+                'start_date' => $t->start_date ? Carbon::parse($t->start_date)->format('Y-m-d') : null,
+                'due_date' => $t->due_date ? Carbon::parse($t->due_date)->format('Y-m-d') : null,
+                'is_overdue' => $isOverdue,
+                'messages_count' => $t->messages_count ?? 0,
+                'website_project' => $t->websiteProject ? [
+                    'id' => $t->websiteProject->id,
+                    'project_name' => $t->websiteProject->project_name,
+                    'client' => $t->websiteProject->client ? [
+                        'name' => $t->websiteProject->client->name,
+                        'company_name' => $t->websiteProject->client->company_name,
+                    ] : null,
+                ] : null,
+                'created_at' => $t->created_at->toISOString(),
+            ];
+        });
+
+        $sTasks = (clone $serviceTasksQuery)->get()->map(function ($t) use ($today) {
+            $isOverdue = $t->status !== 'completed' && $t->due_date && Carbon::parse($t->due_date)->lt($today);
+            return [
+                'id' => $t->id,
+                'source_type' => 'service',
+                'task_title' => $t->task_title,
+                'priority' => $t->priority,
+                'status' => $t->status,
+                'start_date' => $t->start_date ? Carbon::parse($t->start_date)->format('Y-m-d') : null,
+                'due_date' => $t->due_date ? Carbon::parse($t->due_date)->format('Y-m-d') : null,
+                'is_overdue' => $isOverdue,
+                'messages_count' => $t->messages_count ?? 0,
+                'service' => $t->service ? [
+                    'id' => $t->service->id,
+                    'service_name' => $t->service->service_name,
+                    'client' => $t->service->client ? [
+                        'name' => $t->service->client->name,
+                        'company_name' => $t->service->client->company_name,
+                    ] : null,
+                ] : null,
+                'created_at' => $t->created_at->toISOString(),
+            ];
+        });
+
+        $gTasks = (clone $generalTasksQuery)->get()->map(function ($t) use ($today) {
+            $isOverdue = $t->status !== 'completed' && $t->due_date && Carbon::parse($t->due_date)->lt($today);
+            return [
+                'id' => $t->id,
+                'source_type' => 'general',
+                'task_code' => $t->task_code,
+                'task_title' => $t->task_title,
+                'priority' => $t->priority,
+                'status' => $t->status,
+                'start_date' => $t->start_date ? Carbon::parse($t->start_date)->format('Y-m-d') : null,
+                'due_date' => $t->due_date ? Carbon::parse($t->due_date)->format('Y-m-d') : null,
+                'is_overdue' => $isOverdue,
+                'messages_count' => $t->messages_count ?? 0,
+                'task_category' => $t->taskCategory ? ['name' => $t->taskCategory->name] : null,
+                'created_at' => $t->created_at->toISOString(),
+            ];
+        });
+
+        $allAssignedTasks = $pTasks->concat($sTasks)->concat($gTasks);
+
+        // Filter urgent tasks
+        $urgentTaskList = $allAssignedTasks->filter(function ($t) {
+            return ($t['priority'] === 'urgent' || $t['priority'] === 'high') && $t['status'] !== 'completed';
+        })->values()->take(6);
+
+        // Filter active tasks (todo or in_progress or in_review)
+        $activeTaskList = $allAssignedTasks->filter(function ($t) {
+            return $t['status'] !== 'completed';
+        })->sortBy('due_date')->values()->take(10);
+
+        // Recently completed tasks
+        $recentCompletedTaskList = $allAssignedTasks->filter(function ($t) {
+            return $t['status'] === 'completed';
+        })->sortByDesc('created_at')->values()->take(5);
+
+        // 5. Permitted Menus & Features ("My Workspace")
+        $permissions = $user->getAllPermissions()->pluck('name')->toArray();
+        $isSuper = $user->hasRole('Super Admin') || $user->hasRole('admin');
+
+        $hasPerm = function (string $perm) use ($permissions, $isSuper) {
+            return $isSuper || in_array($perm, $permissions);
+        };
+
+        $permittedWorkspace = [];
+
+        // Always available for employee
+        $permittedWorkspace[] = [
+            'id' => 'my-tasks',
+            'title' => 'My Assigned Tasks',
+            'description' => 'View, update status, and track all tasks assigned to you',
+            'url' => '/my-tasks',
+            'icon' => 'ListTodo',
+            'badge' => ($inProgressTasks + $todoTasks > 0) ? ($inProgressTasks + $todoTasks) . ' Active' : '0 Active',
+            'badge_color' => 'blue',
+        ];
+
+        if ($hasPerm('view-projects')) {
+            $assignedProjectIds = ProjectTask::where('assigned_employee_id', $employeeId)->pluck('website_project_id')->unique()->filter()->values();
+            $myProjectCount = $assignedProjectIds->count();
+            $permittedWorkspace[] = [
+                'id' => 'projects',
+                'title' => 'Projects Directory',
+                'description' => 'Browse and track web and software development projects',
+                'url' => '/projects',
+                'icon' => 'FolderKanban',
+                'badge' => $myProjectCount . ' Assigned',
+                'badge_color' => 'indigo',
+            ];
+        }
+
+        if ($hasPerm('view-services')) {
+            $assignedServiceIds = ServiceTask::where('assigned_employee_id', $employeeId)->pluck('client_service_id')->unique()->filter()->values();
+            $myServiceCount = $assignedServiceIds->count();
+            $permittedWorkspace[] = [
+                'id' => 'services',
+                'title' => 'Services Directory',
+                'description' => 'Monthly retainers, marketing campaigns, and ongoing services',
+                'url' => '/services',
+                'icon' => 'Layers',
+                'badge' => $myServiceCount . ' Assigned',
+                'badge_color' => 'purple',
+            ];
+        }
+
+        if ($hasPerm('view-tasks')) {
+            $permittedWorkspace[] = [
+                'id' => 'general-tasks',
+                'title' => 'General Tasks',
+                'description' => 'Internal workspace tasks, todo lists, and team milestones',
+                'url' => '/tasks',
+                'icon' => 'CheckSquare',
+                'badge' => $totalGeneralTasks . ' Tasks',
+                'badge_color' => 'amber',
+            ];
+        }
+
+        if ($hasPerm('view-credentials')) {
+            $permittedWorkspace[] = [
+                'id' => 'credentials',
+                'title' => 'Credentials Vault',
+                'description' => 'Authorized access keys, server logins, and secure client credentials',
+                'url' => '/credentials',
+                'icon' => 'Key',
+                'badge' => 'Secure Vault',
+                'badge_color' => 'slate',
+            ];
+        }
+
+        if ($hasPerm('view-payroll')) {
+            $permittedWorkspace[] = [
+                'id' => 'payroll',
+                'title' => 'Monthly Payroll',
+                'description' => 'Access your monthly salary history, payslips, and records',
+                'url' => '/payroll',
+                'icon' => 'Banknote',
+                'badge' => 'Salary History',
+                'badge_color' => 'emerald',
+            ];
+        }
+
+        if ($hasPerm('view-clients')) {
+            $permittedWorkspace[] = [
+                'id' => 'clients',
+                'title' => 'Client Hub',
+                'description' => 'Directory of enterprise and regional client accounts',
+                'url' => '/clients',
+                'icon' => 'Building',
+                'badge' => 'Directory',
+                'badge_color' => 'cyan',
+            ];
+        }
+
+        if ($hasPerm('view-reports')) {
+            $permittedWorkspace[] = [
+                'id' => 'reports',
+                'title' => 'Reports & Analytics',
+                'description' => 'Authorized general reports and operational logs',
+                'url' => '/reports',
+                'icon' => 'LineChart',
+                'badge' => 'Analytics',
+                'badge_color' => 'rose',
+            ];
+        }
+
+        // 6. Assigned Projects (Where employee has tasks)
+        $assignedProjects = [];
+        if ($hasPerm('view-projects')) {
+            $assignedProjectIds = ProjectTask::where('assigned_employee_id', $employeeId)->pluck('website_project_id')->unique()->filter()->values();
+            if ($assignedProjectIds->isNotEmpty()) {
+                $assignedProjects = WebsiteProject::with(['client:id,name,company_name,currency', 'category:id,name'])
+                    ->whereIn('id', $assignedProjectIds)
+                    ->get()
+                    ->map(function ($p) use ($employeeId) {
+                        $myProjectTasks = ProjectTask::where('website_project_id', $p->id)
+                            ->where('assigned_employee_id', $employeeId);
+                        $total = (clone $myProjectTasks)->count();
+                        $completed = (clone $myProjectTasks)->where('status', 'completed')->count();
+                        return [
+                            'id' => $p->id,
+                            'project_name' => $p->project_name,
+                            'client_name' => $p->client ? ($p->client->company_name ?: $p->client->name) : 'N/A',
+                            'category_name' => $p->category->name ?? 'General',
+                            'status' => $p->status,
+                            'deadline' => $p->deadline ? Carbon::parse($p->deadline)->format('Y-m-d') : null,
+                            'progress_percentage' => $p->progress_percentage ?? 0,
+                            'my_tasks_total' => $total,
+                            'my_tasks_completed' => $completed,
+                        ];
+                    })->values();
+            }
+        }
+
+        // 7. Recent Task Discussions / Messages
+        $recentTaskMessages = TaskMessage::with('user:id,name,avatar')
+            ->where(function ($q) use ($employeeId) {
+                $q->where(function ($sub) use ($employeeId) {
+                    $sub->where('taskable_type', ProjectTask::class)
+                        ->whereIn('taskable_id', ProjectTask::where('assigned_employee_id', $employeeId)->pluck('id'));
+                })->orWhere(function ($sub) use ($employeeId) {
+                    $sub->where('taskable_type', ServiceTask::class)
+                        ->whereIn('taskable_id', ServiceTask::where('assigned_employee_id', $employeeId)->pluck('id'));
+                })->orWhere(function ($sub) use ($employeeId) {
+                    $sub->where('taskable_type', Task::class)
+                        ->whereIn('taskable_id', Task::where('assigned_employee_id', $employeeId)->pluck('id'));
+                });
+            })
+            ->latest()
+            ->take(6)
+            ->get()
+            ->map(function ($m) {
+                $taskTitle = 'Assigned Task';
+                $taskType = 'general';
+                if ($m->taskable) {
+                    $taskTitle = $m->taskable->task_title ?? 'Task';
+                    if ($m->taskable_type === ProjectTask::class) {
+                        $taskType = 'project';
+                    } elseif ($m->taskable_type === ServiceTask::class) {
+                        $taskType = 'service';
+                    }
+                }
+                return [
+                    'id' => $m->id,
+                    'task_id' => $m->taskable_id,
+                    'task_type' => $taskType,
+                    'task_title' => $taskTitle,
+                    'user_name' => $m->user ? $m->user->name : 'Colleague',
+                    'user_avatar' => $m->user ? $m->user->avatar : null,
+                    'message' => $m->message,
+                    'created_at' => $m->created_at->diffForHumans(),
+                ];
+            });
+
+        return Inertia::render('employee/dashboard', [
+            'employee' => $employee ? [
+                'id' => $employee->id,
+                'name' => $employee->name,
+                'employee_code' => $employee->employee_code,
+                'email' => $employee->email,
+                'phone' => $employee->phone,
+                'avatar' => $employee->avatar,
+                'joining_date' => $employee->joining_date ? Carbon::parse($employee->joining_date)->format('d M, Y') : null,
+                'allowed_paid_leaves' => $employee->allowed_paid_leaves,
+                'department_name' => $employee->department->name ?? 'N/A',
+                'designation_name' => $employee->designation->name ?? 'N/A',
+                'status' => $employee->status,
+            ] : [
+                'id' => 0,
+                'name' => $user->name,
+                'employee_code' => 'EMP',
+                'email' => $user->email,
+                'phone' => null,
+                'avatar' => $user->avatar,
+                'joining_date' => null,
+                'allowed_paid_leaves' => 0,
+                'department_name' => 'Operations',
+                'designation_name' => 'Team Member',
+                'status' => 'active',
+            ],
+            'kpis' => $kpis,
+            'urgentTasks' => $urgentTaskList,
+            'activeTasks' => $activeTaskList,
+            'recentCompletedTasks' => $recentCompletedTaskList,
+            'permittedWorkspace' => $permittedWorkspace,
+            'assignedProjects' => $assignedProjects,
+            'recentTaskMessages' => $recentTaskMessages,
         ]);
     }
 }

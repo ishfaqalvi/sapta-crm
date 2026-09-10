@@ -302,28 +302,22 @@
     <!-- KPI Summary Grid -->
     <table class="kpi-container">
         <tr>
-            <td style="width: 25%; padding-right: 4px;">
+            <td style="width: 33.33%; padding-right: 4px;">
                 <div class="kpi-box kpi-total">
                     <div class="kpi-label">Total Billed ({{ $kpi['count_all'] }})</div>
                     <div class="kpi-value">{{ number_format($kpi['total_billed'], 2) }}</div>
                 </div>
             </td>
-            <td style="width: 25%; padding: 0 2px;">
+            <td style="width: 33.33%; padding: 0 2px;">
                 <div class="kpi-box kpi-paid">
                     <div class="kpi-label">Settled / Paid ({{ $kpi['count_paid'] }})</div>
                     <div class="kpi-value">{{ number_format($kpi['total_paid'], 2) }}</div>
                 </div>
             </td>
-            <td style="width: 25%; padding: 0 2px;">
+            <td style="width: 33.33%; padding-left: 4px;">
                 <div class="kpi-box kpi-pending">
-                    <div class="kpi-label">Pending / Due ({{ $kpi['count_pending'] }})</div>
-                    <div class="kpi-value">{{ number_format($kpi['total_pending'], 2) }}</div>
-                </div>
-            </td>
-            <td style="width: 25%; padding-left: 4px;">
-                <div class="kpi-box kpi-overdue">
-                    <div class="kpi-label">Overdue ({{ $kpi['count_overdue'] }})</div>
-                    <div class="kpi-value">{{ number_format($kpi['total_overdue'], 2) }}</div>
+                    <div class="kpi-label">Unpaid / Due ({{ $kpi['count_unpaid'] ?? ($kpi['count_pending'] + $kpi['count_overdue']) }})</div>
+                    <div class="kpi-value">{{ number_format($kpi['total_unpaid'] ?? ($kpi['total_pending'] + $kpi['total_overdue']), 2) }}</div>
                 </div>
             </td>
         </tr>
@@ -384,15 +378,37 @@
         </tbody>
         @if(count($transactions) > 0)
             <tfoot>
+                <tr style="background-color: #f0fdf4; font-weight: 700; border-top: 1.5px solid #bbf7d0;">
+                    <td colspan="4" style="padding: 5px 7px; text-transform: uppercase; font-size: 8px; color: #166534;">
+                        Paid Total ({{ $kpi['count_paid'] }} settled records):
+                    </td>
+                    <td style="padding: 5px 7px; font-size: 8px; color: #166534; font-weight: 800;">
+                        Paid
+                    </td>
+                    <td style="padding: 5px 7px; text-align: right; font-size: 9px; color: #166534; font-weight: 800;">
+                        {{ number_format($kpi['total_paid'], 2) }}
+                    </td>
+                </tr>
+                <tr style="background-color: #fffbeb; font-weight: 700; border-top: 1px solid #fef3c7;">
+                    <td colspan="4" style="padding: 5px 7px; text-transform: uppercase; font-size: 8px; color: #92400e;">
+                        Unpaid Total ({{ $kpi['count_unpaid'] ?? ($kpi['count_pending'] + $kpi['count_overdue']) }} pending/due records):
+                    </td>
+                    <td style="padding: 5px 7px; font-size: 8px; color: #92400e; font-weight: 800;">
+                        Unpaid
+                    </td>
+                    <td style="padding: 5px 7px; text-align: right; font-size: 9px; color: #92400e; font-weight: 800;">
+                        {{ number_format($kpi['total_unpaid'] ?? ($kpi['total_pending'] + $kpi['total_overdue']), 2) }}
+                    </td>
+                </tr>
                 <tr style="background-color: #f1f5f9; font-weight: 800; border-top: 2px solid #cbd5e1;">
-                    <td colspan="4" style="padding: 7px; text-transform: uppercase; font-size: 8px;">
-                        Filtered Summary ({{ count($transactions) }} records)
+                    <td colspan="4" style="padding: 6px 7px; text-transform: uppercase; font-size: 8.5px; color: #1e293b;">
+                        Overall Filtered Total ({{ count($transactions) }} records):
                     </td>
-                    <td style="padding: 7px; font-size: 8px; color: #475569;">
-                        Settled: {{ $kpi['count_paid'] }} | Due: {{ $kpi['count_pending'] }}
+                    <td style="padding: 6px 7px; font-size: 8px; color: #475569;">
+                        All
                     </td>
-                    <td style="padding: 7px; text-align: right; font-size: 9.5px; color: #003796;">
-                        Total: {{ number_format($kpi['total_billed'], 2) }}
+                    <td style="padding: 6px 7px; text-align: right; font-size: 9.5px; color: #003796; font-weight: 900;">
+                        {{ number_format($kpi['total_billed'], 2) }}
                     </td>
                 </tr>
             </tfoot>

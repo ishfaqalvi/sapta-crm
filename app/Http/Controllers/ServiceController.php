@@ -5,6 +5,8 @@ namespace App\Http\Controllers;
 use App\Models\Client;
 use App\Models\ClientService;
 use App\Models\ServiceCategory;
+use App\Models\ServiceTask;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -207,5 +209,102 @@ class ServiceController extends Controller
                 'view_documents' => $canViewDocuments,
             ],
         ]);
+    }
+
+    /**
+     * Display dedicated service task conversation and details page within Admin Portal hierarchy.
+     */
+    public function taskConversation(Request $request, ClientService $service, ServiceTask $task): Response
+    {
+        $user = auth()->user();
+        if (!$user || (!$user->hasRole('Super Admin') && !$user->hasPermissionTo('view-services') && !$user->can('view-services') && !$user->hasRole('admin') && $user->type !== 'admin')) {
+            abort(403, 'Unauthorized. You do not have permission to view services.');
+        }
+
+        if ($task->client_service_id !== $service->id) {
+            abort(404, 'Task not found on this service');
+        }
+
+        $task->load([
+            'assignedEmployee:id,name,employee_code,avatar,email,designation_id,department_id',
+            'assignedEmployee.designation:id,name',
+            'assignedEmployee.department:id,name',
+            'messages' => function ($q) {
+                $q->with('user:id,name,email,avatar,type,employee_id')->orderBy('created_at', 'asc');
+            },
+        ]);
+
+        $service->load([
+            'client:id,name,company_name,client_code,currency,status',
+            'category:id,name',
+        ]);
+
+        $taskData = [
+            'id' => $task->id,
+            'task_title' => $task->task_title,
+            'priority' => $task->priority,
+            'status' => $task->status,
+            'start_date' => $task->start_date ? $task->start_date->toDateString() : null,
+            'due_date' => $task->due_date ? $task->due_date->toDateString() : null,
+            'completed_at' => $task->completed_at ? $task->completed_at->toISOString() : null,
+            'created_at' => $task->created_at ? $task->created_at->toISOString() : null,
+            'description' => $task->description ?? $task->task_description,
+            'attachment' => $task->attachment,
+            'attachment_name' => $task->attachment_name,
+            'source_type' => 'service',
+            'source_id' => $service->id,
+            'source_title' => $service->service_name,
+            'source_code' => $service->service_code ?? 'SRV-' . str_pad((string) $service->id, 4, '0', STR_PAD_LEFT),
+            'source_url' => "/services/{$service->id}?tab=tasks",
+            'from' => "/services/{$service->id}?tab=tasks",
+            'assigned_employee' => $task->assignedEmployee ? [
+                'id' => $task->assignedEmployee->id,
+                'name' => $task->assignedEmployee->name,
+                'employee_code' => $task->assignedEmployee->employee_code,
+                'avatar' => $task->assignedEmployee->avatar,
+                'email' => $task->assignedEmployee->email ?? null,
+                'designation' => $task->assignedEmployee->designation?->name,
+                'department' => $task->assignedEmployee->department?->name,
+            ] : null,
+            'messages' => $task->messages,
+        ];
+
+        return Inertia::render('services/task-conversation', [
+            'service' => [
+                'id' => $service->id,
+                'service_name' => $service->service_name,
+                'service_code' => $service->service_code ?? 'SRV-' . str_pad((string) $service->id, 4, '0', STR_PAD_LEFT),
+                'status' => $service->status,
+                'client' => $service->client,
+                'category' => $service->category,
+            ],
+            'task' => $taskData,
+        ]);
+    }
+
+    /**
+     * Update service task status from the admin task conversation view.
+     */
+    public function updateTaskStatus(Request $request, ServiceTask $task): RedirectResponse
+    {
+        $user = auth()->user();
+        if (!$user || (!$user->hasRole('Super Admin') && !$user->hasPermissionTo('edit-services') && !$user->can('edit-services') && !$user->hasRole('admin') && $user->type !== 'admin')) {
+            abort(403, 'Unauthorized to update task status.');
+        }
+
+        $validated = $request->validate([
+            'status' => 'required|in:todo,in_progress,in_review,completed,cancelled',
+        ]);
+
+        $updateData = ['status' => $validated['status']];
+        if ($validated['status'] === 'completed' && $task->status !== 'completed') {
+            $updateData['completed_at'] = now();
+        } elseif ($validated['status'] !== 'completed') {
+            $updateData['completed_at'] = null;
+        }
+
+        $task->update($updateData);
+
+        return redirect()->back()->with('success', 'Task status updated successfully.');
     }
 }

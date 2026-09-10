@@ -71,6 +71,7 @@ export interface TaskDetailPageData {
     source_id?: number | null;
     source_title?: string | null;
     source_url?: string | null;
+    from?: string | null;
     client?: {
         id?: number;
         name?: string;
@@ -104,6 +105,7 @@ export interface ClientPortalInfo {
 interface TaskShowPageProps {
     client?: ClientPortalInfo | null;
     task: TaskDetailPageData;
+    from?: string | null;
 }
 
 export default function TaskShowPage({ client, task }: TaskShowPageProps) {
@@ -401,9 +403,35 @@ export default function TaskShowPage({ client, task }: TaskShowPageProps) {
     const priorityBadge = getPriorityBadge(task.priority);
     const statusBadge = getStatusBadge(currentStatus);
 
-    const backUrl = isClientUser
-        ? (task.source_type === 'general' ? '/tasks' : (task.source_url || (task.source_type === 'service' ? '/client-portal/services' : '/client-portal/projects')))
-        : (task.source_type === 'project' ? (task.source_url || '/projects') : task.source_type === 'service' ? (task.source_url || '/services') : '/tasks');
+    const resolvedFrom = task.from || (typeof window !== 'undefined' ? new URLSearchParams(window.location.search).get('from') : null);
+
+    let backUrl = resolvedFrom;
+    let backLabel = 'Back';
+
+    if (!backUrl) {
+        if (task.source_type === 'project') {
+            backUrl = task.source_url || (isClientUser ? '/client-portal/projects' : '/projects');
+            backLabel = 'Back to Project Tasks';
+        } else if (task.source_type === 'service') {
+            backUrl = task.source_url || (isClientUser ? '/client-portal/services' : '/services');
+            backLabel = 'Back to Service Tasks';
+        } else {
+            backUrl = '/tasks';
+            backLabel = 'Back to General Tasks';
+        }
+    } else {
+        if (backUrl.includes('my-tasks')) {
+            backLabel = 'Back to My Tasks';
+        } else if (backUrl.includes('dashboard')) {
+            backLabel = 'Back to Dashboard';
+        } else if (task.source_type === 'project') {
+            backLabel = 'Back to Project Tasks';
+        } else if (task.source_type === 'service') {
+            backLabel = 'Back to Service Tasks';
+        } else {
+            backLabel = 'Back to Tasks';
+        }
+    }
 
     const PageContent = (
         <div className="p-2 sm:p-6 w-full space-y-6 bg-slate-50/50 dark:bg-slate-950">
@@ -437,13 +465,13 @@ export default function TaskShowPage({ client, task }: TaskShowPageProps) {
                         <span>Refresh</span>
                     </button>
 
-                    {task.source_url && (
+                    {task.source_url && backUrl !== task.source_url && (
                         <Link
                             href={task.source_url}
                             className="h-10 px-3 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 text-xs font-bold transition-all inline-flex items-center gap-2 cursor-pointer"
                         >
                             <ExternalLink className="size-3.5 text-blue-500" />
-                            <span>Open {task.source_type === 'service' ? 'Service' : (task.source_type === 'general' ? 'Tasks List' : 'Project')}</span>
+                            <span>Open {task.source_type === 'service' ? 'Service Workspace' : (task.source_type === 'general' ? 'Tasks List' : 'Project Workspace')}</span>
                         </Link>
                     )}
 
@@ -452,7 +480,7 @@ export default function TaskShowPage({ client, task }: TaskShowPageProps) {
                         className="h-10 px-3.5 rounded-xl bg-gradient-to-r from-[#003796] via-[#0052D4] to-[#1d4ed8] text-white text-xs font-bold hover:opacity-95 transition-all shadow-md shadow-blue-500/20 inline-flex items-center gap-2"
                     >
                         <ArrowLeft className="size-4" />
-                        <span>Back to Tasks</span>
+                        <span>{backLabel}</span>
                     </Link>
                 </div>
             </div>
@@ -540,9 +568,15 @@ export default function TaskShowPage({ client, task }: TaskShowPageProps) {
                                     </p>
                                 </div>
                             </div>
-                            <span className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/60 px-2.5 py-1 rounded-lg border border-emerald-200/60">
-                                Notifications Active
-                            </span>
+                            {task.assigned_employee ? (
+                                <span className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/60 px-2.5 py-1 rounded-lg border border-emerald-200/60">
+                                    Notifications Active
+                                </span>
+                            ) : (
+                                <span className="text-[10px] font-bold text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/60 px-2.5 py-1 rounded-lg border border-amber-200/60">
+                                    Pending Employee Assignment
+                                </span>
+                            )}
                         </div>
 
                         {/* Message Thread List */}
@@ -685,93 +719,107 @@ export default function TaskShowPage({ client, task }: TaskShowPageProps) {
                             <div ref={messagesEndRef} />
                         </div>
 
-                        {/* Reply Composer Form */}
-                        <form
-                            onSubmit={handleSendMessage}
-                            className="p-3.5 sm:p-4 border-t border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900"
-                        >
-                            <input
-                                ref={fileInputRef}
-                                type="file"
-                                className="hidden"
-                                onChange={(e) => {
-                                    if (e.target.files && e.target.files[0]) {
-                                        setSelectedFile(e.target.files[0]);
-                                    }
-                                }}
-                            />
-
-                            <div className="rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200/80 dark:border-slate-800 focus-within:ring-2 focus-within:ring-blue-500/20 focus-within:border-blue-500 transition-all p-3 space-y-2">
-                                {selectedFile && (
-                                    <div className="flex items-center justify-between gap-2 p-2 rounded-lg bg-blue-50/80 dark:bg-blue-950/60 border border-blue-200/60 dark:border-blue-900/60 text-xs">
-                                        <div className="flex items-center gap-2 min-w-0">
-                                            <Paperclip className="size-3.5 text-blue-600 shrink-0" />
-                                            <span className="font-bold text-slate-800 dark:text-slate-200 truncate">
-                                                {selectedFile.name}
-                                            </span>
-                                            <span className="text-[10px] text-slate-400">
-                                                ({(selectedFile.size / 1024).toFixed(1)} KB)
-                                            </span>
-                                        </div>
-                                        <button
-                                            type="button"
-                                            onClick={() => {
-                                                setSelectedFile(null);
-                                                if (fileInputRef.current) fileInputRef.current.value = '';
-                                            }}
-                                            className="p-1 text-slate-400 hover:text-rose-600 rounded-lg transition-colors cursor-pointer"
-                                        >
-                                            <X className="size-3.5" />
-                                        </button>
-                                    </div>
-                                )}
-
-                                <textarea
-                                    ref={textareaRef}
-                                    rows={3}
-                                    value={inputText}
-                                    onChange={(e) => setInputText(e.target.value)}
-                                    onKeyDown={(e) => {
-                                        if (e.key === 'Enter' && !e.shiftKey) {
-                                            e.preventDefault();
-                                            handleSendMessage();
+                        {/* Reply Composer Form / Unassigned Notice */}
+                        {task.assigned_employee ? (
+                            <form
+                                onSubmit={handleSendMessage}
+                                className="p-3.5 sm:p-4 border-t border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900"
+                            >
+                                <input
+                                    ref={fileInputRef}
+                                    type="file"
+                                    className="hidden"
+                                    onChange={(e) => {
+                                        if (e.target.files && e.target.files[0]) {
+                                            setSelectedFile(e.target.files[0]);
                                         }
                                     }}
-                                    placeholder="Type your message, query, or update... (Press Enter to send, Shift+Enter for new line)"
-                                    className="w-full px-2 py-1 bg-transparent border-0 text-xs sm:text-sm text-slate-800 dark:text-slate-200 placeholder:text-slate-400 focus:outline-none focus:ring-0 resize-none leading-relaxed"
                                 />
 
-                                <div className="flex items-center justify-between pt-2 border-t border-slate-200/60 dark:border-slate-800/80 gap-2">
-                                    <button
-                                        type="button"
-                                        onClick={() => fileInputRef.current?.click()}
-                                        className={`h-9 px-3.5 rounded-xl border text-xs font-semibold inline-flex items-center gap-1.5 transition-all cursor-pointer ${
-                                            selectedFile
-                                                ? 'bg-blue-50 text-blue-600 border-blue-300 dark:bg-blue-950/60 dark:border-blue-800'
-                                                : 'bg-white hover:bg-slate-100 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700 shadow-2xs'
-                                        }`}
-                                        title="Attach File (Images, PDFs, Documents up to 10MB)"
-                                    >
-                                        <Paperclip className="size-3.5" />
-                                        <span>{selectedFile ? 'Change File' : 'Attach File'}</span>
-                                    </button>
+                                <div className="rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200/80 dark:border-slate-800 focus-within:ring-2 focus-within:ring-blue-500/20 focus-within:border-blue-500 transition-all p-3 space-y-2">
+                                    {selectedFile && (
+                                        <div className="flex items-center justify-between gap-2 p-2 rounded-lg bg-blue-50/80 dark:bg-blue-950/60 border border-blue-200/60 dark:border-blue-900/60 text-xs">
+                                            <div className="flex items-center gap-2 min-w-0">
+                                                <Paperclip className="size-3.5 text-blue-600 shrink-0" />
+                                                <span className="font-bold text-slate-800 dark:text-slate-200 truncate">
+                                                    {selectedFile.name}
+                                                </span>
+                                                <span className="text-[10px] text-slate-400">
+                                                    ({(selectedFile.size / 1024).toFixed(1)} KB)
+                                                </span>
+                                            </div>
+                                            <button
+                                                type="button"
+                                                onClick={() => {
+                                                    setSelectedFile(null);
+                                                    if (fileInputRef.current) fileInputRef.current.value = '';
+                                                }}
+                                                className="p-1 text-slate-400 hover:text-rose-600 rounded-lg transition-colors cursor-pointer"
+                                            >
+                                                <X className="size-3.5" />
+                                            </button>
+                                        </div>
+                                    )}
 
-                                    <button
-                                        type="submit"
-                                        disabled={isSending || (!inputText.trim() && !selectedFile)}
-                                        className="h-9 px-5 rounded-xl bg-gradient-to-r from-[#003796] via-[#0052D4] to-[#1d4ed8] text-white text-xs font-bold shadow-md shadow-blue-600/20 hover:opacity-95 active:scale-[0.98] transition-all inline-flex items-center gap-2 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed shrink-0"
-                                        title="Send Message / Reply"
-                                    >
-                                        {isSending ? (
-                                            <Loader2 className="size-3.5 animate-spin" />
-                                        ) : (
-                                            <Send className="size-3.5" />
-                                        )}
-                                        <span>Send Reply</span>
-                                    </button>
+                                    <textarea
+                                        ref={textareaRef}
+                                        rows={3}
+                                        value={inputText}
+                                        onChange={(e) => setInputText(e.target.value)}
+                                        onKeyDown={(e) => {
+                                            if (e.key === 'Enter' && !e.shiftKey) {
+                                                e.preventDefault();
+                                                handleSendMessage();
+                                            }
+                                        }}
+                                        placeholder="Type your message, query, or update... (Press Enter to send, Shift+Enter for new line)"
+                                        className="w-full px-2 py-1 bg-transparent border-0 text-xs sm:text-sm text-slate-800 dark:text-slate-200 placeholder:text-slate-400 focus:outline-none focus:ring-0 resize-none leading-relaxed"
+                                    />
+
+                                    <div className="flex items-center justify-between pt-2 border-t border-slate-200/60 dark:border-slate-800/80 gap-2">
+                                        <button
+                                            type="button"
+                                            onClick={() => fileInputRef.current?.click()}
+                                            className={`h-9 px-3.5 rounded-xl border text-xs font-semibold inline-flex items-center gap-1.5 transition-all cursor-pointer ${
+                                                selectedFile
+                                                    ? 'bg-blue-50 text-blue-600 border-blue-300 dark:bg-blue-950/60 dark:border-blue-800'
+                                                    : 'bg-white hover:bg-slate-100 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700 shadow-2xs'
+                                            }`}
+                                            title="Attach File (Images, PDFs, Documents up to 10MB)"
+                                        >
+                                            <Paperclip className="size-3.5" />
+                                            <span>{selectedFile ? 'Change File' : 'Attach File'}</span>
+                                        </button>
+
+                                        <button
+                                            type="submit"
+                                            disabled={isSending || (!inputText.trim() && !selectedFile)}
+                                            className="h-9 px-5 rounded-xl bg-gradient-to-r from-[#003796] via-[#0052D4] to-[#1d4ed8] text-white text-xs font-bold shadow-md shadow-blue-600/20 hover:opacity-95 active:scale-[0.98] transition-all inline-flex items-center gap-2 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed shrink-0"
+                                            title="Send Message / Reply"
+                                        >
+                                            {isSending ? (
+                                                <Loader2 className="size-3.5 animate-spin" />
+                                            ) : (
+                                                <Send className="size-3.5" />
+                                            )}
+                                            <span>Send Reply</span>
+                                        </button>
+                                    </div>
+                                </div>
+                            </form>
+                        ) : (
+                            <div className="p-4 sm:p-5 border-t border-slate-100 dark:border-slate-800 bg-amber-50/60 dark:bg-amber-950/30 flex items-start gap-3">
+                                <AlertCircle className="size-5 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
+                                <div>
+                                    <h5 className="text-xs font-extrabold text-amber-900 dark:text-amber-200">
+                                        Task Not Assigned to an Employee
+                                    </h5>
+                                    <p className="text-[11px] text-amber-700 dark:text-amber-300/80 mt-0.5 leading-relaxed">
+                                        This task must be assigned to an employee before conversation and team queries can take place.
+                                    </p>
                                 </div>
                             </div>
-                        </form>
+                        )}
                     </div>
                 </div>
 

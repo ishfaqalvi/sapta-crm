@@ -45,14 +45,19 @@ class TaskMessageController extends Controller
         $sourceId = null;
         $sourceUrl = null;
         $isClient = $user->type === 'client';
+        $from = $request->query('from');
+        if ($from && (!str_starts_with($from, '/') || str_starts_with($from, '//'))) {
+            $from = null;
+        }
 
-        if ($type === 'project' && $task->websiteProject) {
-            $sourceTitle = $task->websiteProject->project_name ?? 'Website Project';
-            $sourceId = $task->websiteProject->id;
+        if ($type === 'project') {
+            $sourceTitle = $task->websiteProject ? ($task->websiteProject->project_name ?? 'Website Project') : 'Project Task';
+            $sourceId = $task->websiteProject?->id ?? $task->website_project_id;
             $sourceUrl = $isClient
-                ? "/client-portal/projects/{$task->websiteProject->id}?tab=tasks"
-                : "/projects/{$task->websiteProject->id}";
-            if ($task->websiteProject->client) {
+                ? ($sourceId ? "/client-portal/projects/{$sourceId}?tab=tasks" : "/client-portal/projects")
+                : ($sourceId ? "/projects/{$sourceId}?tab=tasks" : "/projects");
+
+            if ($task->websiteProject && $task->websiteProject->client) {
                 $clientData = [
                     'id' => $task->websiteProject->client->id,
                     'name' => $task->websiteProject->client->name,
@@ -61,13 +66,14 @@ class TaskMessageController extends Controller
                     'currency' => $task->websiteProject->client->currency ?? 'USD',
                 ];
             }
-        } elseif ($type === 'service' && $task->service) {
-            $sourceTitle = $task->service->service_name ?? 'Client Service';
-            $sourceId = $task->service->id;
+        } elseif ($type === 'service') {
+            $sourceTitle = $task->service ? ($task->service->service_name ?? 'Client Service') : 'Service Task';
+            $sourceId = $task->service?->id ?? $task->client_service_id;
             $sourceUrl = $isClient
-                ? "/client-portal/services/{$task->service->id}?tab=tasks"
-                : "/services/{$task->service->id}";
-            if ($task->service->client) {
+                ? ($sourceId ? "/client-portal/services/{$sourceId}?tab=tasks" : "/client-portal/services")
+                : ($sourceId ? "/services/{$sourceId}?tab=tasks" : "/services");
+
+            if ($task->service && $task->service->client) {
                 $clientData = [
                     'id' => $task->service->client->id,
                     'name' => $task->service->client->name,
@@ -98,6 +104,7 @@ class TaskMessageController extends Controller
             'source_id' => $sourceId,
             'source_title' => $sourceTitle,
             'source_url' => $sourceUrl,
+            'from' => $from,
             'client' => $clientData,
             'assigned_employee' => $task->assignedEmployee ? [
                 'id' => $task->assignedEmployee->id,
@@ -114,6 +121,7 @@ class TaskMessageController extends Controller
         return Inertia::render('tasks/show', [
             'client' => $clientData,
             'task' => $taskData,
+            'from' => $from,
         ]);
     }
 
@@ -246,6 +254,12 @@ class TaskMessageController extends Controller
             return response()->json(['error' => 'Task not found'], 404);
         }
 
+        if (!$task->assigned_employee_id) {
+            return response()->json([
+                'error' => 'This task must be assigned to an employee before starting a discussion or sending queries.',
+            ], 422);
+        }
+
         $attachmentPath = null;
         $attachmentName = null;
 
@@ -324,7 +338,7 @@ class TaskMessageController extends Controller
     }
 
     /**
-     * Dispatch notification to Admin(s) if Employee sent, or to Employee if Admin sent.
+     * Dispatch notification to Admin(s) if Employee/Client sent, or to Employee/Client if Admin sent.
      */
     protected function dispatchTaskMessageNotification(User $sender, $task, string $type, TaskMessage $message): void
     {
@@ -336,10 +350,30 @@ class TaskMessageController extends Controller
         };
 
         $isSenderAdmin = ($sender->type === 'admin' || $sender->hasRole('Super Admin') || $sender->hasRole('admin'));
-        $actionUrl = "/tasks/detail/{$type}/{$task->id}";
+        $isSenderClient = ($sender->type === 'client');
+
+        $projectId = $task->website_project_id ?? $task->websiteProject?->id;
+        $serviceId = $task->client_service_id ?? $task->service?->id;
+
+        // Dedicated URL for Admin recipients
+        $adminActionUrl = match ($type) {
+            'project' => $projectId ? "/projects/{$projectId}/tasks/{$task->id}/conversation" : "/projects",
+            'service' => $serviceId ? "/services/{$serviceId}/tasks/{$task->id}/conversation" : "/services",
+            default => "/my-tasks/task/general/{$task->id}/conversation",
+        };
+
+        // Dedicated URL for Employee recipients
+        $employeeActionUrl = "/my-tasks/task/{$type}/{$task->id}/conversation";
+
+        // Dedicated URL for Client Portal recipients
+        $clientActionUrl = match ($type) {
+            'project' => $projectId ? "/client-portal/projects/{$projectId}/tasks/{$task->id}/conversation" : "/client-portal/projects",
+            'service' => $serviceId ? "/client-portal/services/{$serviceId}/tasks/{$task->id}/conversation" : "/client-portal/services",
+            default => "/tasks",
+        };
 
         if (!$isSenderAdmin) {
-            // Sender is Employee -> Notify All Admins
+            // Sender is Employee or Client -> Notify All Admins
             $admins = User::where('type', 'admin')
                 ->orWhereHas('roles', fn($q) => $q->whereIn('name', ['Super Admin', 'Admin', 'super admin', 'admin']))
                 ->get();
@@ -348,10 +382,10 @@ class TaskMessageController extends Controller
                 if ($admin->id !== $sender->id) {
                     $admin->notify(new CrmNotification(
                         "Task Query: {$taskTitle}",
-                        "{$sender->name} posted a query on {$sourceTitle} task '{$taskTitle}': " . Str::limit($message->message, 100),
+                        "{$sender->name} posted a message on {$sourceTitle} task '{$taskTitle}': " . Str::limit($message->message, 100),
                         'task_message',
                         'info',
-                        $actionUrl,
+                        $adminActionUrl,
                         [
                             'task_id' => $task->id,
                             'task_type' => $type,
@@ -362,30 +396,58 @@ class TaskMessageController extends Controller
                     ));
                 }
             }
-        } else {
-            // Sender is Admin -> Notify Assigned Employee
-            $employeeId = $task->assigned_employee_id;
-            if ($employeeId) {
-                $employeeUser = User::where('employee_id', $employeeId)
-                    ->orWhereHas('employee', fn($q) => $q->where('id', $employeeId))
-                    ->first();
+        }
 
-                if ($employeeUser && $employeeUser->id !== $sender->id) {
-                    $employeeUser->notify(new CrmNotification(
-                        "Admin Reply on Task: {$taskTitle}",
-                        "{$sender->name} replied on {$sourceTitle} task '{$taskTitle}': " . Str::limit($message->message, 100),
-                        'task_message',
-                        'info',
-                        $actionUrl,
-                        [
-                            'task_id' => $task->id,
-                            'task_type' => $type,
-                            'task_title' => $taskTitle,
-                            'sender_id' => $sender->id,
-                            'sender_name' => $sender->name,
-                        ]
-                    ));
-                }
+        // Notify Assigned Employee (if sender is not the assigned employee)
+        $employeeId = $task->assigned_employee_id;
+        if ($employeeId) {
+            $employeeUser = User::where('employee_id', $employeeId)
+                ->orWhereHas('employee', fn($q) => $q->where('id', $employeeId))
+                ->first();
+
+            if ($employeeUser && $employeeUser->id !== $sender->id) {
+                $employeeUser->notify(new CrmNotification(
+                    "New Reply on Task: {$taskTitle}",
+                    "{$sender->name} replied on {$sourceTitle} task '{$taskTitle}': " . Str::limit($message->message, 100),
+                    'task_message',
+                    'info',
+                    $employeeActionUrl,
+                    [
+                        'task_id' => $task->id,
+                        'task_type' => $type,
+                        'task_title' => $taskTitle,
+                        'sender_id' => $sender->id,
+                        'sender_name' => $sender->name,
+                    ]
+                ));
+            }
+        }
+
+        // Notify Client Portal User (if project/service belongs to a client and sender is not the client)
+        $clientModel = null;
+        if ($type === 'project' && $task->websiteProject) {
+            $clientModel = $task->websiteProject->client;
+        } elseif ($type === 'service' && $task->service) {
+            $clientModel = $task->service->client;
+        }
+
+        if ($clientModel && !$isSenderClient) {
+            $clientUser = $clientModel->user ?: User::where('type', 'client')->where('client_id', $clientModel->id)->first();
+            if ($clientUser && $clientUser->id !== $sender->id) {
+                $clientUser->notify(new CrmNotification(
+                    "New Reply on Task: {$taskTitle}",
+                    "{$sender->name} replied on {$sourceTitle} task '{$taskTitle}': " . Str::limit($message->message, 100),
+                    'task_message',
+                    'info',
+                    $clientActionUrl,
+                    [
+                        'task_id' => $task->id,
+                        'task_type' => $type,
+                        'task_title' => $taskTitle,
+                        'sender_id' => $sender->id,
+                        'sender_name' => $sender->name,
+                    ]
+                ));
             }
         }
     }

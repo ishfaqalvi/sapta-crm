@@ -13,6 +13,7 @@ import {
     PenTool,
     Plus,
     Receipt,
+    RotateCcw,
     Save,
     Sparkles,
     Trash2,
@@ -51,6 +52,9 @@ interface QuotationCreateProps {
         address: string;
         email: string;
         whatsapp: string;
+        authorized_by_text?: string;
+        logo_url?: string | null;
+        signature_url?: string | null;
     };
 }
 
@@ -73,6 +77,13 @@ export default function QuotationCreate({
         },
     ]);
 
+    const initialCompanyName = defaultCompany?.name || client.company_name || client.name || '';
+    const initialCompanyPhone = defaultCompany?.phone || client.phone || client.mobile || '';
+    const initialCompanyAddress = defaultCompany?.address || '';
+    const initialCompanyEmail = defaultCompany?.email || client.email || '';
+    const initialCompanyWhatsapp = defaultCompany?.whatsapp || client.mobile || client.phone || '';
+    const initialAuthorizedBy = defaultCompany?.authorized_by_text || (client.company_name ? `For, ${client.company_name}` : (client.name ? `For, ${client.name}` : ''));
+
     const { data, setData, post, processing, errors } = useForm<{
         [key: string]: any;
         quotation_number: string;
@@ -89,6 +100,10 @@ export default function QuotationCreate({
         company_address: string;
         company_email: string;
         company_whatsapp: string;
+        existing_company_logo: string;
+        company_logo: File | null;
+        existing_signature_image: string;
+        signature_image: File | null;
         greeting: string;
         opening_text: string;
         closing_text: string;
@@ -100,11 +115,9 @@ export default function QuotationCreate({
         notes: string;
         terms: string;
         authorized_by_text: string;
-        signature_image: File | null;
-        company_logo: File | null;
         items: ItemRow[];
     }>({
-        quotation_number: '',
+        quotation_number: suggestedNumber || '',
         currency_code: clientCurrency,
         exchange_rate_to_pkr: 1,
         subject: '',
@@ -113,29 +126,78 @@ export default function QuotationCreate({
         customer_email: '',
         customer_phone: '',
         customer_address: '',
-        company_name: '',
-        company_phone: '',
-        company_address: '',
-        company_email: '',
-        company_whatsapp: '',
+        company_name: initialCompanyName,
+        company_phone: initialCompanyPhone,
+        company_address: initialCompanyAddress,
+        company_email: initialCompanyEmail,
+        company_whatsapp: initialCompanyWhatsapp,
+        existing_company_logo: defaultCompany?.logo_url || '',
         company_logo: null,
+        existing_signature_image: defaultCompany?.signature_url || '',
         signature_image: null,
-        greeting: '',
-        opening_text: '',
-        closing_text: '',
+        greeting: 'Dear Sir/Madam,',
+        opening_text: 'In case of any queries, kindly get in touch with us. Thank you and I look forward to hearing from you.',
+        closing_text: "We thank you for providing us with an opportunity to submit our quotation for shifting your home furniture and appliances. Our prices are reasonable; our staff are professional and well trained to handle all your stuff and equipment's with care. Please find the complete details and expenses to cover this operation.",
         tax_rate: '',
         discount: '',
-        date: '',
+        date: new Date().toISOString().split('T')[0],
         expiry_date: '',
         status: 'draft',
         notes: '',
         terms: '',
-        authorized_by_text: '',
+        authorized_by_text: initialAuthorizedBy,
         items: items,
     });
 
-    const [showCompanyDetails, setShowCompanyDetails] = useState(false);
-    const [signaturePreview, setSignaturePreview] = useState<string | null>(null);
+    const [showCompanyDetails, setShowCompanyDetails] = useState(true);
+    const [companyLogoPreview, setCompanyLogoPreview] = useState<string | null>(defaultCompany?.logo_url || null);
+    const [signaturePreview, setSignaturePreview] = useState<string | null>(defaultCompany?.signature_url || null);
+
+    const handleResetCompanyToProfile = () => {
+        setData((prev) => ({
+            ...prev,
+            company_name: initialCompanyName,
+            company_phone: initialCompanyPhone,
+            company_address: initialCompanyAddress,
+            company_email: initialCompanyEmail,
+            company_whatsapp: initialCompanyWhatsapp,
+            authorized_by_text: initialAuthorizedBy,
+            existing_company_logo: defaultCompany?.logo_url || '',
+            company_logo: null,
+            existing_signature_image: defaultCompany?.signature_url || '',
+            signature_image: null,
+        }));
+        setCompanyLogoPreview(defaultCompany?.logo_url || null);
+        setSignaturePreview(defaultCompany?.signature_url || null);
+    };
+
+    const handleLogoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        if (e.target.files && e.target.files[0]) {
+            const file = e.target.files[0];
+            setData('company_logo', file);
+            setCompanyLogoPreview(URL.createObjectURL(file));
+        }
+    };
+
+    const handleRemoveLogo = () => {
+        setData('company_logo', null);
+        setData('existing_company_logo', '');
+        setCompanyLogoPreview(null);
+    };
+
+    const handleSignatureChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        if (e.target.files && e.target.files[0]) {
+            const file = e.target.files[0];
+            setData('signature_image', file);
+            setSignaturePreview(URL.createObjectURL(file));
+        }
+    };
+
+    const handleRemoveSignature = () => {
+        setData('signature_image', null);
+        setData('existing_signature_image', '');
+        setSignaturePreview(null);
+    };
 
     useEffect(() => {
         setData('items', items);
@@ -162,14 +224,6 @@ export default function QuotationCreate({
     const removeItemRow = (index: number) => {
         if (items.length <= 1) return;
         setItems((prev) => prev.filter((_, i) => i !== index));
-    };
-
-    const handleSignatureChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-        if (e.target.files && e.target.files[0]) {
-            const file = e.target.files[0];
-            setData('signature_image', file);
-            setSignaturePreview(URL.createObjectURL(file));
-        }
     };
 
     // Calculations
@@ -410,7 +464,7 @@ export default function QuotationCreate({
                             {/* Client Name */}
                             <div>
                                 <label className="block text-xs font-extrabold text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-2">
-                                    Recipient Name <span className="text-rose-500">*</span>
+                                    Recipient Name <span className="text-slate-400 font-normal normal-case">(Optional)</span>
                                 </label>
                                 <input
                                     type="text"
@@ -422,7 +476,6 @@ export default function QuotationCreate({
                                             ? 'border-rose-500 focus:ring-2 focus:ring-rose-500/20'
                                             : 'border-slate-200 dark:border-slate-800 focus:border-blue-600 focus:ring-2 focus:ring-blue-600/10'
                                     }`}
-                                    required
                                 />
                                 {errors.customer_name && (
                                     <p className="text-rose-500 text-xs font-medium mt-1.5">{errors.customer_name}</p>
@@ -496,32 +549,48 @@ export default function QuotationCreate({
 
                     {/* Section 3: Company Header & Salutations */}
                     <div className="space-y-4">
-                        <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800">
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-100 dark:border-slate-800">
                             <div className="flex items-center gap-2.5">
                                 <div className="p-2 rounded-xl bg-amber-50 dark:bg-amber-950/60 text-amber-600 dark:text-amber-400">
                                     <Building2 className="size-4" />
                                 </div>
                                 <div>
-                                    <h2 className="text-sm font-extrabold text-slate-900 dark:text-white">
-                                        Company Header & Salutations
-                                    </h2>
+                                    <div className="flex items-center gap-2 flex-wrap">
+                                        <h2 className="text-sm font-extrabold text-slate-900 dark:text-white">
+                                            Provider / Company Details
+                                        </h2>
+                                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400 border border-emerald-200/60 dark:border-emerald-800/40">
+                                            <CheckCircle2 className="size-3" /> Auto-populated from profile
+                                        </span>
+                                    </div>
                                     <p className="text-[11px] text-slate-400 font-medium">
-                                        Company details, greeting, and inquiry statement (optional custom override)
+                                        Company provider details loaded from profile. You can edit any value or reset to profile defaults anytime.
                                     </p>
                                 </div>
                             </div>
 
-                            <button
-                                type="button"
-                                onClick={() => setShowCompanyDetails(!showCompanyDetails)}
-                                className="text-xs text-blue-600 dark:text-blue-400 font-bold hover:underline cursor-pointer"
-                            >
-                                {showCompanyDetails ? 'Hide Provider Details' : 'Edit Provider Info'}
-                            </button>
+                            <div className="flex items-center gap-2 self-end sm:self-auto">
+                                <button
+                                    type="button"
+                                    onClick={handleResetCompanyToProfile}
+                                    className="inline-flex items-center gap-1.5 text-xs text-slate-700 dark:text-slate-300 hover:text-blue-600 dark:hover:text-blue-400 font-bold px-2.5 py-1.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700/60 transition-colors cursor-pointer"
+                                    title="Reset company provider details back to profile defaults"
+                                >
+                                    <RotateCcw className="size-3" />
+                                    <span>Reset to Profile</span>
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => setShowCompanyDetails(!showCompanyDetails)}
+                                    className="text-xs text-blue-600 dark:text-blue-400 font-bold hover:underline cursor-pointer px-2 py-1"
+                                >
+                                    {showCompanyDetails ? 'Hide Provider Details' : 'Show Provider Details'}
+                                </button>
+                            </div>
                         </div>
 
                         {showCompanyDetails && (
-                            <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 pt-2 pb-4 border-b border-slate-100 dark:border-slate-800">
+                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 pt-2 pb-4 border-b border-slate-100 dark:border-slate-800">
                                 <div>
                                     <label className="block text-xs font-extrabold text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-2">
                                         Company Provider Name
@@ -550,21 +619,6 @@ export default function QuotationCreate({
                                     />
                                     {errors.company_phone && (
                                         <p className="text-rose-500 text-xs font-medium mt-1.5">{errors.company_phone}</p>
-                                    )}
-                                </div>
-                                <div>
-                                    <label className="block text-xs font-extrabold text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-2">
-                                        Company Address
-                                    </label>
-                                    <input
-                                        type="text"
-                                        value={data.company_address}
-                                        onChange={(e) => setData('company_address', e.target.value)}
-                                        placeholder={defaultCompany?.address || 'e.g. Dubai, United Arab Emirates'}
-                                        className="w-full h-10 px-4 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-xs font-medium text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:border-blue-600 transition-all"
-                                    />
-                                    {errors.company_address && (
-                                        <p className="text-rose-500 text-xs font-medium mt-1.5">{errors.company_address}</p>
                                     )}
                                 </div>
                                 <div>
@@ -603,18 +657,48 @@ export default function QuotationCreate({
                                 </div>
                                 <div>
                                     <label className="block text-xs font-extrabold text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-2">
-                                        Client Company Logo (Optional)
+                                        Company Address
                                     </label>
                                     <input
-                                        type="file"
-                                        accept="image/*"
-                                        onChange={(e) => {
-                                            if (e.target.files && e.target.files[0]) {
-                                                setData('company_logo', e.target.files[0]);
-                                            }
-                                        }}
-                                        className="w-full text-xs text-slate-500 file:mr-3 file:py-2 file:px-3.5 file:rounded-xl file:border-0 file:text-xs file:font-bold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 cursor-pointer"
+                                        type="text"
+                                        value={data.company_address}
+                                        onChange={(e) => setData('company_address', e.target.value)}
+                                        placeholder={defaultCompany?.address || 'e.g. Dubai, United Arab Emirates'}
+                                        className="w-full h-10 px-4 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-xs font-medium text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:border-blue-600 transition-all"
                                     />
+                                    {errors.company_address && (
+                                        <p className="text-rose-500 text-xs font-medium mt-1.5">{errors.company_address}</p>
+                                    )}
+                                </div>
+                                <div>
+                                    <label className="block text-xs font-extrabold text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-2">
+                                        Company Logo (Optional)
+                                    </label>
+                                    <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
+                                        {companyLogoPreview && (
+                                            <div className="flex items-center gap-2 p-1.5 bg-slate-100 dark:bg-slate-800 rounded-xl shrink-0 border border-slate-200 dark:border-slate-700">
+                                                <img
+                                                    src={companyLogoPreview}
+                                                    alt="Logo Preview"
+                                                    className="h-8 max-w-[90px] object-contain"
+                                                />
+                                                <button
+                                                    type="button"
+                                                    onClick={handleRemoveLogo}
+                                                    className="p-1 text-rose-500 hover:text-rose-700 hover:bg-rose-50 dark:hover:bg-rose-950/40 rounded-lg transition-colors cursor-pointer"
+                                                    title="Remove Logo"
+                                                >
+                                                    <Trash2 className="size-3.5" />
+                                                </button>
+                                            </div>
+                                        )}
+                                        <input
+                                            type="file"
+                                            accept="image/*"
+                                            onChange={handleLogoChange}
+                                            className="w-full text-xs text-slate-500 file:mr-3 file:py-2 file:px-3.5 file:rounded-xl file:border-0 file:text-xs file:font-bold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 cursor-pointer"
+                                        />
+                                    </div>
                                     {errors.company_logo && (
                                         <p className="text-rose-500 text-xs font-medium mt-1.5">{errors.company_logo}</p>
                                     )}
@@ -642,12 +726,12 @@ export default function QuotationCreate({
                                 <label className="block text-xs font-extrabold text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-2">
                                     Inquiry Opener Text
                                 </label>
-                                <input
-                                    type="text"
+                                <textarea
+                                    rows={2}
                                     value={data.opening_text}
                                     onChange={(e) => setData('opening_text', e.target.value)}
-                                    placeholder="e.g. Thank you for your valuable inquiry. We are pleased to quote as below"
-                                    className="w-full h-10 px-4 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-xs font-medium text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:border-blue-600 transition-all"
+                                    placeholder="In case of any queries, kindly get in touch with us. Thank you and I look forward to hearing from you."
+                                    className="w-full px-4 py-2.5 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-xs font-medium text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:border-blue-600 transition-all"
                                 />
                                 {errors.opening_text && (
                                     <p className="text-rose-500 text-xs font-medium mt-1.5">{errors.opening_text}</p>
@@ -778,12 +862,12 @@ export default function QuotationCreate({
                                 <label className="block text-xs font-extrabold text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-2">
                                     Closing Remarks
                                 </label>
-                                <input
-                                    type="text"
+                                <textarea
+                                    rows={3}
                                     value={data.closing_text}
                                     onChange={(e) => setData('closing_text', e.target.value)}
-                                    placeholder="e.g. We hope you find our offer to be in line with your requirement."
-                                    className="w-full h-10 px-4 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-xs font-medium text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:border-blue-600 transition-all"
+                                    placeholder="We thank you for providing us with an opportunity to submit our quotation for shifting your home furniture and appliances. Our prices are reasonable; our staff are professional and well trained to handle all your stuff and equipment's with care. Please find the complete details and expenses to cover this operation."
+                                    className="w-full px-4 py-2.5 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-xs font-medium text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:border-blue-600 transition-all"
                                 />
                                 {errors.closing_text && (
                                     <p className="text-rose-500 text-xs font-medium mt-1">{errors.closing_text}</p>
@@ -900,6 +984,14 @@ export default function QuotationCreate({
                                                 alt="Signature Preview"
                                                 className="h-8 max-w-[100px] object-contain"
                                             />
+                                            <button
+                                                type="button"
+                                                onClick={handleRemoveSignature}
+                                                className="p-1 text-rose-500 hover:text-rose-700 hover:bg-rose-50 dark:hover:bg-rose-950/40 rounded-lg transition-colors cursor-pointer"
+                                                title="Remove Signature"
+                                            >
+                                                <Trash2 className="size-3.5" />
+                                            </button>
                                             <span className="text-[11px] text-emerald-600 font-bold pr-1">Ready</span>
                                         </div>
                                     )}
