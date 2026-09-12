@@ -324,7 +324,7 @@
             }
         }
 
-        $companyDisplay = $quotation->company_name ?: ($client->company_name ?: $client->name ?: 'AL MUSTAFA FURNITURE MOVERS');
+        $companyDisplay = $quotation->company_name ?: ($client?->company_name ?: ($client?->name ?: ''));
         $initials = 'Q';
         if ($companyDisplay) {
             $parts = preg_split('/\s+/', trim($companyDisplay));
@@ -411,21 +411,37 @@
 
     <hr class="header-hr">
 
+    @php
+        $hasRecipient = !empty(trim($quotation->customer_name ?? '')) 
+            || !empty(trim($quotation->customer_phone ?? '')) 
+            || !empty(trim($quotation->customer_email ?? '')) 
+            || !empty(trim($quotation->customer_address ?? ''))
+            || !empty(trim($quotation->customer_prefix ?? ''));
+    @endphp
+
     <!-- Recipient & Meta Section -->
     <table class="table-layout">
         <tr>
             <td style="width: 55%;">
-                <div class="to-section">
-                    <div class="to-title">To,</div>
-                    @if(!empty(trim($quotation->customer_name ?? '')))
-                        <div class="to-name">
-                            {{ $quotation->customer_prefix ?: 'Mr/Mrs' }} {{ $quotation->customer_name }}
-                        </div>
-                    @endif
-                    @if($quotation->customer_phone)
-                        <div class="to-phone">Phone: {{ $quotation->customer_phone }}</div>
-                    @endif
-                </div>
+                @if($hasRecipient)
+                    <div class="to-section">
+                        <div class="to-title">To,</div>
+                        @if(!empty(trim($quotation->customer_name ?? '')))
+                            <div class="to-name">
+                                {{ $quotation->customer_prefix ? $quotation->customer_prefix . ' ' : '' }}{{ $quotation->customer_name }}
+                            </div>
+                        @endif
+                        @if(!empty(trim($quotation->customer_phone ?? '')))
+                            <div class="to-phone">Phone: {{ $quotation->customer_phone }}</div>
+                        @endif
+                        @if(!empty(trim($quotation->customer_email ?? '')))
+                            <div class="to-phone">Email: {{ $quotation->customer_email }}</div>
+                        @endif
+                        @if(!empty(trim($quotation->customer_address ?? '')))
+                            <div class="to-phone">Address: {{ $quotation->customer_address }}</div>
+                        @endif
+                    </div>
+                @endif
             </td>
             <td style="width: 45%;">
                 <div class="meta-section">
@@ -442,7 +458,7 @@
     <!-- Salutation & Inquiry Intro -->
     <div class="salutation-block">
         <div class="greeting">{{ $quotation->greeting ?: 'Dear Sir/Mam,' }}</div>
-        <div>{{ $quotation->opening_text ?: 'In case of any queries, kindly get in touch with us. Thank you and I look forward to hearing from you.' }}</div>
+        <div>{{ $quotation->opening_text ?: "We thank you for providing us with an opportunity to submit our quotation for shifting your home furniture and appliances. Our prices are reasonable; our staff are professional and well trained to handle all your stuff and equipment's with care. Please find the complete details and expenses to cover this operation." }}</div>
     </div>
 
     <!-- Line Items Table -->
@@ -510,7 +526,7 @@
 
     <!-- Closing Remarks -->
     <div class="closing-text">
-        {{ $quotation->closing_text ?: "We thank you for providing us with an opportunity to submit our quotation for shifting your home furniture and appliances. Our prices are reasonable; our staff are professional and well trained to handle all your stuff and equipment's with care. Please find the complete details and expenses to cover this operation." }}
+        {{ $quotation->closing_text ?: 'In case of any queries, kindly get in touch with us. Thank you and I look forward to hearing from you.' }}
     </div>
 
     <!-- Notes & Terms if any -->
@@ -531,7 +547,7 @@
     <div class="signature-wrapper">
         <div class="signature-box">
             <div class="company-for">
-                {{ $quotation->authorized_by_text ?: ('For, ' . $companyDisplay) }}
+                {{ $quotation->authorized_by_text ?: ($companyDisplay ? 'For, ' . $companyDisplay : '') }}
             </div>
             @if($sigData)
                 <div style="min-height: 64px; text-align: center;">

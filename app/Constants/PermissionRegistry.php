@@ -45,6 +45,13 @@ class PermissionRegistry
             ],
 
             // 2. Finance & Billing
+            'Quotations & Proposals' => [
+                'view-quotations',
+                'create-quotations',
+                'edit-quotations',
+                'delete-quotations',
+                'print-quotations',
+            ],
             'Invoices & Billing' => [
                 'view-invoices',
             ],

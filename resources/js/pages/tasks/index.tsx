@@ -105,11 +105,13 @@ interface TasksIndexProps {
         priority?: string;
         assigned_employee_id?: string;
     };
+    is_employee?: boolean;
 }
 
-export default function TasksIndex({ tasks, stats, categories = [], employees = [], filters }: TasksIndexProps) {
+export default function TasksIndex({ tasks, stats, categories = [], employees = [], filters, is_employee }: TasksIndexProps) {
     const { auth } = usePage().props as any;
     const user = auth?.user;
+    const isEmployee = Boolean(is_employee || user?.type === 'employee');
 
     const [searchQuery, setSearchQuery] = useState(filters?.search || '');
     const [categoryId, setCategoryId] = useState(filters?.task_category_id || '');
@@ -144,7 +146,7 @@ export default function TasksIndex({ tasks, stats, categories = [], employees = 
                     task_category_id: categoryId || undefined,
                     status: statusFilter || undefined,
                     priority: priorityFilter || undefined,
-                    assigned_employee_id: assignedId || undefined,
+                    assigned_employee_id: isEmployee ? (filters?.assigned_employee_id || undefined) : (assignedId || undefined),
                 },
                 { preserveState: true, replace: true }
             );
@@ -158,8 +160,12 @@ export default function TasksIndex({ tasks, stats, categories = [], employees = 
         setCategoryId('');
         setStatusFilter('');
         setPriorityFilter('');
-        setAssignedId('');
-        router.get('/tasks', {}, { preserveState: true, replace: true });
+        if (!isEmployee) {
+            setAssignedId('');
+            router.get('/tasks', {}, { preserveState: true, replace: true });
+        } else {
+            router.get('/tasks', { assigned_employee_id: filters?.assigned_employee_id || undefined }, { preserveState: true, replace: true });
+        }
     };
 
     const handleQuickStatusChange = (task: TaskItem, newStatus: string) => {
@@ -238,7 +244,7 @@ export default function TasksIndex({ tasks, stats, categories = [], employees = 
         }
     };
 
-    const hasActiveFilters = Boolean(searchQuery || categoryId || statusFilter || priorityFilter || assignedId);
+    const hasActiveFilters = Boolean(searchQuery || categoryId || statusFilter || priorityFilter || (!isEmployee && assignedId));
 
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
@@ -386,16 +392,23 @@ export default function TasksIndex({ tasks, stats, categories = [], employees = 
                             <option value="urgent">Urgent</option>
                         </select>
 
-                        {/* Employee Searchable Filter */}
-                        <div className="w-full">
-                            <SearchableSelect
-                                options={employeeSelectOptions}
-                                value={assignedId}
-                                onChange={(val) => setAssignedId(val)}
-                                placeholder="Filter Employee"
-                                searchPlaceholder="Type employee name..."
-                            />
-                        </div>
+                        {/* Employee Searchable Filter or Assigned to Indicator */}
+                        {isEmployee ? (
+                            <div className="h-10 px-3.5 rounded-xl bg-blue-50/80 dark:bg-blue-950/40 border border-blue-200/80 dark:border-blue-800/60 flex items-center gap-2 text-xs font-semibold text-blue-700 dark:text-blue-300">
+                                <User className="size-4 text-blue-600 dark:text-blue-400 shrink-0" />
+                                <span className="truncate">Assigned: {employees[0]?.name || 'Assigned to You'}</span>
+                            </div>
+                        ) : (
+                            <div className="w-full">
+                                <SearchableSelect
+                                    options={employeeSelectOptions}
+                                    value={assignedId}
+                                    onChange={(val) => setAssignedId(val)}
+                                    placeholder="Filter Employee"
+                                    searchPlaceholder="Type employee name..."
+                                />
+                            </div>
+                        )}
                     </div>
 
                     {hasActiveFilters && (

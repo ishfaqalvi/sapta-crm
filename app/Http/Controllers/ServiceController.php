@@ -6,6 +6,7 @@ use App\Models\Client;
 use App\Models\ClientService;
 use App\Models\ServiceCategory;
 use App\Models\ServiceTask;
+use App\Services\TaskNotificationService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
@@ -303,7 +304,12 @@ class ServiceController extends Controller
             $updateData['completed_at'] = null;
         }
 
+        $oldStatus = $task->status;
         $task->update($updateData);
+
+        if ($oldStatus !== $validated['status'] && $task->assigned_employee_id) {
+            TaskNotificationService::notifyTaskUpdated($task, 'service', ['status' => $validated['status']]);
+        }
 
         return redirect()->back()->with('success', 'Task status updated successfully.');
     }

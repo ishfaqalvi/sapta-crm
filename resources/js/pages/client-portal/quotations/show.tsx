@@ -45,6 +45,13 @@ export default function QuotationShow({ client, quotation }: QuotationShowProps)
 
     const isInvoice = quotation.status === 'accepted' || quotation.status === 'paid';
     const documentTypeLabel = isInvoice ? 'Invoice' : 'Quotation';
+    const hasRecipient = Boolean(
+        quotation.customer_name?.trim() ||
+        quotation.customer_phone?.trim() ||
+        quotation.customer_email?.trim() ||
+        quotation.customer_address?.trim() ||
+        quotation.customer_prefix?.trim()
+    );
 
     const handleStatusChange = (newStatus: string) => {
         setStatusUpdating(true);
@@ -150,7 +157,7 @@ export default function QuotationShow({ client, quotation }: QuotationShowProps)
                                 {getStatusBadge()}
                             </div>
                             <p className="text-xs text-slate-400 mt-0.5">
-                                Created on {formatDate(quotation.date)} for {quotation.customer_name}
+                                Created on {formatDate(quotation.date)}{quotation.customer_name?.trim() ? ` for ${quotation.customer_name}` : ''}
                             </p>
                         </div>
                     </div>
@@ -330,17 +337,27 @@ export default function QuotationShow({ client, quotation }: QuotationShowProps)
                     {/* Recipient & Quotation Meta */}
                     <div className="flex flex-row justify-between items-start gap-4">
                         {/* Left: Recipient */}
-                        <div className="space-y-0.5 text-sm sm:text-base font-bold text-slate-900">
-                            <div>To,</div>
-                            {quotation.customer_name?.trim() && (
-                                <div className="text-base sm:text-lg font-black">
-                                    {quotation.customer_prefix || 'Mr/Mrs'} {quotation.customer_name}
-                                </div>
-                            )}
-                            {quotation.customer_phone && (
-                                <div className="text-xs font-normal text-slate-500">Phone: {quotation.customer_phone}</div>
-                            )}
-                        </div>
+                        {hasRecipient ? (
+                            <div className="space-y-0.5 text-sm sm:text-base font-bold text-slate-900">
+                                <div>To,</div>
+                                {quotation.customer_name?.trim() && (
+                                    <div className="text-base sm:text-lg font-black">
+                                        {quotation.customer_prefix ? `${quotation.customer_prefix} ` : ''}{quotation.customer_name}
+                                    </div>
+                                )}
+                                {quotation.customer_phone?.trim() && (
+                                    <div className="text-xs font-normal text-slate-500">Phone: {quotation.customer_phone}</div>
+                                )}
+                                {quotation.customer_email?.trim() && (
+                                    <div className="text-xs font-normal text-slate-500">Email: {quotation.customer_email}</div>
+                                )}
+                                {quotation.customer_address?.trim() && (
+                                    <div className="text-xs font-normal text-slate-500">Address: {quotation.customer_address}</div>
+                                )}
+                            </div>
+                        ) : (
+                            <div />
+                        )}
 
                         {/* Right: Meta */}
                         <div className="text-right text-sm sm:text-base space-y-1">
@@ -366,7 +383,7 @@ export default function QuotationShow({ client, quotation }: QuotationShowProps)
                         <div className="font-bold">{quotation.greeting || 'Dear Sir/Mam,'}</div>
                         <div>
                             {quotation.opening_text ||
-                                'In case of any queries, kindly get in touch with us. Thank you and I look forward to hearing from you.'}
+                                "We thank you for providing us with an opportunity to submit our quotation for shifting your home furniture and appliances. Our prices are reasonable; our staff are professional and well trained to handle all your stuff and equipment's with care. Please find the complete details and expenses to cover this operation."}
                         </div>
                     </div>
 
@@ -474,7 +491,7 @@ export default function QuotationShow({ client, quotation }: QuotationShowProps)
                     {/* Closing Note */}
                     <div className="text-sm font-semibold text-slate-900 pt-2">
                         {quotation.closing_text ||
-                            "We thank you for providing us with an opportunity to submit our quotation for shifting your home furniture and appliances. Our prices are reasonable; our staff are professional and well trained to handle all your stuff and equipment's with care. Please find the complete details and expenses to cover this operation."}
+                            'In case of any queries, kindly get in touch with us. Thank you and I look forward to hearing from you.'}
                     </div>
 
                     {/* Notes & Terms if any */}

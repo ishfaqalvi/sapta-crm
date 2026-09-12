@@ -524,7 +524,7 @@ export default function ClientPortalInvoicesIndex({
                         <div className="border border-slate-200/80 dark:border-slate-800 rounded-xl overflow-hidden w-full min-w-0">
                             <div className="w-full overflow-x-auto scrollbar-thin">
                                 {(() => {
-                                    const hasAnyRemainingCost = Boolean(viewingInvoice.items?.some((item) => Number(item.remaining_cost) > 0));
+                                    const hasAnyRemainingCost = false; // Hidden for now per requirement
                                     return (
                                         <table className="w-full min-w-[400px] text-left border-collapse text-xs">
                                             <thead>

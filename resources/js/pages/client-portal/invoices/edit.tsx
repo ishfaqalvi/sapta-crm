@@ -533,11 +533,10 @@ export default function EditClientInvoice({
                                 <div className="overflow-x-auto">
                                     <table className="w-full text-left text-xs border-collapse">
                                         <thead>
-                                            <tr className="border-b border-slate-100 dark:border-slate-800 text-[10px] font-extrabold uppercase text-slate-400">
+                                             <tr className="border-b border-slate-100 dark:border-slate-800 text-[10px] font-extrabold uppercase text-slate-400">
                                                 <th className="pb-3 px-2 w-10 text-center">#</th>
                                                 <th className="pb-3 px-3">Description</th>
                                                 <th className="pb-3 px-3 w-32 text-right">Amount</th>
-                                                <th className="pb-3 px-3 w-32 text-right">Remaining Balance</th>
                                                 <th className="pb-3 px-2 w-20 text-center">Actions</th>
                                             </tr>
                                         </thead>
@@ -571,17 +570,6 @@ export default function EditClientInvoice({
                                                         {/* Amount */}
                                                         <td className="py-3 px-3 text-right font-extrabold text-slate-900 dark:text-white font-mono text-xs">
                                                             {formatCurrency(itemAmount)}
-                                                        </td>
-
-                                                        {/* Remaining Cost */}
-                                                        <td className="py-3 px-3 text-right font-mono text-xs">
-                                                            {Number(item.remaining_cost) > 0 ? (
-                                                                <span className="font-bold text-slate-700 dark:text-slate-300">
-                                                                    {formatCurrency(Number(item.remaining_cost))}
-                                                                </span>
-                                                            ) : (
-                                                                <span className="text-slate-400 dark:text-slate-500 font-normal">—</span>
-                                                            )}
                                                         </td>
 
                                                         {/* Actions */}
@@ -949,11 +937,6 @@ export default function EditClientInvoice({
                                                 <div className="font-black font-mono text-xs text-slate-900 dark:text-white">
                                                     {formatCurrency(item.amount)}
                                                 </div>
-                                                {item.remaining_cost !== undefined && Number(item.remaining_cost) > 0 && (
-                                                    <span className="text-[10px] text-slate-500 dark:text-slate-400 font-mono block">
-                                                        Rem: {formatCurrency(item.remaining_cost)}
-                                                    </span>
-                                                )}
                                                 {item.due_date && (
                                                     <span className="text-[10px] text-slate-400 font-mono">
                                                         Due: {item.due_date}
@@ -1062,9 +1045,8 @@ export default function EditClientInvoice({
                                 />
                             </div>
 
-                            {/* Amount & Remaining Cost Grid */}
-                            <div className="grid grid-cols-2 gap-3">
-                                <div className="space-y-1.5">
+                            {/* Amount Input */}
+                            <div className="space-y-1.5">
                                     <Label htmlFor="custom_amount" className="text-xs font-bold text-slate-700 dark:text-slate-300">
                                         Amount ({clientCurrency}) *
                                     </Label>
@@ -1079,23 +1061,6 @@ export default function EditClientInvoice({
                                         className="h-11 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 text-xs font-mono font-bold text-right"
                                     />
                                 </div>
-
-                                <div className="space-y-1.5">
-                                    <Label htmlFor="custom_remaining" className="text-xs font-bold text-slate-700 dark:text-slate-300">
-                                        Remaining Balance ({clientCurrency})
-                                    </Label>
-                                    <Input
-                                        id="custom_remaining"
-                                        type="number"
-                                        min="0"
-                                        step="0.01"
-                                        value={customRemainingCost}
-                                        onChange={(e) => setCustomRemainingCost(e.target.value)}
-                                        placeholder="Optional (leave empty if N/A)"
-                                        className="h-11 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 text-xs font-mono font-bold text-right"
-                                    />
-                                </div>
-                            </div>
 
                             {/* Modal Actions */}
                             <div className="pt-3 flex items-center justify-end gap-2.5">

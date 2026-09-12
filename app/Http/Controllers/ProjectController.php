@@ -6,6 +6,7 @@ use App\Models\Client;
 use App\Models\ProjectCategory;
 use App\Models\ProjectTask;
 use App\Models\WebsiteProject;
+use App\Services\TaskNotificationService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
@@ -317,7 +318,12 @@ class ProjectController extends Controller
             $updateData['completed_at'] = null;
         }
 
+        $oldStatus = $task->status;
         $task->update($updateData);
+
+        if ($oldStatus !== $validated['status'] && $task->assigned_employee_id) {
+            TaskNotificationService::notifyTaskUpdated($task, 'project', ['status' => $validated['status']]);
+        }
 
         return redirect()->back()->with('success', 'Task status updated successfully.');
     }

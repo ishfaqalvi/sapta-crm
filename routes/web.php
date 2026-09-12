@@ -42,6 +42,7 @@ use App\Http\Controllers\{
     ClientDomainController,
     ClientHostingController,
     InvoiceController,
+    QuotationController,
     ReportController,
     NotificationController,
     MyTaskController,
@@ -426,6 +427,25 @@ Route::middleware(['web', 'admin.access'])->group(function () {
         Route::post('store', 'store')->name('store');
         Route::put('update/{credential}', 'update')->name('update');
         Route::delete('destroy/{credential}', 'destroy')->name('destroy');
+    });
+
+    /*
+    |--------------------------------------------------------------------------
+    | Admin Quotations & Proposals Routes (Full CRUD, Walk-In Customers, PDF & Print)
+    |--------------------------------------------------------------------------
+    */
+    Route::controller(QuotationController::class)->prefix('quotations')->as('quotations.')->group(function () {
+        Route::get('/', 'index')->name('index');
+        Route::get('create', 'create')->name('create');
+        Route::post('/', 'store')->name('store');
+        Route::get('{quotation}', 'show')->name('show');
+        Route::get('{quotation}/edit', 'edit')->name('edit');
+        Route::put('{quotation}', 'update')->name('update');
+        Route::post('{quotation}', 'update');
+        Route::patch('{quotation}/status', 'updateStatus')->name('status');
+        Route::delete('{quotation}', 'destroy')->name('destroy');
+        Route::get('{quotation}/pdf', 'pdf')->name('pdf');
+        Route::get('{quotation}/print', 'print')->name('print');
     });
 
     /*

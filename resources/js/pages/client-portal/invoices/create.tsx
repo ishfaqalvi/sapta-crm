@@ -485,11 +485,10 @@ export default function CreateClientInvoice({
                                 <div className="overflow-x-auto">
                                     <table className="w-full text-left text-xs border-collapse">
                                         <thead>
-                                            <tr className="border-b border-slate-100 dark:border-slate-800 text-[10px] font-extrabold uppercase text-slate-400">
+                                             <tr className="border-b border-slate-100 dark:border-slate-800 text-[10px] font-extrabold uppercase text-slate-400">
                                                 <th className="pb-3 px-2 w-10 text-center">#</th>
                                                 <th className="pb-3 px-3">Description</th>
                                                 <th className="pb-3 px-3 w-32 text-right">Amount</th>
-                                                <th className="pb-3 px-3 w-32 text-right">Remaining Balance</th>
                                                 <th className="pb-3 px-2 w-20 text-center">Actions</th>
                                             </tr>
                                         </thead>
@@ -523,17 +522,6 @@ export default function CreateClientInvoice({
                                                         {/* Amount */}
                                                         <td className="py-3 px-3 text-right font-extrabold text-slate-900 dark:text-white font-mono text-xs">
                                                             {formatCurrency(itemAmount)}
-                                                        </td>
-
-                                                        {/* Remaining Cost */}
-                                                        <td className="py-3 px-3 text-right font-mono text-xs">
-                                                            {Number(item.remaining_cost) > 0 ? (
-                                                                <span className="font-bold text-slate-700 dark:text-slate-300">
-                                                                    {formatCurrency(Number(item.remaining_cost))}
-                                                                </span>
-                                                            ) : (
-                                                                <span className="text-slate-400 dark:text-slate-500 font-normal">—</span>
-                                                            )}
                                                         </td>
 
                                                         {/* Actions */}
@@ -909,11 +897,6 @@ export default function CreateClientInvoice({
                                                     <span className="text-sm font-black font-mono text-slate-900 dark:text-white block">
                                                         {formatCurrency(item.amount)}
                                                     </span>
-                                                    {item.remaining_cost !== undefined && Number(item.remaining_cost) > 0 && (
-                                                        <span className="text-[10px] font-semibold text-slate-500 dark:text-slate-400 block font-mono">
-                                                            Rem: {formatCurrency(item.remaining_cost)}
-                                                        </span>
-                                                    )}
                                                     <span
                                                         className={`text-[10px] font-bold ${added ? 'text-emerald-600 dark:text-emerald-400' : 'text-slate-400'
                                                             }`}
@@ -1009,40 +992,22 @@ export default function CreateClientInvoice({
                                     />
                                 </div>
 
-                                {/* Amount & Remaining Cost Grid */}
-                                <div className="grid grid-cols-2 gap-3">
-                                    <div className="space-y-1.5">
-                                        <Label htmlFor="custom_amount" className="text-xs font-bold text-slate-700 dark:text-slate-300">
-                                            Amount ({clientCurrency}) *
-                                        </Label>
-                                        <Input
-                                            id="custom_amount"
-                                            type="number"
-                                            step="0.01"
-                                            min="0"
-                                            value={customAmount}
-                                            onChange={(e) => setCustomAmount(e.target.value)}
-                                            placeholder="0.00"
-                                            className="h-11 rounded-xl bg-slate-50 dark:bg-slate-950 border-slate-200 text-xs font-bold font-mono text-right"
-                                            required
-                                        />
-                                    </div>
-
-                                    <div className="space-y-1.5">
-                                        <Label htmlFor="custom_remaining" className="text-xs font-bold text-slate-700 dark:text-slate-300">
-                                            Remaining Balance ({clientCurrency})
-                                        </Label>
-                                        <Input
-                                            id="custom_remaining"
-                                            type="number"
-                                            step="0.01"
-                                            min="0"
-                                            value={customRemainingCost}
-                                            onChange={(e) => setCustomRemainingCost(e.target.value)}
-                                            placeholder="Optional (leave empty if N/A)"
-                                            className="h-11 rounded-xl bg-slate-50 dark:bg-slate-950 border-slate-200 text-xs font-bold font-mono text-right"
-                                        />
-                                    </div>
+                                {/* Amount Input */}
+                                <div className="space-y-1.5">
+                                    <Label htmlFor="custom_amount" className="text-xs font-bold text-slate-700 dark:text-slate-300">
+                                        Amount ({clientCurrency}) *
+                                    </Label>
+                                    <Input
+                                        id="custom_amount"
+                                        type="number"
+                                        step="0.01"
+                                        min="0"
+                                        value={customAmount}
+                                        onChange={(e) => setCustomAmount(e.target.value)}
+                                        placeholder="0.00"
+                                        className="h-11 rounded-xl bg-slate-50 dark:bg-slate-950 border-slate-200 text-xs font-bold font-mono text-right"
+                                        required
+                                    />
                                 </div>
 
                                 {/* Actions */}

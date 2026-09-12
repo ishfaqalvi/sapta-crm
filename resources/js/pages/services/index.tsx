@@ -294,17 +294,17 @@ export default function ServicesIndex({ services, stats, clients, categories, fi
 
                 {/* Table Container */}
                 <div className="rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 shadow-xs overflow-hidden">
-                    <div className="overflow-x-auto">
-                        <table className="w-full text-left text-xs text-slate-600 dark:text-slate-300">
+                    <div className="w-full overflow-x-auto scrollbar-thin">
+                        <table className="w-full min-w-[1000px] text-left text-xs text-slate-600 dark:text-slate-300">
                             <thead className="bg-slate-50 dark:bg-slate-950/70 border-b border-slate-200/80 dark:border-slate-800 uppercase tracking-wider text-[11px] font-bold text-slate-500">
                                 <tr>
-                                    <th className="px-6 py-4">Service & Category</th>
-                                    <th className="px-6 py-4">Client</th>
-                                    <th className="px-6 py-4">Status</th>
-                                    <th className="px-6 py-4">Billing Cycle</th>
-                                    <th className="px-6 py-4">Renewal / Timeline</th>
-                                    <th className="px-6 py-4 text-center">Tasks</th>
-                                    <th className="px-6 py-4 text-right">Actions</th>
+                                    <th className="px-6 py-4 whitespace-nowrap min-w-[220px]">Service & Category</th>
+                                    <th className="px-6 py-4 whitespace-nowrap min-w-[180px]">Client</th>
+                                    <th className="px-6 py-4 whitespace-nowrap min-w-[120px]">Status</th>
+                                    <th className="px-6 py-4 whitespace-nowrap min-w-[130px]">Billing Cycle</th>
+                                    <th className="px-6 py-4 whitespace-nowrap min-w-[180px]">Renewal / Timeline</th>
+                                    <th className="px-6 py-4 text-center whitespace-nowrap min-w-[90px]">Tasks</th>
+                                    <th className="px-6 py-4 text-right whitespace-nowrap min-w-[100px]">Actions</th>
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
@@ -312,7 +312,7 @@ export default function ServicesIndex({ services, stats, clients, categories, fi
                                     services.data.map((srv) => (
                                         <tr key={srv.id} className="hover:bg-slate-50/70 dark:hover:bg-slate-800/40 transition-colors">
                                             {/* Service Name & Category */}
-                                            <td className="px-6 py-4">
+                                            <td className="px-6 py-4 whitespace-nowrap">
                                                 <div>
                                                     <Link
                                                         href={route('services.show', srv.id)}
@@ -330,7 +330,7 @@ export default function ServicesIndex({ services, stats, clients, categories, fi
                                             </td>
 
                                             {/* Client Info */}
-                                            <td className="px-6 py-4">
+                                            <td className="px-6 py-4 whitespace-nowrap">
                                                 {srv.client ? (
                                                     <div>
                                                         <span className="font-bold text-slate-800 dark:text-slate-200 block">
@@ -380,7 +380,7 @@ export default function ServicesIndex({ services, stats, clients, categories, fi
                                             </td>
 
                                             {/* Action Button: View Details */}
-                                            <td className="px-6 py-4 text-right">
+                                            <td className="px-6 py-4 text-right whitespace-nowrap">
                                                 <div className="flex items-center justify-end gap-1.5">
                                                     <Link
                                                         href={route('services.show', srv.id)}

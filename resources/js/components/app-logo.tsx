@@ -3,9 +3,9 @@ import { HTMLAttributes } from 'react';
 
 export default function AppLogo({ className = '', ...props }: HTMLAttributes<HTMLDivElement>) {
     return (
-        <div className={`flex items-center gap-2.5 ${className}`} {...props}>
-            <AppLogoIcon className="h-8 w-auto" />
-            <div className="flex flex-col text-left">
+        <div className={`flex items-center gap-2.5 group-data-[collapsible=icon]:gap-0 group-data-[collapsible=icon]:justify-center ${className}`} {...props}>
+            <AppLogoIcon className="h-8 w-auto shrink-0" />
+            <div className="flex flex-col text-left group-data-[collapsible=icon]:hidden">
                 <span className="text-base font-bold tracking-tight text-slate-900 dark:text-white leading-none">
                     SAPTA <span className="text-blue-600 dark:text-blue-400">CRM</span>
                 </span>

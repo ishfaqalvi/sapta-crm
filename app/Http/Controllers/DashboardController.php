@@ -60,6 +60,20 @@ class DashboardController extends Controller
             return Inertia::render('dashboard', [
                 'canViewDashboard' => false,
                 'canViewBudget' => false,
+                'kpi' => [
+                    'total_billed' => 0.0,
+                    'total_paid' => 0.0,
+                    'total_pending' => 0.0,
+                    'total_overdue' => 0.0,
+                    'total_unpaid' => 0.0,
+                    'total_cancelled' => 0.0,
+                    'count_all' => 0,
+                    'count_paid' => 0,
+                    'count_pending' => 0,
+                    'count_overdue' => 0,
+                    'count_unpaid' => 0,
+                    'count_cancelled' => 0,
+                ],
                 'kpis' => [
                     'total_revenue_pkr' => 0,
                     'mrr_pkr' => 0,
@@ -358,9 +372,13 @@ class DashboardController extends Controller
             $recentCashflow = collect()->concat($recentIncomes)->concat($recentExpenses)->sortByDesc('date')->values()->take(5);
         }
 
+        $financialReportData = $this->calculateReportKpiAndBreakdown($canViewBudget);
+
         return Inertia::render('dashboard', [
             'canViewDashboard' => true,
             'canViewBudget' => $canViewBudget,
+            'kpi' => $financialReportData['kpi'],
+            'categoryBreakdown' => $financialReportData['categoryBreakdown'],
             'kpis' => [
                 'total_revenue_pkr' => round($totalRevenuePkr, 2),
                 'mrr_pkr' => round($mrrPkr, 2),
@@ -382,7 +400,6 @@ class DashboardController extends Controller
             'projectStatus' => $projectStatusCounts,
             'taskStatus' => $taskStatusCounts,
             'currencyBreakdown' => $currencyBreakdown,
-            'categoryBreakdown' => $this->calculateCategoryBreakdown($canViewBudget),
             'recentInvoices' => $recentInvoices,
             'recentProjects' => $recentProjects,
             'urgentTasks' => $urgentTasks,
@@ -392,124 +409,156 @@ class DashboardController extends Controller
     }
 
     /**
-     * Calculate category-wise financial and statistical breakdown consistent with projects and services.
+     * Normalize status across various database status variations consistent with ReportController.
      */
-    protected function calculateCategoryBreakdown(bool $includeFinancials = true): array
+    protected function normalizeStatus(?string $status): string
     {
-        // 1. Projects (Matches Project Budget, Cleared Payments, and Pending Balance)
-        $projects = WebsiteProject::with('payments')->get();
-        $projectCount = (int) $projects->count();
-        $projectTotal = 0.0;
-        $projectPaid = 0.0;
-        $projectPending = 0.0;
+        $st = strtolower(trim((string) $status));
+        if (in_array($st, ['paid', 'completed', 'settled'])) {
+            return 'paid';
+        }
+        if (in_array($st, ['overdue'])) {
+            return 'overdue';
+        }
+        if (in_array($st, ['cancelled', 'void'])) {
+            return 'cancelled';
+        }
+        return 'pending';
+    }
 
-        if ($includeFinancials) {
-            $projectTotal = (float) $projects->sum('total_budget_pkr');
-            $projectPaid = (float) $projects->sum(function ($p) {
-                return $p->payments
-                    ->filter(fn($pay) => in_array(strtolower(trim((string)$pay->status)), ['paid', 'completed', 'settled']))
-                    ->sum('amount_pkr');
-            });
-            $projectPending = max(0.0, $projectTotal - $projectPaid);
+    /**
+     * Calculate financial KPI data and category breakdown identical to Financial Report (ReportController).
+     */
+    protected function calculateReportKpiAndBreakdown(bool $includeFinancials = true): array
+    {
+        if (!$includeFinancials) {
+            return [
+                'kpi' => [
+                    'total_billed' => 0.0,
+                    'total_paid' => 0.0,
+                    'total_pending' => 0.0,
+                    'total_overdue' => 0.0,
+                    'total_unpaid' => 0.0,
+                    'total_cancelled' => 0.0,
+                    'count_all' => 0,
+                    'count_paid' => 0,
+                    'count_pending' => 0,
+                    'count_overdue' => 0,
+                    'count_unpaid' => 0,
+                    'count_cancelled' => 0,
+                ],
+                'categoryBreakdown' => [
+                    'project' => ['total' => 0.0, 'paid' => 0.0, 'pending' => 0.0, 'count' => WebsiteProject::count()],
+                    'service' => ['total' => 0.0, 'paid' => 0.0, 'pending' => 0.0, 'count' => ClientService::count()],
+                    'domain' => ['total' => 0.0, 'paid' => 0.0, 'pending' => 0.0, 'count' => ClientDomain::count()],
+                    'hosting' => ['total' => 0.0, 'paid' => 0.0, 'pending' => 0.0, 'count' => ClientHosting::count()],
+                ],
+            ];
         }
 
-        // 2. Services
-        $services = ClientService::with('payments')->get();
-        $serviceCount = (int) $services->count();
-        $serviceTotal = 0.0;
-        $servicePaid = 0.0;
-        $servicePending = 0.0;
+        // 1. Project Payments
+        $projectPayments = ProjectPayment::all()->map(function ($p) {
+            $status = $this->normalizeStatus($p->status);
+            return [
+                'category' => 'project',
+                'amount' => (float) ($p->amount_pkr ?? $p->amount ?? 0),
+                'status' => $status,
+            ];
+        });
 
-        if ($includeFinancials) {
-            $servicePayments = ServicePayment::all();
-            if ($servicePayments->count() > 0) {
-                $serviceTotal = (float) $servicePayments->sum(function ($s) {
-                    $status = strtolower(trim((string)$s->status));
-                    $rate = (float) ($s->exchange_rate ?: 1);
-                    return in_array($status, ['paid', 'completed', 'settled']) && (float) $s->amount_paid > 0
-                        ? (float) ($s->amount_paid_pkr ?: ($s->amount_paid * $rate))
-                        : ((float) $s->amount_due > 0 ? (float) ($s->amount_due * $rate) : 0.0);
-                });
-                $servicePaid = (float) $servicePayments->filter(fn($s) => in_array(strtolower(trim((string)$s->status)), ['paid', 'completed', 'settled']))->sum(function ($s) {
-                    $rate = (float) ($s->exchange_rate ?: 1);
-                    return (float) ($s->amount_paid_pkr ?: ($s->amount_paid * $rate));
-                });
-                $servicePending = (float) $servicePayments->filter(fn($s) => in_array(strtolower(trim((string)$s->status)), ['pending', 'due', 'due_pending', 'unpaid', 'overdue']))->sum(function ($s) {
-                    $rate = (float) ($s->exchange_rate ?: 1);
-                    return (float) ($s->amount_due * $rate);
-                });
-            } else {
-                $serviceTotal = (float) $services->sum('monthly_fee_pkr');
-                $servicePaid = 0.0;
-                $servicePending = $serviceTotal;
-            }
-        }
+        // 2. Service Payments
+        $servicePayments = ServicePayment::with('service:id,monthly_fee')->get()->map(function ($s) {
+            $status = $this->normalizeStatus($s->status);
+            $rate = (float) ($s->exchange_rate ?: 1);
+            $amount = (float) ($status === 'paid' && (float) $s->amount_paid > 0
+                ? ($s->amount_paid_pkr ?: ($s->amount_paid * $rate))
+                : ((float) $s->amount_due > 0 ? ($s->amount_due * $rate) : ($s->service ? $s->service->monthly_fee * $rate : 0)));
 
-        // 3. Domains
-        $domains = ClientDomain::all();
-        $domainCount = (int) $domains->count();
-        $domainTotal = 0.0;
-        $domainPaid = 0.0;
-        $domainPending = 0.0;
+            return [
+                'category' => 'service',
+                'amount' => $amount,
+                'status' => $status,
+            ];
+        });
 
-        if ($includeFinancials) {
-            $domainPayments = DomainPayment::all();
-            if ($domainPayments->count() > 0) {
-                $domainTotal = (float) $domainPayments->sum('amount');
-                $domainPaid = (float) $domainPayments->filter(fn($d) => in_array(strtolower(trim((string)$d->status)), ['paid', 'completed', 'settled']))->sum('amount');
-                $domainPending = (float) $domainPayments->filter(fn($d) => in_array(strtolower(trim((string)$d->status)), ['pending', 'due', 'due_pending', 'unpaid', 'overdue']))->sum('amount');
-            } else {
-                $domainTotal = (float) $domains->sum('client_price_pkr');
-                $domainPaid = 0.0;
-                $domainPending = $domainTotal;
-            }
-        }
+        // 3. Domain Payments
+        $domainPayments = DomainPayment::all()->map(function ($d) {
+            $status = $this->normalizeStatus($d->status);
+            return [
+                'category' => 'domain',
+                'amount' => (float) ($d->amount ?? 0),
+                'status' => $status,
+            ];
+        });
 
-        // 4. Hostings
-        $hostings = ClientHosting::all();
-        $hostingCount = (int) $hostings->count();
-        $hostingTotal = 0.0;
-        $hostingPaid = 0.0;
-        $hostingPending = 0.0;
+        // 4. Hosting Payments
+        $hostingPayments = HostingPayment::all()->map(function ($h) {
+            $status = $this->normalizeStatus($h->status);
+            return [
+                'category' => 'hosting',
+                'amount' => (float) ($h->amount ?? 0),
+                'status' => $status,
+            ];
+        });
 
-        if ($includeFinancials) {
-            $hostingPayments = HostingPayment::all();
-            if ($hostingPayments->count() > 0) {
-                $hostingTotal = (float) $hostingPayments->sum('amount');
-                $hostingPaid = (float) $hostingPayments->filter(fn($h) => in_array(strtolower(trim((string)$h->status)), ['paid', 'completed', 'settled']))->sum('amount');
-                $hostingPending = (float) $hostingPayments->filter(fn($h) => in_array(strtolower(trim((string)$h->status)), ['pending', 'due', 'due_pending', 'unpaid', 'overdue']))->sum('amount');
-            } else {
-                $hostingTotal = (float) $hostings->sum('client_price_pkr');
-                $hostingPaid = 0.0;
-                $hostingPending = $hostingTotal;
-            }
-        }
+        $allTransactions = collect()
+            ->concat($projectPayments)
+            ->concat($servicePayments)
+            ->concat($domainPayments)
+            ->concat($hostingPayments);
 
-        return [
+        $categoryBreakdown = [
             'project' => [
-                'total' => round($projectTotal, 2),
-                'paid' => round($projectPaid, 2),
-                'pending' => round($projectPending, 2),
-                'count' => $projectCount,
+                'total' => (float) $projectPayments->sum('amount'),
+                'paid' => (float) $projectPayments->where('status', 'paid')->sum('amount'),
+                'pending' => (float) $projectPayments->whereIn('status', ['pending', 'overdue'])->sum('amount'),
+                'count' => $projectPayments->count(),
             ],
             'service' => [
-                'total' => round($serviceTotal, 2),
-                'paid' => round($servicePaid, 2),
-                'pending' => round($servicePending, 2),
-                'count' => $serviceCount,
+                'total' => (float) $servicePayments->sum('amount'),
+                'paid' => (float) $servicePayments->where('status', 'paid')->sum('amount'),
+                'pending' => (float) $servicePayments->whereIn('status', ['pending', 'overdue'])->sum('amount'),
+                'count' => $servicePayments->count(),
             ],
             'domain' => [
-                'total' => round($domainTotal, 2),
-                'paid' => round($domainPaid, 2),
-                'pending' => round($domainPending, 2),
-                'count' => $domainCount,
+                'total' => (float) $domainPayments->sum('amount'),
+                'paid' => (float) $domainPayments->where('status', 'paid')->sum('amount'),
+                'pending' => (float) $domainPayments->whereIn('status', ['pending', 'overdue'])->sum('amount'),
+                'count' => $domainPayments->count(),
             ],
             'hosting' => [
-                'total' => round($hostingTotal, 2),
-                'paid' => round($hostingPaid, 2),
-                'pending' => round($hostingPending, 2),
-                'count' => $hostingCount,
+                'total' => (float) $hostingPayments->sum('amount'),
+                'paid' => (float) $hostingPayments->where('status', 'paid')->sum('amount'),
+                'pending' => (float) $hostingPayments->whereIn('status', ['pending', 'overdue'])->sum('amount'),
+                'count' => $hostingPayments->count(),
             ],
+        ];
+
+        $totalBilled = (float) $allTransactions->sum('amount');
+        $totalPaid = (float) $allTransactions->where('status', 'paid')->sum('amount');
+        $totalPending = (float) $allTransactions->where('status', 'pending')->sum('amount');
+        $totalOverdue = (float) $allTransactions->where('status', 'overdue')->sum('amount');
+        $totalUnpaid = (float) $allTransactions->whereIn('status', ['pending', 'overdue'])->sum('amount');
+        $totalCancelled = (float) $allTransactions->where('status', 'cancelled')->sum('amount');
+
+        $kpi = [
+            'total_billed' => $totalBilled,
+            'total_paid' => $totalPaid,
+            'total_pending' => $totalPending,
+            'total_overdue' => $totalOverdue,
+            'total_unpaid' => $totalUnpaid,
+            'total_cancelled' => $totalCancelled,
+            'count_all' => $allTransactions->count(),
+            'count_paid' => $allTransactions->where('status', 'paid')->count(),
+            'count_pending' => $allTransactions->where('status', 'pending')->count(),
+            'count_overdue' => $allTransactions->where('status', 'overdue')->count(),
+            'count_unpaid' => $allTransactions->whereIn('status', ['pending', 'overdue'])->count(),
+            'count_cancelled' => $allTransactions->where('status', 'cancelled')->count(),
+        ];
+
+        return [
+            'kpi' => $kpi,
+            'categoryBreakdown' => $categoryBreakdown,
         ];
     }
 

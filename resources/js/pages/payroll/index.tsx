@@ -423,12 +423,12 @@ export default function PayrollIndex({ payrolls, summary, filters }: PayrollInde
 
                 {/* Table */}
                 <div className="rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/90 dark:border-slate-800 shadow-xs overflow-hidden">
-                    <div className="overflow-x-auto">
-                        <table className="w-full text-left text-xs text-slate-600 dark:text-slate-300">
+                    <div className="w-full overflow-x-auto scrollbar-thin">
+                        <table className="w-full min-w-[1150px] text-left text-xs text-slate-600 dark:text-slate-300">
                             <thead className="bg-slate-50 dark:bg-slate-950/70 border-b border-slate-200/80 dark:border-slate-800 uppercase tracking-wider text-[11px] font-bold text-slate-500 dark:text-slate-400">
                                 <tr>
                                     {hasPermission(authUser, 'print-payslips') && (
-                                        <th className="px-4 py-4 w-10">
+                                        <th className="px-4 py-4 w-10 whitespace-nowrap">
                                             <input
                                                 type="checkbox"
                                                 checked={isAllSelected}
@@ -437,13 +437,13 @@ export default function PayrollIndex({ payrolls, summary, filters }: PayrollInde
                                             />
                                         </th>
                                     )}
-                                    <th className="px-6 py-4">Employee</th>
-                                    <th className="px-6 py-4">Base Salary</th>
-                                    <th className="px-6 py-4">Days / Leaves</th>
-                                    <th className="px-6 py-4">Deductions & Bonuses</th>
-                                    <th className="px-6 py-4">Net Payable (PKR)</th>
-                                    <th className="px-6 py-4">Disbursement Status</th>
-                                    <th className="px-6 py-4 text-right">Actions</th>
+                                    <th className="px-6 py-4 whitespace-nowrap min-w-[220px]">Employee</th>
+                                    <th className="px-6 py-4 whitespace-nowrap min-w-[150px]">Base Salary</th>
+                                    <th className="px-6 py-4 whitespace-nowrap min-w-[160px]">Days / Leaves</th>
+                                    <th className="px-6 py-4 whitespace-nowrap min-w-[180px]">Deductions & Bonuses</th>
+                                    <th className="px-6 py-4 whitespace-nowrap min-w-[150px]">Net Payable (PKR)</th>
+                                    <th className="px-6 py-4 whitespace-nowrap min-w-[150px]">Disbursement Status</th>
+                                    <th className="px-6 py-4 text-right whitespace-nowrap min-w-[160px]">Actions</th>
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
@@ -456,7 +456,7 @@ export default function PayrollIndex({ payrolls, summary, filters }: PayrollInde
                                             <tr key={item.id} className="hover:bg-slate-50/70 dark:hover:bg-slate-800/40 transition-colors">
                                                 {/* Checkbox */}
                                                 {hasPermission(authUser, 'print-payslips') && (
-                                                    <td className="px-4 py-4">
+                                                    <td className="px-4 py-4 whitespace-nowrap">
                                                         <input
                                                             type="checkbox"
                                                             checked={isChecked}
@@ -467,7 +467,7 @@ export default function PayrollIndex({ payrolls, summary, filters }: PayrollInde
                                                 )}
 
                                                 {/* Employee Info */}
-                                                <td className="px-6 py-4">
+                                                <td className="px-6 py-4 whitespace-nowrap">
                                                     <div>
                                                         <div className="flex items-center gap-2">
                                                             <Link
@@ -487,7 +487,7 @@ export default function PayrollIndex({ payrolls, summary, filters }: PayrollInde
                                                 </td>
 
                                                 {/* Base Salary */}
-                                                <td className="px-6 py-4 font-bold text-slate-800 dark:text-slate-200">
+                                                <td className="px-6 py-4 font-bold text-slate-800 dark:text-slate-200 whitespace-nowrap">
                                                     PKR {Number(item.base_salary_pkr).toLocaleString()}
                                                     <span className="text-[10px] text-slate-400 block font-normal mt-0.5">
                                                         Daily ~ PKR {Number(item.daily_rate_pkr).toLocaleString()}
@@ -495,7 +495,7 @@ export default function PayrollIndex({ payrolls, summary, filters }: PayrollInde
                                                 </td>
 
                                                 {/* Days & Leaves */}
-                                                <td className="px-6 py-4">
+                                                <td className="px-6 py-4 whitespace-nowrap">
                                                     <div className="space-y-1 text-xs font-semibold">
                                                         <div>Work Days: <strong className="text-slate-900 dark:text-white">{item.total_working_days}</strong></div>
                                                         <div className="text-[11px]">
@@ -506,7 +506,7 @@ export default function PayrollIndex({ payrolls, summary, filters }: PayrollInde
                                                 </td>
 
                                                 {/* Deductions & Bonuses */}
-                                                <td className="px-6 py-4">
+                                                <td className="px-6 py-4 whitespace-nowrap">
                                                     <div className="space-y-0.5 text-xs font-medium">
                                                         {Number(item.leave_deduction_pkr) > 0 && (
                                                             <span className="text-rose-600 font-bold block text-[11px]">
@@ -530,7 +530,7 @@ export default function PayrollIndex({ payrolls, summary, filters }: PayrollInde
                                                 </td>
 
                                                 {/* Net Salary PKR */}
-                                                <td className="px-6 py-4 font-extrabold text-slate-900 dark:text-white text-base">
+                                                <td className="px-6 py-4 font-extrabold text-slate-900 dark:text-white text-base whitespace-nowrap">
                                                     <span className="text-blue-600 dark:text-blue-400">
                                                         PKR {Number(item.net_salary_pkr).toLocaleString()}
                                                     </span>

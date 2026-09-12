@@ -463,6 +463,9 @@ class ProjectController extends Controller
 
         if ($task->assigned_employee_id && $task->assigned_employee_id !== $oldAssignedId) {
             TaskNotificationService::notifyAssignedEmployee($task, 'project', $oldAssignedId);
+        } elseif ($task->assigned_employee_id && $oldAssignedId && (int) $task->assigned_employee_id === (int) $oldAssignedId) {
+            // Task was already assigned to this employee and has now been updated
+            TaskNotificationService::notifyTaskUpdated($task, 'project');
         }
 
         return redirect()->back()->with('success', 'Task updated successfully.');
@@ -482,6 +485,7 @@ class ProjectController extends Controller
             'status' => 'required|in:todo,in_progress,in_review,completed,cancelled',
         ]);
 
+        $oldStatus = $task->status;
         $updateData = ['status' => $validated['status']];
         if ($validated['status'] === 'completed') {
             $updateData['completed_at'] = now();
@@ -490,6 +494,10 @@ class ProjectController extends Controller
         }
 
         $task->update($updateData);
+
+        if ($oldStatus !== $validated['status'] && $task->assigned_employee_id) {
+            TaskNotificationService::notifyTaskUpdated($task, 'project', ['status' => $validated['status']]);
+        }
 
         return redirect()->back()->with('success', 'Task status updated.');
     }

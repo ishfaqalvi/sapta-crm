@@ -343,7 +343,7 @@ export default function ClientPortalInvoiceShow({
 
                     {/* Line Items Table */}
                     {(() => {
-                        const hasAnyRemainingCost = Boolean(invoice.items?.some((item) => Number(item.remaining_cost) > 0));
+                        const hasAnyRemainingCost = false; // Hidden for now per requirement
                         return (
                             <div className="overflow-x-auto">
                                 <table className="w-full text-left text-xs text-slate-700 dark:text-slate-300">

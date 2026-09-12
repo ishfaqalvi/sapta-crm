@@ -9,6 +9,7 @@ use App\Models\Task;
 use App\Models\TaskMessage;
 use App\Models\User;
 use App\Notifications\CrmNotification;
+use App\Services\TaskNotificationService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -32,6 +33,10 @@ class TaskMessageController extends Controller
         $task = $this->resolveTask($type, $id);
         if (!$task) {
             abort(404, 'Task not found');
+        }
+
+        if (!$this->canAccessTask($user, $type, $task)) {
+            abort(403, 'Unauthorized access to this task.');
         }
 
         $task->load([
@@ -140,6 +145,10 @@ class TaskMessageController extends Controller
             abort(404, 'Task not found');
         }
 
+        if (!$this->canAccessTask($user, $type, $task)) {
+            abort(403, 'Unauthorized access to update this task.');
+        }
+
         $validated = $request->validate([
             'status' => 'required|in:todo,in_progress,in_review,completed,cancelled',
         ]);
@@ -151,7 +160,12 @@ class TaskMessageController extends Controller
             $updateData['completed_at'] = null;
         }
 
+        $oldStatus = $task->status;
         $task->update($updateData);
+
+        if ($oldStatus !== $validated['status'] && $task->assigned_employee_id) {
+            TaskNotificationService::notifyTaskUpdated($task, $type, ['status' => $validated['status']]);
+        }
 
         return redirect()->back()->with('success', 'Task status updated successfully.');
     }
@@ -169,6 +183,10 @@ class TaskMessageController extends Controller
         $task = $this->resolveTask($type, $id);
         if (!$task) {
             return response()->json(['error' => 'Task not found'], 404);
+        }
+
+        if (!$this->canAccessTask($user, $type, $task)) {
+            return response()->json(['error' => 'Unauthorized access to this task.'], 403);
         }
 
         $messages = $task->messages()
@@ -254,6 +272,10 @@ class TaskMessageController extends Controller
             return response()->json(['error' => 'Task not found'], 404);
         }
 
+        if (!$this->canAccessTask($user, $validated['task_type'], $task)) {
+            return response()->json(['error' => 'Unauthorized access to this task.'], 403);
+        }
+
         if (!$task->assigned_employee_id) {
             return response()->json([
                 'error' => 'This task must be assigned to an employee before starting a discussion or sending queries.',
@@ -335,6 +357,52 @@ class TaskMessageController extends Controller
             'general' => Task::with(['taskCategory', 'assignedEmployee'])->find($id),
             default => null,
         };
+    }
+
+    /**
+     * Determine if the user is an employee and get their employee ID.
+     */
+    protected function isEmployeeUser(?User $user): array
+    {
+        if (!$user) {
+            return [false, null];
+        }
+
+        $isAdmin = $user->hasRole('admin') || $user->hasRole('Super Admin') || $user->type === 'admin';
+        if ($isAdmin) {
+            return [false, null];
+        }
+
+        $isEmployee = $user->type === 'employee' || !empty($user->employee_id);
+        $employeeId = null;
+
+        if ($isEmployee) {
+            if ($user->employee_id) {
+                $employeeId = $user->employee_id;
+            } else {
+                $employee = Employee::where('user_id', $user->id)
+                    ->orWhere('email', $user->email)
+                    ->first();
+                $employeeId = $employee?->id;
+            }
+        }
+
+        return [$isEmployee, $employeeId];
+    }
+
+    /**
+     * Check if the authenticated user has authorization to access the specific task.
+     */
+    protected function canAccessTask(User $user, string $type, $task): bool
+    {
+        if ($type === 'general') {
+            [$isEmployee, $employeeId] = $this->isEmployeeUser($user);
+            if ($isEmployee) {
+                return (int) $task->assigned_employee_id === (int) $employeeId;
+            }
+        }
+
+        return true;
     }
 
     /**

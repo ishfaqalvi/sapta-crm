@@ -70,10 +70,26 @@ export interface CategoryBreakdown {
     hosting: CategoryBreakdownItem;
 }
 
+export interface KpiData {
+    total_billed: number;
+    total_paid: number;
+    total_pending: number;
+    total_overdue: number;
+    total_unpaid?: number;
+    total_cancelled: number;
+    count_all: number;
+    count_paid: number;
+    count_pending: number;
+    count_overdue: number;
+    count_unpaid?: number;
+    count_cancelled: number;
+}
+
 interface DashboardProps {
     canViewDashboard?: boolean;
     canViewBudget?: boolean;
     categoryBreakdown?: CategoryBreakdown;
+    kpi?: KpiData;
     kpis: {
         total_revenue_pkr: number;
         mrr_pkr: number;
@@ -172,6 +188,20 @@ interface DashboardProps {
 export default function Dashboard({
     canViewDashboard,
     canViewBudget: canViewBudgetProp,
+    kpi = {
+        total_billed: 0,
+        total_paid: 0,
+        total_pending: 0,
+        total_overdue: 0,
+        total_unpaid: 0,
+        total_cancelled: 0,
+        count_all: 0,
+        count_paid: 0,
+        count_pending: 0,
+        count_overdue: 0,
+        count_unpaid: 0,
+        count_cancelled: 0,
+    },
     categoryBreakdown = {
         project: { total: 0, paid: 0, pending: 0, count: 0 },
         service: { total: 0, paid: 0, pending: 0, count: 0 },
@@ -207,6 +237,9 @@ export default function Dashboard({
 }: DashboardProps) {
     const { auth } = usePage().props as any;
     const user = auth?.user;
+
+    const totalUnpaid = (kpi?.total_unpaid ?? ((kpi?.total_pending || 0) + (kpi?.total_overdue || 0))) || 0;
+    const countUnpaid = (kpi?.count_unpaid ?? ((kpi?.count_pending || 0) + (kpi?.count_overdue || 0))) || 0;
 
     const [activeChartTab, setActiveChartTab] = useState<'revenue' | 'net'>('revenue');
 
@@ -355,78 +388,68 @@ export default function Dashboard({
                     </div>
                 </div>
 
-                {/* 4 Main Executive KPI Cards (Row of 4 with Vibrant Colors) */}
+                {/* Main Executive KPI Stat Cards (Identical in Style & Clarity to Financial Reports Page) */}
                 {canViewBudget ? (
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                        {/* Card 1: Total Collected Revenue (Vibrant Emerald Card) */}
-                        <div className="p-4 sm:p-5 rounded-xl bg-gradient-to-br from-emerald-500/10 via-emerald-500/5 to-transparent dark:from-emerald-950/40 dark:via-emerald-950/20 bg-white dark:bg-slate-900 border border-emerald-200/90 dark:border-emerald-800/80 shadow-xs flex items-center justify-between hover:border-emerald-300 transition-all">
-                            <div className="space-y-1">
-                                <span className="text-[11px] font-extrabold uppercase tracking-wider text-emerald-700 dark:text-emerald-400">
-                                    Total Revenue
-                                </span>
-                                <h3 className="text-xl sm:text-2xl font-black text-slate-900 dark:text-white font-mono tracking-tight">
-                                    PKR {Number(kpis.total_revenue_pkr || 0).toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        {/* Total Billed Volume */}
+                        <div className="p-4 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 shadow-xs flex items-center justify-between">
+                            <div>
+                                <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400">
+                                    Total Billed Volume
+                                </p>
+                                <h3 className="text-lg font-black text-slate-900 dark:text-white mt-0.5">
+                                    PKR {kpi.total_billed.toLocaleString('en-US', {
+                                        minimumFractionDigits: 2,
+                                        maximumFractionDigits: 2,
+                                    })}
                                 </h3>
-                                <p className="text-[10px] text-emerald-700 dark:text-emerald-400 font-bold flex items-center gap-1">
-                                    <ArrowUpRight className="size-3" /> All-time collected inflow
+                                <p className="text-[10px] text-slate-400 font-semibold mt-1">
+                                    {kpi.count_all} records recorded
                                 </p>
                             </div>
-                            <div className="size-11 rounded-xl bg-emerald-500 text-white flex items-center justify-center shadow-md shadow-emerald-500/30 shrink-0">
-                                <TrendingUp className="size-5" />
-                            </div>
-                        </div>
-
-                        {/* Card 2: Monthly Retainers Yield (Vibrant Electric Blue Card) */}
-                        <div className="p-4 sm:p-5 rounded-xl bg-gradient-to-br from-blue-500/10 via-blue-500/5 to-transparent dark:from-blue-950/40 dark:via-blue-950/20 bg-white dark:bg-slate-900 border border-blue-200/90 dark:border-blue-800/80 shadow-xs flex items-center justify-between hover:border-blue-300 transition-all">
-                            <div className="space-y-1">
-                                <span className="text-[11px] font-extrabold uppercase tracking-wider text-blue-700 dark:text-blue-400">
-                                    Monthly Retainers (MRR)
-                                </span>
-                                <h3 className="text-xl sm:text-2xl font-black text-slate-900 dark:text-white font-mono tracking-tight">
-                                    PKR {Number(kpis.mrr_pkr || 0).toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
-                                </h3>
-                                <p className="text-[10px] text-blue-700 dark:text-blue-400 font-bold">
-                                    Active recurring service yield
-                                </p>
-                            </div>
-                            <div className="size-11 rounded-xl bg-blue-600 text-white flex items-center justify-center shadow-md shadow-blue-600/30 shrink-0">
+                            <div className="size-11 rounded-2xl bg-blue-50 dark:bg-blue-950 text-blue-600 dark:text-blue-400 flex items-center justify-center shadow-2xs">
                                 <Receipt className="size-5" />
                             </div>
                         </div>
 
-                        {/* Card 3: Net Cash Flow / Profit (Vibrant Teal / Violet Card) */}
-                        <div className="p-4 sm:p-5 rounded-xl bg-gradient-to-br from-teal-500/10 via-teal-500/5 to-transparent dark:from-teal-950/40 dark:via-teal-950/20 bg-white dark:bg-slate-900 border border-teal-200/90 dark:border-teal-800/80 shadow-xs flex items-center justify-between hover:border-teal-300 transition-all">
-                            <div className="space-y-1">
-                                <span className="text-[11px] font-extrabold uppercase tracking-wider text-teal-700 dark:text-teal-400">
-                                    Net Cash Flow
-                                </span>
-                                <h3 className={`text-xl sm:text-2xl font-black font-mono tracking-tight ${kpis.net_profit_pkr >= 0 ? 'text-teal-600 dark:text-teal-400' : 'text-rose-600 dark:text-rose-400'
-                                    }`}>
-                                    PKR {Number(kpis.net_profit_pkr || 0).toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
+                        {/* Total Paid Amount */}
+                        <div className="p-4 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 shadow-xs flex items-center justify-between">
+                            <div>
+                                <p className="text-[11px] font-bold uppercase tracking-wider text-emerald-600 dark:text-emerald-400">
+                                    Total Paid Amount
+                                </p>
+                                <h3 className="text-lg font-black text-emerald-600 dark:text-emerald-400 mt-0.5">
+                                    PKR {kpi.total_paid.toLocaleString('en-US', {
+                                        minimumFractionDigits: 2,
+                                        maximumFractionDigits: 2,
+                                    })}
                                 </h3>
-                                <p className="text-[10px] text-slate-500 dark:text-slate-400 font-bold">
-                                    Revenue vs (Expenses + Payroll)
+                                <p className="text-[10px] text-emerald-700 dark:text-emerald-400 font-semibold mt-1">
+                                    {kpi.count_paid} settled payments
                                 </p>
                             </div>
-                            <div className="size-11 rounded-xl bg-teal-600 text-white flex items-center justify-center shadow-md shadow-teal-600/30 shrink-0">
-                                <Coins className="size-5" />
+                            <div className="size-11 rounded-2xl bg-emerald-50 dark:bg-emerald-950 text-emerald-600 dark:text-emerald-400 flex items-center justify-center shadow-2xs">
+                                <CheckCircle2 className="size-5" />
                             </div>
                         </div>
 
-                        {/* Card 4: Receivables Due & Overdue (Vibrant Amber / Rose Card) */}
-                        <div className="p-4 sm:p-5 rounded-xl bg-gradient-to-br from-amber-500/10 via-amber-500/5 to-transparent dark:from-amber-950/40 dark:via-amber-950/20 bg-white dark:bg-slate-900 border border-amber-200/90 dark:border-amber-800/80 shadow-xs flex items-center justify-between hover:border-amber-300 transition-all">
-                            <div className="space-y-1">
-                                <span className="text-[11px] font-extrabold uppercase tracking-wider text-amber-700 dark:text-amber-400">
-                                    Receivables Due
-                                </span>
-                                <h3 className="text-xl sm:text-2xl font-black text-amber-600 dark:text-amber-400 font-mono tracking-tight">
-                                    PKR {Number(kpis.pending_receivables_pkr || 0).toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
+                        {/* Total Unpaid Amount */}
+                        <div className="p-4 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 shadow-xs flex items-center justify-between">
+                            <div>
+                                <p className="text-[11px] font-bold uppercase tracking-wider text-amber-600 dark:text-amber-400">
+                                    Total Unpaid Amount
+                                </p>
+                                <h3 className="text-lg font-black text-amber-600 dark:text-amber-400 mt-0.5">
+                                    PKR {totalUnpaid.toLocaleString('en-US', {
+                                        minimumFractionDigits: 2,
+                                        maximumFractionDigits: 2,
+                                    })}
                                 </h3>
-                                <p className="text-[10px] text-amber-700 dark:text-amber-400 font-bold">
-                                    Pending milestones & invoices
+                                <p className="text-[10px] text-amber-700 dark:text-amber-400 font-semibold mt-1">
+                                    {countUnpaid} items pending / due
                                 </p>
                             </div>
-                            <div className="size-11 rounded-xl bg-amber-500 text-white flex items-center justify-center shadow-md shadow-amber-500/30 shrink-0">
+                            <div className="size-11 rounded-2xl bg-amber-50 dark:bg-amber-950 text-amber-600 dark:text-amber-400 flex items-center justify-center shadow-2xs">
                                 <Clock className="size-5" />
                             </div>
                         </div>
@@ -434,80 +457,80 @@ export default function Dashboard({
                 ) : (
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                         {/* Operational Card 1: Projects Pipeline */}
-                        <div className="p-4 sm:p-5 rounded-xl bg-gradient-to-br from-purple-500/10 via-purple-500/5 to-transparent dark:from-purple-950/40 dark:via-purple-950/20 bg-white dark:bg-slate-900 border border-purple-200/90 dark:border-purple-800/80 shadow-xs flex items-center justify-between hover:border-purple-300 transition-all">
-                            <div className="space-y-1">
-                                <span className="text-[11px] font-extrabold uppercase tracking-wider text-purple-700 dark:text-purple-400">
+                        <div className="p-4 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 shadow-xs flex items-center justify-between">
+                            <div>
+                                <p className="text-[11px] font-bold uppercase tracking-wider text-purple-600 dark:text-purple-400">
                                     Projects Pipeline
-                                </span>
-                                <h3 className="text-xl sm:text-2xl font-black text-slate-900 dark:text-white font-mono tracking-tight">
-                                    {kpis.active_projects_count} <span className="text-sm font-bold text-slate-400">Active</span>
+                                </p>
+                                <h3 className="text-lg font-black text-slate-900 dark:text-white mt-0.5">
+                                    {kpis.active_projects_count} <span className="text-xs font-bold text-slate-400">Active</span>
                                 </h3>
-                                <p className="text-[10px] text-purple-700 dark:text-purple-400 font-bold">
-                                    {kpis.total_projects_count} Total Projects Assigned
+                                <p className="text-[10px] text-slate-400 font-semibold mt-1">
+                                    {kpis.total_projects_count} total projects
                                 </p>
                             </div>
-                            <div className="size-11 rounded-xl bg-purple-600 text-white flex items-center justify-center shadow-md shadow-purple-600/30 shrink-0">
+                            <div className="size-11 rounded-2xl bg-purple-50 dark:bg-purple-950 text-purple-600 dark:text-purple-400 flex items-center justify-center shadow-2xs">
                                 <Briefcase className="size-5" />
                             </div>
                         </div>
 
                         {/* Operational Card 2: Workload Tasks */}
-                        <div className="p-4 sm:p-5 rounded-xl bg-gradient-to-br from-blue-500/10 via-blue-500/5 to-transparent dark:from-blue-950/40 dark:via-blue-950/20 bg-white dark:bg-slate-900 border border-blue-200/90 dark:border-blue-800/80 shadow-xs flex items-center justify-between hover:border-blue-300 transition-all">
-                            <div className="space-y-1">
-                                <span className="text-[11px] font-extrabold uppercase tracking-wider text-blue-700 dark:text-blue-400">
+                        <div className="p-4 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 shadow-xs flex items-center justify-between">
+                            <div>
+                                <p className="text-[11px] font-bold uppercase tracking-wider text-blue-600 dark:text-blue-400">
                                     Workload Tasks
-                                </span>
-                                <h3 className="text-xl sm:text-2xl font-black text-blue-600 dark:text-blue-400 font-mono tracking-tight">
-                                    {kpis.pending_tasks_count} <span className="text-sm font-bold text-slate-400">Pending</span>
+                                </p>
+                                <h3 className="text-lg font-black text-slate-900 dark:text-white mt-0.5">
+                                    {kpis.pending_tasks_count} <span className="text-xs font-bold text-slate-400">Pending</span>
                                 </h3>
-                                <p className="text-[10px] text-blue-700 dark:text-blue-400 font-bold flex items-center gap-1">
-                                    <AlertCircle className="size-3 text-rose-500" /> {kpis.urgent_tasks_count} Urgent Priority
+                                <p className="text-[10px] text-blue-700 dark:text-blue-400 font-semibold mt-1 flex items-center gap-1">
+                                    <AlertCircle className="size-3 text-rose-500" /> {kpis.urgent_tasks_count} urgent priority
                                 </p>
                             </div>
-                            <div className="size-11 rounded-xl bg-blue-600 text-white flex items-center justify-center shadow-md shadow-blue-600/30 shrink-0">
+                            <div className="size-11 rounded-2xl bg-blue-50 dark:bg-blue-950 text-blue-600 dark:text-blue-400 flex items-center justify-center shadow-2xs">
                                 <CheckCircle2 className="size-5" />
                             </div>
                         </div>
 
                         {/* Operational Card 3: Web Infrastructure */}
-                        <div className="p-4 sm:p-5 rounded-xl bg-gradient-to-br from-amber-500/10 via-amber-500/5 to-transparent dark:from-amber-950/40 dark:via-amber-950/20 bg-white dark:bg-slate-900 border border-amber-200/90 dark:border-amber-800/80 shadow-xs flex items-center justify-between hover:border-amber-300 transition-all">
-                            <div className="space-y-1">
-                                <span className="text-[11px] font-extrabold uppercase tracking-wider text-amber-700 dark:text-amber-400">
+                        <div className="p-4 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 shadow-xs flex items-center justify-between">
+                            <div>
+                                <p className="text-[11px] font-bold uppercase tracking-wider text-amber-600 dark:text-amber-400">
                                     Web Infrastructure
-                                </span>
-                                <h3 className="text-xl sm:text-2xl font-black text-slate-900 dark:text-white font-mono tracking-tight">
-                                    {kpis.total_domains_count + kpis.total_hostings_count} <span className="text-sm font-bold text-slate-400">Assets</span>
+                                </p>
+                                <h3 className="text-lg font-black text-slate-900 dark:text-white mt-0.5">
+                                    {kpis.total_domains_count + kpis.total_hostings_count} <span className="text-xs font-bold text-slate-400">Assets</span>
                                 </h3>
-                                <p className="text-[10px] text-amber-700 dark:text-amber-400 font-bold">
+                                <p className="text-[10px] text-slate-400 font-semibold mt-1">
                                     {kpis.total_domains_count} Domains • {kpis.total_hostings_count} Hostings
                                 </p>
                             </div>
-                            <div className="size-11 rounded-xl bg-amber-500 text-white flex items-center justify-center shadow-md shadow-amber-500/30 shrink-0">
+                            <div className="size-11 rounded-2xl bg-amber-50 dark:bg-amber-950 text-amber-600 dark:text-amber-400 flex items-center justify-center shadow-2xs">
                                 <Globe className="size-5" />
                             </div>
                         </div>
 
                         {/* Operational Card 4: Clients & Workforce */}
-                        <div className="p-4 sm:p-5 rounded-xl bg-gradient-to-br from-emerald-500/10 via-emerald-500/5 to-transparent dark:from-emerald-950/40 dark:via-emerald-950/20 bg-white dark:bg-slate-900 border border-emerald-200/90 dark:border-emerald-800/80 shadow-xs flex items-center justify-between hover:border-emerald-300 transition-all">
-                            <div className="space-y-1">
-                                <span className="text-[11px] font-extrabold uppercase tracking-wider text-emerald-700 dark:text-emerald-400">
+                        <div className="p-4 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 shadow-xs flex items-center justify-between">
+                            <div>
+                                <p className="text-[11px] font-bold uppercase tracking-wider text-emerald-600 dark:text-emerald-400">
                                     Clients & Workforce
-                                </span>
-                                <h3 className="text-xl sm:text-2xl font-black text-slate-900 dark:text-white font-mono tracking-tight">
-                                    {kpis.total_clients_count} <span className="text-sm font-bold text-slate-400">Clients</span>
+                                </p>
+                                <h3 className="text-lg font-black text-slate-900 dark:text-white mt-0.5">
+                                    {kpis.total_clients_count} <span className="text-xs font-bold text-slate-400">Clients</span>
                                 </h3>
-                                <p className="text-[10px] text-emerald-700 dark:text-emerald-400 font-bold">
-                                    {kpis.active_clients_count} Active Clients • {kpis.total_employees_count} Employees
+                                <p className="text-[10px] text-slate-400 font-semibold mt-1">
+                                    {kpis.active_clients_count} Active • {kpis.total_employees_count} Employees
                                 </p>
                             </div>
-                            <div className="size-11 rounded-xl bg-emerald-600 text-white flex items-center justify-center shadow-md shadow-emerald-600/30 shrink-0">
+                            <div className="size-11 rounded-2xl bg-emerald-50 dark:bg-emerald-950 text-emerald-600 dark:text-emerald-400 flex items-center justify-center shadow-2xs">
                                 <Users className="size-5" />
                             </div>
                         </div>
                     </div>
                 )}
 
-                {/* Category-Wise Financial Breakdown Strip */}
+                {/* 4 Category Summary Lifetime Cards (Consistent with Financial Report) */}
                 <div className="space-y-2.5">
                     <div className="flex items-center justify-between">
                         <span className="text-[11px] font-extrabold uppercase tracking-wider text-slate-400">
@@ -516,7 +539,7 @@ export default function Dashboard({
                         {canViewBudget && (
                             <Link
                                 href="/reports"
-                                className="text-xs font-bold text-indigo-600 dark:text-indigo-400 hover:text-indigo-700 dark:hover:text-indigo-300 flex items-center gap-1 transition-colors"
+                                className="text-xs font-bold text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 flex items-center gap-1 transition-colors"
                             >
                                 Detailed Financial Ledger <ArrowUpRight className="size-3.5" />
                             </Link>
@@ -527,24 +550,24 @@ export default function Dashboard({
                         {/* Projects Breakdown */}
                         <Link
                             href="/reports?category=project"
-                            className="p-4 rounded-xl border transition-all cursor-pointer shadow-2xs bg-white dark:bg-slate-900 border-slate-200/80 dark:border-slate-800 hover:border-purple-300 dark:hover:border-purple-700 hover:shadow-xs group block"
+                            className="p-4 rounded-2xl border transition-all cursor-pointer shadow-xs bg-white dark:bg-slate-900 border-slate-200/80 dark:border-slate-800 hover:border-purple-300 dark:hover:border-purple-700 hover:shadow-sm group block"
                         >
                             <div className="flex items-center justify-between">
                                 <span className="text-xs font-extrabold text-slate-900 dark:text-white flex items-center gap-1.5 group-hover:text-purple-600 dark:group-hover:text-purple-400 transition-colors">
                                     <FolderKanban className="size-4 text-purple-600" />
-                                    Website Projects
+                                    Project Milestones
                                 </span>
-                                <span className="text-[11px] font-extrabold text-slate-400 bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded-full">
-                                    {categoryBreakdown.project.count} {categoryBreakdown.project.count === 1 ? 'project' : 'projects'}
+                                <span className="text-[11px] font-extrabold text-slate-400">
+                                    {categoryBreakdown.project.count} {categoryBreakdown.project.count === 1 ? 'item' : 'items'}
                                 </span>
                             </div>
                             {canViewBudget ? (
                                 <>
                                     <div className="mt-3 flex items-baseline justify-between">
-                                        <span className="text-xs text-slate-500">Total Budget:</span>
-                                        <span className="text-sm font-black text-slate-900 dark:text-white font-mono">
+                                        <span className="text-xs text-slate-500">Total:</span>
+                                        <span className="text-sm font-black text-slate-900 dark:text-white">
                                             PKR {categoryBreakdown.project.total.toLocaleString('en-US', {
-                                                minimumFractionDigits: 0,
+                                                minimumFractionDigits: 2,
                                                 maximumFractionDigits: 2,
                                             })}
                                         </span>
@@ -568,14 +591,14 @@ export default function Dashboard({
                         {/* Services Breakdown */}
                         <Link
                             href="/reports?category=service"
-                            className="p-4 rounded-xl border transition-all cursor-pointer shadow-2xs bg-white dark:bg-slate-900 border-slate-200/80 dark:border-slate-800 hover:border-emerald-300 dark:hover:border-emerald-700 hover:shadow-xs group block"
+                            className="p-4 rounded-2xl border transition-all cursor-pointer shadow-xs bg-white dark:bg-slate-900 border-slate-200/80 dark:border-slate-800 hover:border-emerald-300 dark:hover:border-emerald-700 hover:shadow-sm group block"
                         >
                             <div className="flex items-center justify-between">
                                 <span className="text-xs font-extrabold text-slate-900 dark:text-white flex items-center gap-1.5 group-hover:text-emerald-600 dark:group-hover:text-emerald-400 transition-colors">
                                     <Layers className="size-4 text-emerald-600" />
                                     Subscriptions & Services
                                 </span>
-                                <span className="text-[11px] font-extrabold text-slate-400 bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded-full">
+                                <span className="text-[11px] font-extrabold text-slate-400">
                                     {categoryBreakdown.service.count} cycles
                                 </span>
                             </div>
@@ -583,9 +606,9 @@ export default function Dashboard({
                                 <>
                                     <div className="mt-3 flex items-baseline justify-between">
                                         <span className="text-xs text-slate-500">Total:</span>
-                                        <span className="text-sm font-black text-slate-900 dark:text-white font-mono">
+                                        <span className="text-sm font-black text-slate-900 dark:text-white">
                                             PKR {categoryBreakdown.service.total.toLocaleString('en-US', {
-                                                minimumFractionDigits: 0,
+                                                minimumFractionDigits: 2,
                                                 maximumFractionDigits: 2,
                                             })}
                                         </span>
@@ -609,14 +632,14 @@ export default function Dashboard({
                         {/* Domains Breakdown */}
                         <Link
                             href="/reports?category=domain"
-                            className="p-4 rounded-xl border transition-all cursor-pointer shadow-2xs bg-white dark:bg-slate-900 border-slate-200/80 dark:border-slate-800 hover:border-blue-300 dark:hover:border-blue-700 hover:shadow-xs group block"
+                            className="p-4 rounded-2xl border transition-all cursor-pointer shadow-xs bg-white dark:bg-slate-900 border-slate-200/80 dark:border-slate-800 hover:border-blue-300 dark:hover:border-blue-700 hover:shadow-sm group block"
                         >
                             <div className="flex items-center justify-between">
                                 <span className="text-xs font-extrabold text-slate-900 dark:text-white flex items-center gap-1.5 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
                                     <Globe className="size-4 text-blue-600" />
                                     Domain Registrations
                                 </span>
-                                <span className="text-[11px] font-extrabold text-slate-400 bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded-full">
+                                <span className="text-[11px] font-extrabold text-slate-400">
                                     {categoryBreakdown.domain.count} records
                                 </span>
                             </div>
@@ -624,9 +647,9 @@ export default function Dashboard({
                                 <>
                                     <div className="mt-3 flex items-baseline justify-between">
                                         <span className="text-xs text-slate-500">Total:</span>
-                                        <span className="text-sm font-black text-slate-900 dark:text-white font-mono">
+                                        <span className="text-sm font-black text-slate-900 dark:text-white">
                                             PKR {categoryBreakdown.domain.total.toLocaleString('en-US', {
-                                                minimumFractionDigits: 0,
+                                                minimumFractionDigits: 2,
                                                 maximumFractionDigits: 2,
                                             })}
                                         </span>
@@ -650,14 +673,14 @@ export default function Dashboard({
                         {/* Hostings Breakdown */}
                         <Link
                             href="/reports?category=hosting"
-                            className="p-4 rounded-xl border transition-all cursor-pointer shadow-2xs bg-white dark:bg-slate-900 border-slate-200/80 dark:border-slate-800 hover:border-amber-300 dark:hover:border-amber-700 hover:shadow-xs group block"
+                            className="p-4 rounded-2xl border transition-all cursor-pointer shadow-xs bg-white dark:bg-slate-900 border-slate-200/80 dark:border-slate-800 hover:border-amber-300 dark:hover:border-amber-700 hover:shadow-sm group block"
                         >
                             <div className="flex items-center justify-between">
                                 <span className="text-xs font-extrabold text-slate-900 dark:text-white flex items-center gap-1.5 group-hover:text-amber-600 dark:group-hover:text-amber-400 transition-colors">
                                     <Server className="size-4 text-amber-600" />
                                     Web Hostings
                                 </span>
-                                <span className="text-[11px] font-extrabold text-slate-400 bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded-full">
+                                <span className="text-[11px] font-extrabold text-slate-400">
                                     {categoryBreakdown.hosting.count} accounts
                                 </span>
                             </div>
@@ -665,9 +688,9 @@ export default function Dashboard({
                                 <>
                                     <div className="mt-3 flex items-baseline justify-between">
                                         <span className="text-xs text-slate-500">Total:</span>
-                                        <span className="text-sm font-black text-slate-900 dark:text-white font-mono">
+                                        <span className="text-sm font-black text-slate-900 dark:text-white">
                                             PKR {categoryBreakdown.hosting.total.toLocaleString('en-US', {
-                                                minimumFractionDigits: 0,
+                                                minimumFractionDigits: 2,
                                                 maximumFractionDigits: 2,
                                             })}
                                         </span>

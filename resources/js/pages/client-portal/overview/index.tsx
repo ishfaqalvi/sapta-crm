@@ -208,10 +208,26 @@ export interface CategoryBreakdown {
     hosting: CategoryBreakdownItem;
 }
 
+export interface KpiData {
+    total_billed: number;
+    total_paid: number;
+    total_pending: number;
+    total_overdue: number;
+    total_unpaid?: number;
+    total_cancelled: number;
+    count_all: number;
+    count_paid: number;
+    count_pending: number;
+    count_overdue: number;
+    count_unpaid?: number;
+    count_cancelled: number;
+}
+
 interface ClientPortalOverviewProps {
     client: ClientDetailItem;
     invoices?: InvoiceItemData[];
     categoryBreakdown?: CategoryBreakdown;
+    kpi?: KpiData;
     canViewOverview?: boolean;
     canViewProjectBudget?: boolean;
     canViewServiceBudget?: boolean;
@@ -226,6 +242,20 @@ export default function ClientPortalOverview({
         service: { total: 0, paid: 0, pending: 0, count: 0 },
         domain: { total: 0, paid: 0, pending: 0, count: 0 },
         hosting: { total: 0, paid: 0, pending: 0, count: 0 },
+    },
+    kpi = {
+        total_billed: 0,
+        total_paid: 0,
+        total_pending: 0,
+        total_overdue: 0,
+        total_unpaid: 0,
+        total_cancelled: 0,
+        count_all: 0,
+        count_paid: 0,
+        count_pending: 0,
+        count_overdue: 0,
+        count_unpaid: 0,
+        count_cancelled: 0,
     },
     canViewOverview,
     canViewProjectBudget: initialCanViewProjectBudget,
@@ -367,6 +397,10 @@ export default function ClientPortalOverview({
         .filter((inv) => inv.status === 'unpaid' || inv.status === 'overdue')
         .reduce((sum, inv) => sum + (parseFloat(inv.total_amount as string) || 0), 0);
 
+    const canViewBudget = canViewProjectBudget || canViewServiceBudget;
+    const totalUnpaid = kpi.total_unpaid ?? (kpi.total_pending + kpi.total_overdue);
+    const countUnpaid = kpi.count_unpaid ?? (kpi.count_pending + kpi.count_overdue);
+
     // Chart Data 1: Project Budget vs Paid Breakdown
     const projectInvestmentData = projectsList.map((proj) => {
         const projPaid = (proj.payments || [])
@@ -442,174 +476,150 @@ export default function ClientPortalOverview({
             <Head title={`${client.name} | Overview & Portal Dashboard`} />
             <div className="p-4 sm:p-6 w-full mx-auto space-y-6 min-h-screen">
 
-                {/* 1. Main High-Impact KPI Metric Cards Grid (4 Sleek & Compact Cards) */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                    {/* Card 1: Total Project Budget or Total Projects */}
-                    {canViewProjectBudget ? (
-                        <div className="bg-white dark:bg-slate-900 rounded-xl p-4 sm:p-4.5 border border-slate-200/80 dark:border-slate-800 shadow-2xs hover:shadow-md transition-all duration-200 space-y-2 relative overflow-hidden group">
-                            <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-blue-500 via-indigo-500 to-cyan-400" />
-                            <div className="flex items-center justify-between">
-                                <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400">Total Project Budget</span>
-                                <div className="size-8 rounded-lg bg-gradient-to-br from-blue-500 to-indigo-600 text-white flex items-center justify-center shadow-xs group-hover:scale-105 transition-transform">
-                                    <DollarSign className="size-4" />
-                                </div>
-                            </div>
+                {/* 1. Main High-Impact KPI Metric Cards Grid (Identical in Style & Clarity to Financial Reports Page) */}
+                {canViewBudget ? (
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        {/* Total Billed Volume */}
+                        <div className="p-4 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 shadow-xs flex items-center justify-between">
                             <div>
-                                <div className="text-lg sm:text-xl font-black text-slate-900 dark:text-white font-mono tracking-tight">
-                                    {formatCurrency(totalProjectBudget)}
-                                </div>
-                                <div className="text-[11px] text-slate-500 dark:text-slate-400 font-medium mt-1 flex items-center gap-1.5">
-                                    <FolderKanban className="size-3 text-blue-500 shrink-0" />
-                                    <span>{projectsList.length} Projects ({activeProjects.length} Active)</span>
-                                </div>
+                                <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400">
+                                    Total Billed Volume
+                                </p>
+                                <h3 className="text-lg font-black text-slate-900 dark:text-white mt-0.5">
+                                    <span className="text-xs font-bold text-slate-400 mr-1">{client.currency}</span>
+                                    {kpi.total_billed.toLocaleString('en-US', {
+                                        minimumFractionDigits: 2,
+                                        maximumFractionDigits: 2,
+                                    })}
+                                </h3>
+                                <p className="text-[10px] text-slate-400 font-semibold mt-1">
+                                    {kpi.count_all} records recorded
+                                </p>
+                            </div>
+                            <div className="size-11 rounded-2xl bg-blue-50 dark:bg-blue-950 text-blue-600 dark:text-blue-400 flex items-center justify-center shadow-2xs">
+                                <Receipt className="size-5" />
                             </div>
                         </div>
-                    ) : (
-                        <div className="bg-white dark:bg-slate-900 rounded-xl p-4 sm:p-4.5 border border-slate-200/80 dark:border-slate-800 shadow-2xs hover:shadow-md transition-all duration-200 space-y-2 relative overflow-hidden group">
-                            <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-blue-500 via-indigo-500 to-cyan-400" />
-                            <div className="flex items-center justify-between">
-                                <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400">Total Projects</span>
-                                <div className="size-8 rounded-lg bg-gradient-to-br from-blue-500 to-indigo-600 text-white flex items-center justify-center shadow-xs group-hover:scale-105 transition-transform">
-                                    <Globe className="size-4" />
-                                </div>
-                            </div>
-                            <div>
-                                <div className="text-lg sm:text-xl font-black text-slate-900 dark:text-white font-mono tracking-tight">
-                                    {projectsList.length}
-                                </div>
-                                <div className="text-[11px] text-slate-500 dark:text-slate-400 font-medium mt-1 flex items-center gap-1.5">
-                                    <FolderKanban className="size-3 text-blue-500 shrink-0" />
-                                    <span>All Client Workspaces</span>
-                                </div>
-                            </div>
-                        </div>
-                    )}
 
-                    {/* Card 2: Cleared Receipts or Active Projects */}
-                    {canViewProjectBudget ? (
-                        <div className="bg-white dark:bg-slate-900 rounded-xl p-4 sm:p-4.5 border border-slate-200/80 dark:border-slate-800 shadow-2xs hover:shadow-md transition-all duration-200 space-y-2 relative overflow-hidden group">
-                            <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-emerald-400 via-teal-500 to-emerald-600" />
-                            <div className="flex items-center justify-between">
-                                <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400">Cleared Funds</span>
-                                <div className="size-8 rounded-lg bg-gradient-to-br from-emerald-500 to-teal-600 text-white flex items-center justify-center shadow-xs group-hover:scale-105 transition-transform">
-                                    <BadgeDollarSign className="size-4" />
-                                </div>
-                            </div>
+                        {/* Total Paid Amount */}
+                        <div className="p-4 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 shadow-xs flex items-center justify-between">
                             <div>
-                                <div className="text-lg sm:text-xl font-black text-emerald-600 dark:text-emerald-400 font-mono tracking-tight">
-                                    {formatCurrency(totalProjectPaid)}
-                                </div>
-                                <div className="text-[11px] text-slate-500 dark:text-slate-400 font-medium mt-1 flex items-center gap-1.5">
-                                    <span className="px-1.5 py-0.2 rounded text-[10px] font-black bg-emerald-50 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800">
-                                        {paymentProgress}%
-                                    </span>
-                                    <span>Budget Received</span>
-                                </div>
+                                <p className="text-[11px] font-bold uppercase tracking-wider text-emerald-600 dark:text-emerald-400">
+                                    Total Paid Amount
+                                </p>
+                                <h3 className="text-lg font-black text-emerald-600 dark:text-emerald-400 mt-0.5">
+                                    <span className="text-xs font-bold opacity-70 mr-1">{client.currency}</span>
+                                    {kpi.total_paid.toLocaleString('en-US', {
+                                        minimumFractionDigits: 2,
+                                        maximumFractionDigits: 2,
+                                    })}
+                                </h3>
+                                <p className="text-[10px] text-emerald-700 dark:text-emerald-400 font-semibold mt-1">
+                                    {kpi.count_paid} settled payments
+                                </p>
+                            </div>
+                            <div className="size-11 rounded-2xl bg-emerald-50 dark:bg-emerald-950 text-emerald-600 dark:text-emerald-400 flex items-center justify-center shadow-2xs">
+                                <CheckCircle2 className="size-5" />
                             </div>
                         </div>
-                    ) : (
-                        <div className="bg-white dark:bg-slate-900 rounded-xl p-4 sm:p-4.5 border border-slate-200/80 dark:border-slate-800 shadow-2xs hover:shadow-md transition-all duration-200 space-y-2 relative overflow-hidden group">
-                            <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-purple-400 via-indigo-500 to-purple-600" />
-                            <div className="flex items-center justify-between">
-                                <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400">In Progress</span>
-                                <div className="size-8 rounded-lg bg-gradient-to-br from-purple-500 to-indigo-600 text-white flex items-center justify-center shadow-xs group-hover:scale-105 transition-transform">
-                                    <Clock className="size-4" />
-                                </div>
-                            </div>
-                            <div>
-                                <div className="text-lg sm:text-xl font-black text-purple-600 dark:text-purple-400 font-mono tracking-tight">
-                                    {activeProjects.length}
-                                </div>
-                                <div className="text-[11px] text-slate-500 dark:text-slate-400 font-medium mt-1 flex items-center gap-1.5">
-                                    <CheckCircle2 className="size-3 text-purple-500 shrink-0" />
-                                    <span>Active Project Deliveries</span>
-                                </div>
-                            </div>
-                        </div>
-                    )}
 
-                    {/* Card 3: Pending Balance or Completed Projects */}
-                    {canViewProjectBudget ? (
-                        <div className="bg-white dark:bg-slate-900 rounded-xl p-4 sm:p-4.5 border border-slate-200/80 dark:border-slate-800 shadow-2xs hover:shadow-md transition-all duration-200 space-y-2 relative overflow-hidden group">
-                            <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-amber-400 via-rose-500 to-orange-500" />
-                            <div className="flex items-center justify-between">
-                                <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400">Pending Balance</span>
-                                <div className="size-8 rounded-lg bg-gradient-to-br from-amber-500 to-rose-500 text-white flex items-center justify-center shadow-xs group-hover:scale-105 transition-transform">
-                                    <Receipt className="size-4" />
-                                </div>
-                            </div>
+                        {/* Total Unpaid Amount */}
+                        <div className="p-4 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 shadow-xs flex items-center justify-between">
                             <div>
-                                <div className="text-lg sm:text-xl font-black text-amber-600 dark:text-amber-400 font-mono tracking-tight">
-                                    {formatCurrency(pendingProjectBalance)}
-                                </div>
-                                <div className="text-[11px] text-slate-500 dark:text-slate-400 font-medium mt-1 flex items-center gap-1.5">
-                                    <Clock className="size-3 text-amber-500 shrink-0" />
-                                    <span>Upcoming Milestones</span>
-                                </div>
+                                <p className="text-[11px] font-bold uppercase tracking-wider text-amber-600 dark:text-amber-400">
+                                    Total Unpaid Amount
+                                </p>
+                                <h3 className="text-lg font-black text-amber-600 dark:text-amber-400 mt-0.5">
+                                    <span className="text-xs font-bold opacity-70 mr-1">{client.currency}</span>
+                                    {totalUnpaid.toLocaleString('en-US', {
+                                        minimumFractionDigits: 2,
+                                        maximumFractionDigits: 2,
+                                    })}
+                                </h3>
+                                <p className="text-[10px] text-amber-700 dark:text-amber-400 font-semibold mt-1">
+                                    {countUnpaid} items pending / due
+                                </p>
+                            </div>
+                            <div className="size-11 rounded-2xl bg-amber-50 dark:bg-amber-950 text-amber-600 dark:text-amber-400 flex items-center justify-center shadow-2xs">
+                                <Clock className="size-5" />
                             </div>
                         </div>
-                    ) : (
-                        <div className="bg-white dark:bg-slate-900 rounded-xl p-4 sm:p-4.5 border border-slate-200/80 dark:border-slate-800 shadow-2xs hover:shadow-md transition-all duration-200 space-y-2 relative overflow-hidden group">
-                            <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-emerald-400 via-teal-500 to-emerald-600" />
-                            <div className="flex items-center justify-between">
-                                <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400">Completed</span>
-                                <div className="size-8 rounded-lg bg-gradient-to-br from-emerald-500 to-teal-600 text-white flex items-center justify-center shadow-xs group-hover:scale-105 transition-transform">
-                                    <CheckCircle2 className="size-4" />
-                                </div>
-                            </div>
+                    </div>
+                ) : (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                        {/* Operational Card 1: Total Projects */}
+                        <div className="p-4 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 shadow-xs flex items-center justify-between">
                             <div>
-                                <div className="text-lg sm:text-xl font-black text-emerald-600 dark:text-emerald-400 font-mono tracking-tight">
-                                    {completedProjects.length}
-                                </div>
-                                <div className="text-[11px] text-slate-500 dark:text-slate-400 font-medium mt-1 flex items-center gap-1.5">
-                                    <CheckSquare className="size-3 text-emerald-500 shrink-0" />
-                                    <span>Finished Projects</span>
-                                </div>
+                                <p className="text-[11px] font-bold uppercase tracking-wider text-blue-600 dark:text-blue-400">
+                                    Total Projects
+                                </p>
+                                <h3 className="text-lg font-black text-slate-900 dark:text-white mt-0.5">
+                                    {projectsList.length} <span className="text-xs font-bold text-slate-400">Workspaces</span>
+                                </h3>
+                                <p className="text-[10px] text-slate-400 font-semibold mt-1">
+                                    {activeProjects.length} actively ongoing
+                                </p>
+                            </div>
+                            <div className="size-11 rounded-2xl bg-blue-50 dark:bg-blue-950 text-blue-600 dark:text-blue-400 flex items-center justify-center shadow-2xs">
+                                <Globe className="size-5" />
                             </div>
                         </div>
-                    )}
 
-                    {/* Card 4: Monthly Retainers or Total Services */}
-                    {canViewServiceBudget ? (
-                        <div className="bg-white dark:bg-slate-900 rounded-xl p-4 sm:p-4.5 border border-slate-200/80 dark:border-slate-800 shadow-2xs hover:shadow-md transition-all duration-200 space-y-2 relative overflow-hidden group">
-                            <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-cyan-400 via-teal-500 to-blue-500" />
-                            <div className="flex items-center justify-between">
-                                <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400">Monthly Run-Rate</span>
-                                <div className="size-8 rounded-lg bg-gradient-to-br from-cyan-500 to-blue-600 text-white flex items-center justify-center shadow-xs group-hover:scale-105 transition-transform">
-                                    <LineChart className="size-4" />
-                                </div>
-                            </div>
+                        {/* Operational Card 2: In Progress */}
+                        <div className="p-4 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 shadow-xs flex items-center justify-between">
                             <div>
-                                <div className="text-lg sm:text-xl font-black text-cyan-600 dark:text-cyan-400 font-mono tracking-tight">
-                                    {formatCurrency(totalServicesMonthly)} <span className="text-[11px] text-slate-400 font-normal">/ mo</span>
-                                </div>
-                                <div className="text-[11px] text-slate-500 dark:text-slate-400 font-medium mt-1 flex items-center gap-1.5">
-                                    <Zap className="size-3 text-cyan-500 shrink-0" />
-                                    <span>{activeServicesList.length} Active Services</span>
-                                </div>
+                                <p className="text-[11px] font-bold uppercase tracking-wider text-purple-600 dark:text-purple-400">
+                                    In Progress
+                                </p>
+                                <h3 className="text-lg font-black text-purple-600 dark:text-purple-400 mt-0.5">
+                                    {activeProjects.length} <span className="text-xs font-bold text-slate-400">Active</span>
+                                </h3>
+                                <p className="text-[10px] text-purple-700 dark:text-purple-400 font-semibold mt-1">
+                                    Active development deliveries
+                                </p>
+                            </div>
+                            <div className="size-11 rounded-2xl bg-purple-50 dark:bg-purple-950 text-purple-600 dark:text-purple-400 flex items-center justify-center shadow-2xs">
+                                <Clock className="size-5" />
                             </div>
                         </div>
-                    ) : (
-                        <div className="bg-white dark:bg-slate-900 rounded-xl p-4 sm:p-4.5 border border-slate-200/80 dark:border-slate-800 shadow-2xs hover:shadow-md transition-all duration-200 space-y-2 relative overflow-hidden group">
-                            <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-cyan-400 via-teal-500 to-blue-500" />
-                            <div className="flex items-center justify-between">
-                                <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400">Total Services</span>
-                                <div className="size-8 rounded-lg bg-gradient-to-br from-cyan-500 to-blue-600 text-white flex items-center justify-center shadow-xs group-hover:scale-105 transition-transform">
-                                    <Package className="size-4" />
-                                </div>
-                            </div>
+
+                        {/* Operational Card 3: Completed */}
+                        <div className="p-4 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 shadow-xs flex items-center justify-between">
                             <div>
-                                <div className="text-lg sm:text-xl font-black text-cyan-600 dark:text-cyan-400 font-mono tracking-tight">
-                                    {clientServicesList.length}
-                                </div>
-                                <div className="text-[11px] text-slate-500 dark:text-slate-400 font-medium mt-1 flex items-center gap-1.5">
-                                    <Zap className="size-3 text-cyan-500 shrink-0" />
-                                    <span>{activeServicesList.length} Active Services</span>
-                                </div>
+                                <p className="text-[11px] font-bold uppercase tracking-wider text-emerald-600 dark:text-emerald-400">
+                                    Completed
+                                </p>
+                                <h3 className="text-lg font-black text-emerald-600 dark:text-emerald-400 mt-0.5">
+                                    {completedProjects.length} <span className="text-xs font-bold text-slate-400">Finished</span>
+                                </h3>
+                                <p className="text-[10px] text-emerald-700 dark:text-emerald-400 font-semibold mt-1">
+                                    Delivered milestones
+                                </p>
+                            </div>
+                            <div className="size-11 rounded-2xl bg-emerald-50 dark:bg-emerald-950 text-emerald-600 dark:text-emerald-400 flex items-center justify-center shadow-2xs">
+                                <CheckCircle2 className="size-5" />
                             </div>
                         </div>
-                    )}
-                </div>
+
+                        {/* Operational Card 4: Active Services */}
+                        <div className="p-4 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 shadow-xs flex items-center justify-between">
+                            <div>
+                                <p className="text-[11px] font-bold uppercase tracking-wider text-cyan-600 dark:text-cyan-400">
+                                    Active Services
+                                </p>
+                                <h3 className="text-lg font-black text-slate-900 dark:text-white mt-0.5">
+                                    {activeServicesList.length} <span className="text-xs font-bold text-slate-400">Retainers</span>
+                                </h3>
+                                <p className="text-[10px] text-slate-400 font-semibold mt-1">
+                                    {clientServicesList.length} total subscribed
+                                </p>
+                            </div>
+                            <div className="size-11 rounded-2xl bg-cyan-50 dark:bg-cyan-950 text-cyan-600 dark:text-cyan-400 flex items-center justify-center shadow-2xs">
+                                <Package className="size-5" />
+                            </div>
+                        </div>
+                    </div>
+                )}
 
                 {/* 2. Category-Wise Financial & Operational Breakdown (Projects, Services, Domains, Hosting) */}
                 <div className="space-y-2.5">
@@ -629,24 +639,24 @@ export default function ClientPortalOverview({
                         {/* Projects Breakdown */}
                         <Link
                             href="/client-portal/reports?category=project"
-                            className="p-4 rounded-2xl border transition-all cursor-pointer shadow-xs bg-white dark:bg-slate-900 border-slate-200/80 dark:border-slate-800 hover:border-purple-300 dark:hover:border-purple-700 hover:shadow-md group block"
+                            className="p-4 rounded-2xl border transition-all cursor-pointer shadow-xs bg-white dark:bg-slate-900 border-slate-200/80 dark:border-slate-800 hover:border-purple-300 dark:hover:border-purple-700 hover:shadow-sm group block"
                         >
                             <div className="flex items-center justify-between">
                                 <span className="text-xs font-extrabold text-slate-900 dark:text-white flex items-center gap-1.5 group-hover:text-purple-600 dark:group-hover:text-purple-400 transition-colors">
                                     <FolderKanban className="size-4 text-purple-600" />
-                                    Website Projects
+                                    Project Milestones
                                 </span>
-                                <span className="text-[11px] font-extrabold text-slate-400 bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded-full">
-                                    {categoryBreakdown.project.count} {categoryBreakdown.project.count === 1 ? 'project' : 'projects'}
+                                <span className="text-[11px] font-extrabold text-slate-400">
+                                    {categoryBreakdown.project.count} {categoryBreakdown.project.count === 1 ? 'item' : 'items'}
                                 </span>
                             </div>
                             {canViewProjectBudget ? (
                                 <>
                                     <div className="mt-3 flex items-baseline justify-between">
-                                        <span className="text-xs text-slate-500">Total Budget:</span>
-                                        <span className="text-sm font-black text-slate-900 dark:text-white font-mono">
+                                        <span className="text-xs text-slate-500">Total:</span>
+                                        <span className="text-sm font-black text-slate-900 dark:text-white">
                                             {client.currency} {categoryBreakdown.project.total.toLocaleString('en-US', {
-                                                minimumFractionDigits: 0,
+                                                minimumFractionDigits: 2,
                                                 maximumFractionDigits: 2,
                                             })}
                                         </span>
@@ -670,14 +680,14 @@ export default function ClientPortalOverview({
                         {/* Services Breakdown */}
                         <Link
                             href="/client-portal/reports?category=service"
-                            className="p-4 rounded-2xl border transition-all cursor-pointer shadow-xs bg-white dark:bg-slate-900 border-slate-200/80 dark:border-slate-800 hover:border-emerald-300 dark:hover:border-emerald-700 hover:shadow-md group block"
+                            className="p-4 rounded-2xl border transition-all cursor-pointer shadow-xs bg-white dark:bg-slate-900 border-slate-200/80 dark:border-slate-800 hover:border-emerald-300 dark:hover:border-emerald-700 hover:shadow-sm group block"
                         >
                             <div className="flex items-center justify-between">
                                 <span className="text-xs font-extrabold text-slate-900 dark:text-white flex items-center gap-1.5 group-hover:text-emerald-600 dark:group-hover:text-emerald-400 transition-colors">
                                     <Layers className="size-4 text-emerald-600" />
                                     Subscriptions & Services
                                 </span>
-                                <span className="text-[11px] font-extrabold text-slate-400 bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded-full">
+                                <span className="text-[11px] font-extrabold text-slate-400">
                                     {categoryBreakdown.service.count} cycles
                                 </span>
                             </div>
@@ -685,9 +695,9 @@ export default function ClientPortalOverview({
                                 <>
                                     <div className="mt-3 flex items-baseline justify-between">
                                         <span className="text-xs text-slate-500">Total:</span>
-                                        <span className="text-sm font-black text-slate-900 dark:text-white font-mono">
+                                        <span className="text-sm font-black text-slate-900 dark:text-white">
                                             {client.currency} {categoryBreakdown.service.total.toLocaleString('en-US', {
-                                                minimumFractionDigits: 0,
+                                                minimumFractionDigits: 2,
                                                 maximumFractionDigits: 2,
                                             })}
                                         </span>
@@ -711,22 +721,22 @@ export default function ClientPortalOverview({
                         {/* Domains Breakdown */}
                         <Link
                             href="/client-portal/reports?category=domain"
-                            className="p-4 rounded-2xl border transition-all cursor-pointer shadow-xs bg-white dark:bg-slate-900 border-slate-200/80 dark:border-slate-800 hover:border-blue-300 dark:hover:border-blue-700 hover:shadow-md group block"
+                            className="p-4 rounded-2xl border transition-all cursor-pointer shadow-xs bg-white dark:bg-slate-900 border-slate-200/80 dark:border-slate-800 hover:border-blue-300 dark:hover:border-blue-700 hover:shadow-sm group block"
                         >
                             <div className="flex items-center justify-between">
                                 <span className="text-xs font-extrabold text-slate-900 dark:text-white flex items-center gap-1.5 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
                                     <Globe className="size-4 text-blue-600" />
                                     Domain Registrations
                                 </span>
-                                <span className="text-[11px] font-extrabold text-slate-400 bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded-full">
+                                <span className="text-[11px] font-extrabold text-slate-400">
                                     {categoryBreakdown.domain.count} records
                                 </span>
                             </div>
                             <div className="mt-3 flex items-baseline justify-between">
                                 <span className="text-xs text-slate-500">Total:</span>
-                                <span className="text-sm font-black text-slate-900 dark:text-white font-mono">
+                                <span className="text-sm font-black text-slate-900 dark:text-white">
                                     {client.currency} {categoryBreakdown.domain.total.toLocaleString('en-US', {
-                                        minimumFractionDigits: 0,
+                                        minimumFractionDigits: 2,
                                         maximumFractionDigits: 2,
                                     })}
                                 </span>
@@ -744,22 +754,22 @@ export default function ClientPortalOverview({
                         {/* Hostings Breakdown */}
                         <Link
                             href="/client-portal/reports?category=hosting"
-                            className="p-4 rounded-2xl border transition-all cursor-pointer shadow-xs bg-white dark:bg-slate-900 border-slate-200/80 dark:border-slate-800 hover:border-amber-300 dark:hover:border-amber-700 hover:shadow-md group block"
+                            className="p-4 rounded-2xl border transition-all cursor-pointer shadow-xs bg-white dark:bg-slate-900 border-slate-200/80 dark:border-slate-800 hover:border-amber-300 dark:hover:border-amber-700 hover:shadow-sm group block"
                         >
                             <div className="flex items-center justify-between">
                                 <span className="text-xs font-extrabold text-slate-900 dark:text-white flex items-center gap-1.5 group-hover:text-amber-600 dark:group-hover:text-amber-400 transition-colors">
                                     <Server className="size-4 text-amber-600" />
                                     Web Hostings
                                 </span>
-                                <span className="text-[11px] font-extrabold text-slate-400 bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded-full">
+                                <span className="text-[11px] font-extrabold text-slate-400">
                                     {categoryBreakdown.hosting.count} accounts
                                 </span>
                             </div>
                             <div className="mt-3 flex items-baseline justify-between">
                                 <span className="text-xs text-slate-500">Total:</span>
-                                <span className="text-sm font-black text-slate-900 dark:text-white font-mono">
+                                <span className="text-sm font-black text-slate-900 dark:text-white">
                                     {client.currency} {categoryBreakdown.hosting.total.toLocaleString('en-US', {
-                                        minimumFractionDigits: 0,
+                                        minimumFractionDigits: 2,
                                         maximumFractionDigits: 2,
                                     })}
                                 </span>

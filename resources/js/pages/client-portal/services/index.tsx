@@ -434,21 +434,21 @@ export default function ClientPortalServicesIndex({
                 {/* Services Table */}
                 <div className="rounded-xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 overflow-hidden shadow-xs w-full min-w-0">
                     <div className="w-full overflow-x-auto scrollbar-thin">
-                        <table className="w-full min-w-[850px] text-left text-xs">
+                        <table className="w-full min-w-[1050px] text-left text-xs">
                             <thead className="bg-slate-50 dark:bg-slate-800/60 text-slate-500 dark:text-slate-400 font-extrabold uppercase text-[10px] tracking-wider border-b border-slate-200 dark:border-slate-800">
                                 <tr>
-                                    <th className="px-4 py-4 whitespace-nowrap">Service & Category</th>
+                                    <th className="px-4 py-4 whitespace-nowrap min-w-[220px]">Service & Category</th>
                                     {canViewBudget && (
                                         <>
-                                            <th className="px-4 py-4 whitespace-nowrap">Monthly Fee & Duration</th>
-                                            <th className="px-4 py-4 whitespace-nowrap">Collected</th>
-                                            <th className="px-4 py-4 whitespace-nowrap">Due Amount</th>
+                                            <th className="px-4 py-4 whitespace-nowrap min-w-[160px]">Monthly Fee & Duration</th>
+                                            <th className="px-4 py-4 whitespace-nowrap min-w-[130px]">Collected</th>
+                                            <th className="px-4 py-4 whitespace-nowrap min-w-[130px]">Due Amount</th>
                                         </>
                                     )}
-                                    <th className="px-4 py-4 whitespace-nowrap">Due Day</th>
-                                    <th className="px-4 py-4 whitespace-nowrap">Start Date</th>
-                                    <th className="px-4 py-4 whitespace-nowrap">Status</th>
-                                    <th className="px-4 py-4 text-right whitespace-nowrap">Actions</th>
+                                    <th className="px-4 py-4 whitespace-nowrap min-w-[120px]">Due Day</th>
+                                    <th className="px-4 py-4 whitespace-nowrap min-w-[120px]">Start Date</th>
+                                    <th className="px-4 py-4 whitespace-nowrap min-w-[110px]">Status</th>
+                                    <th className="px-4 py-4 text-right whitespace-nowrap min-w-[80px]">Actions</th>
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-slate-100 dark:divide-slate-800">

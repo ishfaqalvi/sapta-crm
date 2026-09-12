@@ -182,7 +182,7 @@ export default function InvoicesShow({ invoice, companyInfo }: InvoicesShowProps
 
                     {/* Line Items Table */}
                     {(() => {
-                        const hasAnyRemainingCost = Boolean(invoice.items?.some((item) => Number(item.remaining_cost) > 0));
+                        const hasAnyRemainingCost = false; // Hidden for now per requirement
                         return (
                             <div className="rounded-2xl border border-slate-200/90 dark:border-slate-800 overflow-hidden">
                                 <table className="w-full text-left text-xs">

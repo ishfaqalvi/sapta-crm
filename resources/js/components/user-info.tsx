@@ -5,7 +5,7 @@ export function UserInfo({ user, showEmail = false }: { user: User; showEmail?: 
     const getInitials = useInitials();
 
     return (
-        <div className="flex items-center gap-3 w-full">
+        <div className="flex items-center gap-3 w-full group-data-[collapsible=icon]:gap-0 group-data-[collapsible=icon]:justify-center">
             <div className="relative size-9 rounded-xl bg-gradient-to-tr from-[#003796] via-[#0052D4] to-[#1d4ed8] text-white font-extrabold text-xs flex items-center justify-center shadow-xs overflow-hidden shrink-0 border border-white/20">
                 {user.avatar ? (
                     <img src={user.avatar} alt={user.name} className="size-full object-cover" />
@@ -14,7 +14,7 @@ export function UserInfo({ user, showEmail = false }: { user: User; showEmail?: 
                 )}
             </div>
 
-            <div className="grid flex-1 text-left text-xs leading-tight min-w-0">
+            <div className="grid flex-1 text-left text-xs leading-tight min-w-0 group-data-[collapsible=icon]:hidden">
                 <span className="truncate font-extrabold text-slate-900 dark:text-white text-sm">
                     {user.name}
                 </span>

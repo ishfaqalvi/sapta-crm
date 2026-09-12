@@ -356,9 +356,8 @@
     </table>
 
     @php
-        $hasRemainingCost = $invoice->items->contains(function($item) {
-            return ($item->remaining_cost ?? 0) > 0;
-        });
+        // Remaining Balance column hidden for now per requirement
+        $hasRemainingCost = false;
     @endphp
 
     <!-- Line Items Table -->

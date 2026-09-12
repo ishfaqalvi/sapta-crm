@@ -113,8 +113,8 @@ class QuotationController extends Controller
             'email' => $client->email ?: (auth()->user()?->email ?: ($lastClientQuotation?->company_email ?? '')),
             'whatsapp' => $client->mobile ?: ($client->phone ?: ($lastClientQuotation?->company_whatsapp ?? '')),
             'authorized_by_text' => $lastClientQuotation?->authorized_by_text ?: ('For, ' . ($client->company_name ?: $client->name)),
-            'logo_url' => $lastClientQuotation?->company_logo ?? null,
-            'signature_url' => $lastClientQuotation?->signature_image ?? null,
+            'logo_url' => null,
+            'signature_url' => null,
         ];
 
         return Inertia::render('client-portal/quotations/create', [
@@ -173,7 +173,6 @@ class QuotationController extends Controller
         ], [
             'quotation_number.required' => 'Quotation number is required.',
             'quotation_number.unique' => 'This quotation number has already been taken.',
-            'customer_name.required' => 'Recipient / Customer name is required.',
             'customer_email.email' => 'Please enter a valid customer email address.',
             'company_email.email' => 'Please enter a valid company email address.',
             'date.required' => 'Quotation issue date is required.',
@@ -390,7 +389,6 @@ class QuotationController extends Controller
         ], [
             'quotation_number.required' => 'Quotation number is required.',
             'quotation_number.unique' => 'This quotation number has already been taken.',
-            'customer_name.required' => 'Recipient / Customer name is required.',
             'customer_email.email' => 'Please enter a valid customer email address.',
             'company_email.email' => 'Please enter a valid company email address.',
             'date.required' => 'Quotation issue date is required.',

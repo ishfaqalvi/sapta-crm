@@ -12,6 +12,7 @@ import {
     CheckSquare,
     Coins,
     Database,
+    FileSpreadsheet,
     FileText,
     FolderKanban,
     Globe,
@@ -96,6 +97,12 @@ const rawNavGroups: PermissionNavGroup[] = [
     {
         title: 'Finance & Billing',
         items: [
+            {
+                title: 'Quotations',
+                url: '/quotations',
+                icon: FileSpreadsheet,
+                permission: 'view-quotations',
+            },
             {
                 title: 'Invoices & Billing',
                 url: '/invoices',
@@ -253,10 +260,15 @@ export function AppSidebar() {
 
     return (
         <Sidebar collapsible="icon" variant="inset" className="border-r border-slate-200/60 dark:border-slate-800/60 bg-white/80 dark:bg-slate-950/80 backdrop-blur-2xl">
-            <SidebarHeader className="p-4 border-b border-slate-100 dark:border-slate-800">
+            <SidebarHeader className="p-4 group-data-[collapsible=icon]:p-2 border-b border-slate-100 dark:border-slate-800 transition-all">
                 <SidebarMenu>
                     <SidebarMenuItem>
-                        <SidebarMenuButton size="lg" asChild className="hover:bg-slate-100 dark:hover:bg-slate-900 rounded-2xl transition-all">
+                        <SidebarMenuButton
+                            size="lg"
+                            asChild
+                            tooltip="Sapta CRM"
+                            className="hover:bg-slate-100 dark:hover:bg-slate-900 rounded-2xl transition-all group-data-[collapsible=icon]:!size-10 group-data-[collapsible=icon]:!p-0 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:mx-auto"
+                        >
                             <Link href="/dashboard" prefetch>
                                 <AppLogo />
                             </Link>
@@ -265,11 +277,11 @@ export function AppSidebar() {
                 </SidebarMenu>
             </SidebarHeader>
 
-            <SidebarContent className="px-1">
+            <SidebarContent className="px-1 group-data-[collapsible=icon]:px-0">
                 <NavMain groups={filteredNavGroups} />
             </SidebarContent>
 
-            <SidebarFooter className="p-3 border-t border-slate-100 dark:border-slate-800">
+            <SidebarFooter className="p-3 group-data-[collapsible=icon]:p-2 border-t border-slate-100 dark:border-slate-800 transition-all">
                 <NavUser />
             </SidebarFooter>
         </Sidebar>

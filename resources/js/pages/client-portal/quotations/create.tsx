@@ -131,13 +131,13 @@ export default function QuotationCreate({
         company_address: initialCompanyAddress,
         company_email: initialCompanyEmail,
         company_whatsapp: initialCompanyWhatsapp,
-        existing_company_logo: defaultCompany?.logo_url || '',
+        existing_company_logo: '',
         company_logo: null,
-        existing_signature_image: defaultCompany?.signature_url || '',
+        existing_signature_image: '',
         signature_image: null,
         greeting: 'Dear Sir/Madam,',
-        opening_text: 'In case of any queries, kindly get in touch with us. Thank you and I look forward to hearing from you.',
-        closing_text: "We thank you for providing us with an opportunity to submit our quotation for shifting your home furniture and appliances. Our prices are reasonable; our staff are professional and well trained to handle all your stuff and equipment's with care. Please find the complete details and expenses to cover this operation.",
+        opening_text: "We thank you for providing us with an opportunity to submit our quotation for shifting your home furniture and appliances. Our prices are reasonable; our staff are professional and well trained to handle all your stuff and equipment's with care. Please find the complete details and expenses to cover this operation.",
+        closing_text: 'In case of any queries, kindly get in touch with us. Thank you and I look forward to hearing from you.',
         tax_rate: '',
         discount: '',
         date: new Date().toISOString().split('T')[0],
@@ -150,8 +150,8 @@ export default function QuotationCreate({
     });
 
     const [showCompanyDetails, setShowCompanyDetails] = useState(true);
-    const [companyLogoPreview, setCompanyLogoPreview] = useState<string | null>(defaultCompany?.logo_url || null);
-    const [signaturePreview, setSignaturePreview] = useState<string | null>(defaultCompany?.signature_url || null);
+    const [companyLogoPreview, setCompanyLogoPreview] = useState<string | null>(null);
+    const [signaturePreview, setSignaturePreview] = useState<string | null>(null);
 
     const handleResetCompanyToProfile = () => {
         setData((prev) => ({
@@ -162,13 +162,13 @@ export default function QuotationCreate({
             company_email: initialCompanyEmail,
             company_whatsapp: initialCompanyWhatsapp,
             authorized_by_text: initialAuthorizedBy,
-            existing_company_logo: defaultCompany?.logo_url || '',
+            existing_company_logo: '',
             company_logo: null,
-            existing_signature_image: defaultCompany?.signature_url || '',
+            existing_signature_image: '',
             signature_image: null,
         }));
-        setCompanyLogoPreview(defaultCompany?.logo_url || null);
-        setSignaturePreview(defaultCompany?.signature_url || null);
+        setCompanyLogoPreview(null);
+        setSignaturePreview(null);
     };
 
     const handleLogoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -438,10 +438,10 @@ export default function QuotationCreate({
                             </div>
                             <div>
                                 <h2 className="text-sm font-extrabold text-slate-900 dark:text-white">
-                                    Recipient Information
+                                    Recipient Information <span className="text-slate-400 font-normal text-xs normal-case">(Optional)</span>
                                 </h2>
                                 <p className="text-[11px] text-slate-400 font-medium">
-                                    Client and contact recipient details
+                                    Client and contact recipient details (all fields optional)
                                 </p>
                             </div>
                         </div>
@@ -450,7 +450,7 @@ export default function QuotationCreate({
                             {/* Prefix */}
                             <div>
                                 <label className="block text-xs font-extrabold text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-2">
-                                    Prefix
+                                    Prefix <span className="text-slate-400 font-normal normal-case">(Optional)</span>
                                 </label>
                                 <input
                                     type="text"
@@ -485,7 +485,7 @@ export default function QuotationCreate({
                             {/* Phone */}
                             <div>
                                 <label className="block text-xs font-extrabold text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-2">
-                                    Contact Phone
+                                    Contact Phone <span className="text-slate-400 font-normal normal-case">(Optional)</span>
                                 </label>
                                 <input
                                     type="text"
@@ -506,7 +506,7 @@ export default function QuotationCreate({
                             {/* Email */}
                             <div>
                                 <label className="block text-xs font-extrabold text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-2">
-                                    Email Address
+                                    Email Address <span className="text-slate-400 font-normal normal-case">(Optional)</span>
                                 </label>
                                 <input
                                     type="email"
@@ -528,7 +528,7 @@ export default function QuotationCreate({
                         {/* Customer Address */}
                         <div className="pt-2">
                             <label className="block text-xs font-extrabold text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-2">
-                                Recipient Address
+                                Recipient Address <span className="text-slate-400 font-normal normal-case">(Optional)</span>
                             </label>
                             <input
                                 type="text"
@@ -730,7 +730,7 @@ export default function QuotationCreate({
                                     rows={2}
                                     value={data.opening_text}
                                     onChange={(e) => setData('opening_text', e.target.value)}
-                                    placeholder="In case of any queries, kindly get in touch with us. Thank you and I look forward to hearing from you."
+                                    placeholder="We thank you for providing us with an opportunity to submit our quotation for shifting your home furniture and appliances. Our prices are reasonable; our staff are professional and well trained to handle all your stuff and equipment's with care. Please find the complete details and expenses to cover this operation."
                                     className="w-full px-4 py-2.5 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-xs font-medium text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:border-blue-600 transition-all"
                                 />
                                 {errors.opening_text && (
@@ -866,7 +866,7 @@ export default function QuotationCreate({
                                     rows={3}
                                     value={data.closing_text}
                                     onChange={(e) => setData('closing_text', e.target.value)}
-                                    placeholder="We thank you for providing us with an opportunity to submit our quotation for shifting your home furniture and appliances. Our prices are reasonable; our staff are professional and well trained to handle all your stuff and equipment's with care. Please find the complete details and expenses to cover this operation."
+                                    placeholder="In case of any queries, kindly get in touch with us. Thank you and I look forward to hearing from you."
                                     className="w-full px-4 py-2.5 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-xs font-medium text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:border-blue-600 transition-all"
                                 />
                                 {errors.closing_text && (
